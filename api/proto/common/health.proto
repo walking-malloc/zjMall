@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package common.v1;
+
+option go_package = "zjMall/api/proto/gen/go/common/v1;commonv1";
+
+import "google/api/annotations.proto";
+
+// 健康检查服务
+service HealthService {
+  // 健康检查
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/healthz"
+    };
+  }
+}
+
+// 健康检查请求
+message HealthCheckRequest {
+  string service = 1; // 服务名称（可选）
+}
+
+// 健康检查响应
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+  }
+  ServingStatus status = 1;
+  string message = 2; // 状态消息
+}
+

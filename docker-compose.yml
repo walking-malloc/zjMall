@@ -1,0 +1,69 @@
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: zjmall-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: zjmall
+      MYSQL_USER: zjmall
+      MYSQL_PASSWORD: zjmall123
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./deploy/mysql/init:/docker-entrypoint-initdb.d  # 初始化SQL脚本目录
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    networks:
+      - zjmall-network
+
+  # Redis缓存
+  redis:
+    image: redis:7.2-alpine
+    container_name: zjmall-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass redis123
+    restart: unless-stopped
+    networks:
+      - zjmall-network
+
+  # Nacos注册中心（可选，如果暂时不用可以注释掉）
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: zjmall-nacos
+    environment:
+      - MODE=standalone
+      - NACOS_AUTH_ENABLE=false
+      - SPRING_DATASOURCE_PLATFORM=mysql
+      - MYSQL_SERVICE_HOST=mysql
+      - MYSQL_SERVICE_PORT=3306
+      - MYSQL_SERVICE_DB=nacos_config
+      - MYSQL_SERVICE_USER=root
+      - MYSQL_SERVICE_PASSWORD=root123456
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    depends_on:
+      - mysql
+    restart: unless-stopped
+    networks:
+      - zjmall-network
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  zjmall-network:
+    driver: bridge
+

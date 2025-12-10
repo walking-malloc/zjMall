@@ -1,0 +1,417 @@
+syntax = "proto3";
+
+package user.v1;
+
+option go_package = "zjMall/api/proto/gen/go/user/v1;userv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+import "google/api/annotations.proto";
+
+// 用户服务
+service UserService {
+  // 用户注册
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/register"
+      body: "*"
+    };
+  }
+  
+  // 密码登录
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/login"
+      body: "*"
+    };
+  }
+  
+  // 验证码登录
+  rpc LoginBySMS(LoginBySMSRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/login-by-sms"
+      body: "*"
+    };
+  }
+  
+  // 登出
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/logout"
+      body: "*"
+    };
+  }
+  
+  // 获取短信验证码
+  rpc GetSMSCode(GetSMSCodeRequest) returns (GetSMSCodeResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/sms-code"
+      body: "*"
+    };
+  }
+  
+  // 查询用户信息
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}"
+    };
+  }
+  
+  // 更新用户信息
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/users/{user_id}"
+      body: "*"
+    };
+  }
+  
+  // 查询用户状态
+  rpc GetUserStatus(GetUserStatusRequest) returns (GetUserStatusResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}/status"
+    };
+  }
+  
+  // 添加收货地址
+  rpc CreateAddress(CreateAddressRequest) returns (CreateAddressResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/{user_id}/addresses"
+      body: "*"
+    };
+  }
+  
+  // 查询收货地址列表
+  rpc ListAddresses(ListAddressesRequest) returns (ListAddressesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}/addresses"
+    };
+  }
+  
+  // 查询单个收货地址
+  rpc GetAddress(GetAddressRequest) returns (GetAddressResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}/addresses/{address_id}"
+    };
+  }
+  
+  // 更新收货地址
+  rpc UpdateAddress(UpdateAddressRequest) returns (UpdateAddressResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/users/{user_id}/addresses/{address_id}"
+      body: "*"
+    };
+  }
+  
+  // 删除收货地址
+  rpc DeleteAddress(DeleteAddressRequest) returns (DeleteAddressResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/users/{user_id}/addresses/{address_id}"
+    };
+  }
+  
+  // 设置默认地址
+  rpc SetDefaultAddress(SetDefaultAddressRequest) returns (SetDefaultAddressResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/users/{user_id}/addresses/{address_id}/default"
+      body: "*"
+    };
+  }
+  
+  // 修改密码
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/users/{user_id}/password"
+      body: "*"
+    };
+  }
+  
+  // 绑定/更换手机号
+  rpc BindPhone(BindPhoneRequest) returns (BindPhoneResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/users/{user_id}/phone"
+      body: "*"
+    };
+  }
+}
+
+// ========== 通用响应结构 ==========
+
+// 统一响应格式
+message Response {
+  int32 code = 1;                    // 错误码，0表示成功
+  string message = 2;                // 响应消息
+  google.protobuf.Any data = 3;      // 响应数据（使用Any类型支持不同数据类型）
+}
+
+// ========== 用户注册登录 ==========
+
+// 注册请求
+message RegisterRequest {
+  string phone = 1;        // 手机号
+  string sms_code = 2;      // 短信验证码
+  string password = 3;     // 密码
+  string confirm_password = 4; // 确认密码
+}
+
+// 注册响应数据
+message RegisterData {
+  UserInfo user = 1;       // 用户信息
+  string token = 2;        // 登录Token
+}
+
+// 注册响应
+message RegisterResponse {
+  int32 code = 1;
+  string message = 2;
+  RegisterData data = 3;
+}
+
+// 密码登录请求
+message LoginRequest {
+  string phone = 1;        // 手机号
+  string password = 2;     // 密码
+  bool remember_me = 3;    // 记住我（延长Token有效期）
+}
+
+// 验证码登录请求
+message LoginBySMSRequest {
+  string phone = 1;        // 手机号
+  string sms_code = 2;     // 短信验证码
+}
+
+// 登录响应数据
+message LoginData {
+  UserInfo user = 1;       // 用户信息
+  string token = 2;        // 登录Token
+  int64 expires_at = 3;    // Token过期时间（时间戳）
+}
+
+// 登录响应
+message LoginResponse {
+  int32 code = 1;
+  string message = 2;
+  LoginData data = 3;
+}
+
+// 登出请求
+message LogoutRequest {
+  string token = 1;        // Token（可选，可以从header获取）
+}
+
+// 登出响应（无数据）
+message LogoutResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 获取短信验证码请求
+message GetSMSCodeRequest {
+  string phone = 1;        // 手机号
+  string type = 2;         // 类型：register/login/bind
+}
+
+// 获取短信验证码响应（无数据）
+message GetSMSCodeResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// ========== 用户信息 ==========
+
+// 用户信息
+message UserInfo {
+  int64 id = 1;            // 用户ID
+  string phone = 2;        // 手机号（脱敏）
+  string nickname = 3;     // 昵称
+  string avatar = 4;       // 头像URL
+  string email = 5;        // 邮箱
+  int32 gender = 6;        // 性别：0-未设置，1-男，2-女
+  string birthday = 7;     // 生日（YYYY-MM-DD）
+  int32 status = 8;        // 状态：1-正常，2-已锁定，3-已注销
+  google.protobuf.Timestamp created_at = 9;  // 注册时间
+  google.protobuf.Timestamp last_login_at = 10; // 最后登录时间
+}
+
+// 查询用户信息请求
+message GetUserRequest {
+  int64 user_id = 1;       // 用户ID
+}
+
+// 查询用户信息响应
+message GetUserResponse {
+  int32 code = 1;
+  string message = 2;
+  UserInfo data = 3;
+}
+
+// 更新用户信息请求
+message UpdateUserRequest {
+  int64 user_id = 1;       // 用户ID
+  string nickname = 2;     // 昵称（可选）
+  string avatar = 3;       // 头像URL（可选）
+  string email = 4;        // 邮箱（可选）
+  int32 gender = 5;        // 性别（可选）
+  string birthday = 6;     // 生日（可选）
+}
+
+// 更新用户信息响应
+message UpdateUserResponse {
+  int32 code = 1;
+  string message = 2;
+  UserInfo data = 3;
+}
+
+// 查询用户状态请求
+message GetUserStatusRequest {
+  int64 user_id = 1;       // 用户ID
+}
+
+// 用户状态数据
+message UserStatusData {
+  int32 status = 1;        // 状态：1-正常，2-已锁定，3-已注销
+}
+
+// 查询用户状态响应
+message GetUserStatusResponse {
+  int32 code = 1;
+  string message = 2;
+  UserStatusData data = 3;
+}
+
+// ========== 收货地址 ==========
+
+// 收货地址
+message Address {
+  int64 id = 1;            // 地址ID
+  int64 user_id = 2;       // 用户ID
+  string receiver_name = 3; // 收货人姓名
+  string receiver_phone = 4; // 收货人手机号
+  string province = 5;     // 省份
+  string city = 6;         // 城市
+  string district = 7;     // 区县
+  string detail = 8;       // 详细地址
+  string postal_code = 9;  // 邮政编码
+  bool is_default = 10;     // 是否默认地址
+  google.protobuf.Timestamp created_at = 11;  // 创建时间
+  google.protobuf.Timestamp updated_at = 12;  // 更新时间
+}
+
+// 添加收货地址请求
+message CreateAddressRequest {
+  int64 user_id = 1;       // 用户ID
+  string receiver_name = 2; // 收货人姓名
+  string receiver_phone = 3; // 收货人手机号
+  string province = 4;     // 省份
+  string city = 5;         // 城市
+  string district = 6;     // 区县
+  string detail = 7;       // 详细地址
+  string postal_code = 8;  // 邮政编码（可选）
+  bool is_default = 9;     // 是否设为默认地址
+}
+
+// 添加收货地址响应
+message CreateAddressResponse {
+  int32 code = 1;
+  string message = 2;
+  Address data = 3;
+}
+
+// 查询收货地址列表请求
+message ListAddressesRequest {
+  int64 user_id = 1;       // 用户ID
+}
+
+// 查询收货地址列表响应
+message ListAddressesResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated Address data = 3; // 地址列表
+}
+
+// 查询单个收货地址请求
+message GetAddressRequest {
+  int64 user_id = 1;       // 用户ID
+  int64 address_id = 2;    // 地址ID
+}
+
+// 查询单个收货地址响应
+message GetAddressResponse {
+  int32 code = 1;
+  string message = 2;
+  Address data = 3;
+}
+
+// 更新收货地址请求
+message UpdateAddressRequest {
+  int64 user_id = 1;       // 用户ID
+  int64 address_id = 2;    // 地址ID
+  string receiver_name = 3; // 收货人姓名（可选）
+  string receiver_phone = 4; // 收货人手机号（可选）
+  string province = 5;     // 省份（可选）
+  string city = 6;         // 城市（可选）
+  string district = 7;     // 区县（可选）
+  string detail = 8;       // 详细地址（可选）
+  string postal_code = 9;  // 邮政编码（可选）
+  bool is_default = 10;    // 是否设为默认地址（可选）
+}
+
+// 更新收货地址响应
+message UpdateAddressResponse {
+  int32 code = 1;
+  string message = 2;
+  Address data = 3;
+}
+
+// 删除收货地址请求
+message DeleteAddressRequest {
+  int64 user_id = 1;       // 用户ID
+  int64 address_id = 2;    // 地址ID
+}
+
+// 删除收货地址响应（无数据）
+message DeleteAddressResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 设置默认地址请求
+message SetDefaultAddressRequest {
+  int64 user_id = 1;       // 用户ID
+  int64 address_id = 2;    // 地址ID
+}
+
+// 设置默认地址响应（无数据）
+message SetDefaultAddressResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// ========== 账号安全 ==========
+
+// 修改密码请求
+message ChangePasswordRequest {
+  int64 user_id = 1;       // 用户ID
+  string old_password = 2; // 旧密码
+  string new_password = 3; // 新密码
+  string confirm_password = 4; // 确认新密码
+}
+
+// 修改密码响应（无数据）
+message ChangePasswordResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 绑定/更换手机号请求
+message BindPhoneRequest {
+  int64 user_id = 1;       // 用户ID
+  string new_phone = 2;    // 新手机号
+  string new_sms_code = 3; // 新手机号验证码
+  string old_sms_code = 4; // 旧手机号验证码
+}
+
+// 绑定/更换手机号响应（无数据）
+message BindPhoneResponse {
+  int32 code = 1;
+  string message = 2;
+}
