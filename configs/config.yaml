@@ -4,3 +4,32 @@ services:
       port: 50051
     http:
       port: 8080
+  user-service:
+    grpc:
+      port: 50052
+    http:
+      port: 8081
+
+mysql:
+  host: 47.95.221.177
+  port: 3306
+  username: root
+  password: root123456
+  db_name: zj_mall
+  charset: utf8mb4
+  parseTime: true
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 30m
+  conn_max_idle_time: 10m
+
+redis:
+  host: 47.95.221.177
+  port: 6379
+  password: ""
+  db: 0
+  poolSize: 10 
+  minIdleConns: 5            # 最小空闲连接数
+  dialTimeout: 5              # 连接超时（秒）
+  readTimeout: 3             # 读取超时（秒）
+  writeTimeout: 3            # 写入超时（秒）
