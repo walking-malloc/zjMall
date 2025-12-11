@@ -13,6 +13,7 @@ import (
 	"time"
 	commonv1 "zjMall/gen/go/api/proto/common"
 	"zjMall/internal/common/handler"
+	"zjMall/internal/common/middleware"
 	"zjMall/internal/config"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -42,17 +43,6 @@ func main() {
 
 	// 启动 gRPC 服务器（在 goroutine 中，避免阻塞）
 	grpcAddr := fmt.Sprintf(":%d", serviceCfg.GRPC.Port)
-	grpcLis, err := net.Listen("tcp", grpcAddr)
-	if err != nil {
-		log.Fatalf("failed to listen on %s: %v", grpcAddr, err)
-	}
-
-	go func() {
-		log.Printf("gRPC server listening on %s", grpcAddr)
-		if err := grpcServer.Serve(grpcLis); err != nil {
-			log.Fatalf("failed to serve gRPC: %v", err)
-		}
-	}()
 
 	//创建http服务器
 	ctx := context.Background()
@@ -75,15 +65,43 @@ func main() {
 		log.Fatalf("failed to register gateway: %v", err)
 	}
 
+	handler := middleware.Chain(
+		middleware.Recovery(),
+		middleware.CORS(middleware.DefaultCORSConfig()),
+		middleware.TraceID(),
+		middleware.Logging(),
+	)(mux)
+
 	// 启动 HTTP 服务器
 	httpAddr := fmt.Sprintf(":%d", serviceCfg.HTTP.Port)
 	httpServer := &http.Server{
 		Addr:         httpAddr,
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+	startGRPCServer(grpcServer, grpcAddr)
+	startHTTPServer(httpServer, httpAddr)
+	gracefulShutdown(httpServer, grpcServer)
+
+}
+
+func startGRPCServer(grpcServer *grpc.Server, grpcAddr string) {
+	grpcLis, err := net.Listen("tcp", grpcAddr)
+	if err != nil {
+		log.Fatalf("failed to listen on %s: %v", grpcAddr, err)
+	}
+
+	go func() {
+		log.Printf("gRPC server listening on %s", grpcAddr)
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Fatalf("failed to serve gRPC: %v", err)
+		}
+	}()
+}
+
+func startHTTPServer(httpServer *http.Server, httpAddr string) {
 	go func() {
 		log.Printf("HTTP server listening on %s", httpAddr)
 		log.Printf("Try: http://localhost%s/healthz", httpAddr)
@@ -92,7 +110,9 @@ func main() {
 			log.Fatalf("failed to serve HTTP: %v", err)
 		}
 	}()
+}
 
+func gracefulShutdown(httpServer *http.Server, grpcServer *grpc.Server) {
 	signChan := make(chan os.Signal, 1)
 	signal.Notify(signChan, syscall.SIGINT, syscall.SIGTERM) //当收到SIGINT（Ctrl+C）或SIGTERM（终止信号（通常是系统关闭、K8s 停止容器时发送））信号时，关闭服务器
 	<-signChan
@@ -113,6 +133,5 @@ func main() {
 	grpcServer.GracefulStop()
 	log.Println("gRPC 服务器已关闭")
 
-	log.Println("所有服务器已优雅关闭")
-
+	log.Println("所有服务器已关闭")
 }
