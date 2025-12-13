@@ -16,6 +16,8 @@ type CacheRepository interface {
 	Exists(ctx context.Context, key string) (bool, error)
 	SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) (bool, error)
 	Expire(ctx context.Context, key string, expiration time.Duration) error
+	GetInt(ctx context.Context, key string) (int64, error)
+	Incr(ctx context.Context, key string) error
 }
 
 // RedisCacheRepository Redis 缓存仓库实现
@@ -59,4 +61,12 @@ func (r *RedisCacheRepository) SetNX(ctx context.Context, key string, value inte
 // Expire 设置过期时间
 func (r *RedisCacheRepository) Expire(ctx context.Context, key string, expiration time.Duration) error {
 	return r.client.Expire(ctx, key, expiration).Err()
+}
+
+func (r *RedisCacheRepository) GetInt(ctx context.Context, key string) (int64, error) {
+	return r.client.Get(ctx, key).Int64()
+}
+
+func (r *RedisCacheRepository) Incr(ctx context.Context, key string) error {
+	return r.client.Incr(ctx, key).Err()
 }

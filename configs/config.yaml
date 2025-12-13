@@ -15,7 +15,7 @@ mysql:
   port: 3306
   username: root
   password: root123456
-  db_name: zj_mall
+  db_name: zjmall
   charset: utf8mb4
   parseTime: true
   max_idle_conns: 10
@@ -26,10 +26,16 @@ mysql:
 redis:
   host: 47.95.221.177
   port: 6379
-  password: ""
+  password: "redis123"
   db: 0
   poolSize: 10 
   minIdleConns: 5            # 最小空闲连接数
   dialTimeout: 5              # 连接超时（秒）
   readTimeout: 3             # 读取超时（秒）
   writeTimeout: 3            # 写入超时（秒）
+
+sms:
+  code_length: 6
+  expire_time: 300
+  send_interval: 60
+  max_send_count: 20

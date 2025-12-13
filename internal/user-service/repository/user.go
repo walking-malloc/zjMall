@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 	"zjMall/internal/common/cache"
 	"zjMall/internal/user-service/model"
@@ -15,6 +16,12 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, user *model.User) error
 	GetUserByID(ctx context.Context, id int64) (*model.User, error)
 	GetUserByPhone(ctx context.Context, phone string) (*model.User, error)
+
+	//短信验证码相关操作
+	SetSMSCode(ctx context.Context, phone, code string, expiration time.Duration) error
+	GetSMSCode(ctx context.Context, phone string) (string, error)
+	DeleteSMSCode(ctx context.Context, phone string) error
+	CheckSMSCodeRateLimit(ctx context.Context, phone string, interval int64, dailyLimit int64) error
 }
 
 type userRepository struct {
@@ -103,4 +110,47 @@ func (r *userRepository) setToCache(ctx context.Context, key string, user *model
 	}
 
 	r.cacheRepo.Set(ctx, key, data, expiration)
+}
+
+// 设置短信验证码
+func (r *userRepository) SetSMSCode(ctx context.Context, phone, code string, expiration time.Duration) error {
+	key := fmt.Sprintf("user:sms:code:%s", phone)
+	return r.cacheRepo.Set(ctx, key, code, expiration)
+}
+
+// 获取短信验证码
+func (r *userRepository) GetSMSCode(ctx context.Context, phone string) (string, error) {
+	key := fmt.Sprintf("user:sms:code:%s", phone)
+	log.Printf("GetSMSCode %s:%v", key, phone)
+	return r.cacheRepo.Get(ctx, key)
+}
+
+// 删除短信验证码
+func (r *userRepository) DeleteSMSCode(ctx context.Context, phone string) error {
+	key := fmt.Sprintf("user:sms:code:%s", phone)
+	log.Printf("DeleteSMSCode %s:%v", key, phone)
+	return r.cacheRepo.Delete(ctx, key)
+}
+
+func (r *userRepository) CheckSMSCodeRateLimit(ctx context.Context, phone string, interval int64, dailyLimit int64) error {
+	rateKey := fmt.Sprintf("user:sms:rate:%s", phone)
+	ok, _ := r.cacheRepo.SetNX(ctx, rateKey, 1, time.Duration(interval)*time.Second) //如果key存在，表示在interval秒内已经发送过短信验证码
+	if !ok {
+		return fmt.Errorf("短信验证码发送频率过高，请%d秒后再试", interval)
+	}
+
+	//每日发送次数检查
+	today := time.Now().Format("2006-01-02")
+	countKey := fmt.Sprintf("user:sms:count:%s:%s", phone, today)
+	count, _ := r.cacheRepo.GetInt(ctx, countKey)
+	if count >= dailyLimit {
+		return fmt.Errorf("短信验证码发送次数过多，请明日再试")
+	}
+
+	if count == 0 {
+		r.cacheRepo.Set(ctx, countKey, 1, 24*time.Hour)
+	} else {
+		r.cacheRepo.Incr(ctx, countKey)
+	}
+	return nil
 }

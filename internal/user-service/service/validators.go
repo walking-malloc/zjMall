@@ -53,3 +53,20 @@ func (l *LoginRequestValidator) Validate() error {
 	}
 	return nil
 }
+
+type GetSMSCodeRequestValidator struct {
+	Phone string `validate:"required,phone" label:"手机号"`
+}
+
+func NewGetSMSCodeRequestValidator(req *userv1.GetSMSCodeRequest) *GetSMSCodeRequestValidator {
+	return &GetSMSCodeRequestValidator{
+		Phone: req.Phone,
+	}
+}
+
+func (g *GetSMSCodeRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(g); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}

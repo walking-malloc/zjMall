@@ -11,12 +11,12 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
-	commonv1 "zjMall/gen/go/api/proto/common"
 	userv1 "zjMall/gen/go/api/proto/user"
 	"zjMall/internal/common/cache"
 	"zjMall/internal/common/middleware"
 	"zjMall/internal/config"
 	"zjMall/internal/database"
+	"zjMall/internal/sms"
 	"zjMall/internal/user-service/handler"
 	"zjMall/internal/user-service/repository"
 	"zjMall/internal/user-service/service"
@@ -56,11 +56,16 @@ func main() {
 	// 5. 创建通用的缓存仓库（所有服务共享）
 	baseCacheRepo := cache.NewCacheRepository(redisClient)
 
-	// 6. 创建用户仓库（
+	// 6. 创建用户仓库
 	userRepo := repository.NewUserRepository(db, baseCacheRepo)
 
-	// 7. 创建Service
-	userService := service.NewUserService(userRepo)
+	// 7. 获取短信配置并创建短信客户端（Mock）
+	smsConfig := config.GetSMSConfig()
+	smsClient := sms.NewMockSMSClient()
+	log.Println("✅ 使用 Mock 短信服务（学习模式）")
+
+	// 8. 创建Service
+	userService := service.NewUserService(userRepo, smsClient, *smsConfig)
 
 	//7.创建Handler
 	userServiceHandler := handler.NewUserServiceHandler(userService)
@@ -93,12 +98,12 @@ func main() {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 
-	// 注册 HTTP 网关处理器
-	err = commonv1.RegisterHealthServiceHandlerFromEndpoint(
+	// 注册用户服务的 HTTP 网关处理器
+	err = userv1.RegisterUserServiceHandlerFromEndpoint(
 		ctx, mux, grpcAddr, opts,
 	)
 	if err != nil {
-		log.Fatalf("failed to register gateway: %v", err)
+		log.Fatalf("failed to register user service gateway: %v", err)
 	}
 
 	handler := middleware.Chain(

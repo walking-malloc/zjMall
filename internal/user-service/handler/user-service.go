@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	userv1 "zjMall/gen/go/api/proto/user"
 	"zjMall/internal/user-service/service"
 )
@@ -14,4 +15,8 @@ func NewUserServiceHandler(userService *service.UserService) *UserServiceHandler
 	return &UserServiceHandler{
 		userService: userService, // 初始化 service
 	}
+}
+
+func (h *UserServiceHandler) GetSMSCode(ctx context.Context, req *userv1.GetSMSCodeRequest) (*userv1.GetSMSCodeResponse, error) {
+	return h.userService.GetSMSCode(ctx, req)
 }

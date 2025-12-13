@@ -43,10 +43,17 @@ type RedisConfig struct {
 	ReadTimeout  int    `yaml:"readTimeout"`
 	WriteTimeout int    `yaml:"writeTimeout"`
 }
+type SMSConfig struct {
+	CodeLength   int `yaml:"code_length"`
+	ExpireTime   int `yaml:"expire_time"`
+	SendInterval int `yaml:"send_interval"`
+	MaxSendCount int `yaml:"max_send_count"`
+}
 type Config struct {
 	Services map[string]ServiceConfig `yaml:"services"`
 	MySQL    DatabaseConfig           `yaml:"mysql"`
 	Redis    RedisConfig              `yaml:"redis"`
+	SMS      SMSConfig                `yaml:"sms"`
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -79,4 +86,8 @@ func (c *Config) GetMySQLConfig() *DatabaseConfig {
 
 func (c *Config) GetRedisConfig() *RedisConfig {
 	return &c.Redis
+}
+
+func (c *Config) GetSMSConfig() *SMSConfig {
+	return &c.SMS
 }

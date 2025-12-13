@@ -207,7 +207,6 @@ message LogoutResponse {
 // 获取短信验证码请求
 message GetSMSCodeRequest {
   string phone = 1;        // 手机号
-  string type = 2;         // 类型：register/login/bind
 }
 
 // 获取短信验证码响应（无数据）
