@@ -1,19 +1,14 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
-	"net"
-	"net/http"
-	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
-	"time"
+	commonv1 "zjMall/gen/go/api/proto/common"
 	userv1 "zjMall/gen/go/api/proto/user"
 	"zjMall/internal/common/cache"
 	"zjMall/internal/common/middleware"
+	"zjMall/internal/common/server"
 	"zjMall/internal/config"
 	"zjMall/internal/database"
 	"zjMall/internal/sms"
@@ -22,9 +17,7 @@ import (
 	"zjMall/internal/user-service/service"
 	"zjMall/pkg/validator"
 
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -76,103 +69,48 @@ func main() {
 		log.Fatalf("Error getting service config: %v", err)
 	}
 
-	// 创建gRPC服务器
-	grpcServer := grpc.NewServer()
+	// 创建服务器实例
+	srv := server.NewServer(&server.Config{
+		GRPCAddr: fmt.Sprintf(":%d", serviceCfg.GRPC.Port),
+		HTTPAddr: fmt.Sprintf(":%d", serviceCfg.HTTP.Port),
+	})
 
-	// 注册user服务
-	userv1.RegisterUserServiceServer(grpcServer, userServiceHandler)
+	// 注册 gRPC 服务
+	srv.RegisterGRPCService(func(grpcServer *grpc.Server) {
+		// 注册用户服务
+		userv1.RegisterUserServiceServer(grpcServer, userServiceHandler)
+	})
 
-	// 启动 gRPC 服务器（在 goroutine 中，避免阻塞）
-	grpcAddr := fmt.Sprintf(":%d", serviceCfg.GRPC.Port)
-
-	//创建http服务器
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// 创建 HTTP 路由
-	mux := runtime.NewServeMux()
-
-	// 连接到 gRPC 服务器
-	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	// 注册 HTTP 网关处理器
+	if err := srv.RegisterHTTPGateway(commonv1.RegisterHealthServiceHandlerFromEndpoint); err != nil {
+		log.Fatalf("failed to register health service gateway: %v", err)
 	}
 
-	// 注册用户服务的 HTTP 网关处理器
-	err = userv1.RegisterUserServiceHandlerFromEndpoint(
-		ctx, mux, grpcAddr, opts,
-	)
-	if err != nil {
+	if err := srv.RegisterHTTPGateway(userv1.RegisterUserServiceHandlerFromEndpoint); err != nil {
 		log.Fatalf("failed to register user service gateway: %v", err)
 	}
 
-	handler := middleware.Chain(
+	// 注册 Swagger 文档
+	srv.RegisterSwagger(
+		server.SwaggerDoc{
+			Name:        "user",
+			FilePath:    "docs/openapi/user.swagger.json",
+			Title:       "用户服务 API",
+			Description: "用户服务 API 文档，包括用户注册、登录、短信验证码等功能",
+			Version:     "1.0.0",
+		},
+	)
+
+	// 使用中间件
+	srv.UseMiddleware(
 		middleware.Recovery(),
 		middleware.CORS(middleware.DefaultCORSConfig()),
 		middleware.TraceID(),
 		middleware.Logging(),
-	)(mux)
+	)
 
-	// 启动 HTTP 服务器
-	httpAddr := fmt.Sprintf(":%d", serviceCfg.HTTP.Port)
-	httpServer := &http.Server{
-		Addr:         httpAddr,
-		Handler:      handler,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+	// 启动服务器（阻塞）
+	if err := srv.Start(); err != nil {
+		log.Fatalf("failed to start server: %v", err)
 	}
-	startGRPCServer(grpcServer, grpcAddr)
-	startHTTPServer(httpServer, httpAddr)
-	gracefulShutdown(httpServer, grpcServer)
-
-}
-
-func startGRPCServer(grpcServer *grpc.Server, grpcAddr string) {
-	grpcLis, err := net.Listen("tcp", grpcAddr)
-	if err != nil {
-		log.Fatalf("failed to listen on %s: %v", grpcAddr, err)
-	}
-
-	go func() {
-		log.Printf("gRPC server listening on %s", grpcAddr)
-		if err := grpcServer.Serve(grpcLis); err != nil {
-			log.Fatalf("failed to serve gRPC: %v", err)
-		}
-	}()
-}
-
-func startHTTPServer(httpServer *http.Server, httpAddr string) {
-	go func() {
-		log.Printf("HTTP server listening on %s", httpAddr)
-		log.Printf("Try: http://localhost%s/healthz", httpAddr)
-
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("failed to serve HTTP: %v", err)
-		}
-	}()
-}
-
-func gracefulShutdown(httpServer *http.Server, grpcServer *grpc.Server) {
-	signChan := make(chan os.Signal, 1)
-	signal.Notify(signChan, syscall.SIGINT, syscall.SIGTERM) //当收到SIGINT（Ctrl+C）或SIGTERM（终止信号（通常是系统关闭、K8s 停止容器时发送））信号时，关闭服务器
-	<-signChan
-
-	// ========== 新增：优雅关闭 HTTP 服务器 ==========
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer shutdownCancel()
-
-	log.Println("正在关闭 HTTP 服务器...")
-	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP 服务器关闭错误: %v", err)
-	} else {
-		log.Println("HTTP 服务器已关闭")
-	}
-
-	// ========== 新增：优雅关闭 gRPC 服务器 ==========
-	log.Println("正在关闭 gRPC 服务器...")
-	grpcServer.GracefulStop()
-	log.Println("gRPC 服务器已关闭")
-
-	log.Println("所有服务器已关闭")
 }

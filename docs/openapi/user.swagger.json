@@ -1,0 +1,1249 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "api/proto/user/user.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "UserService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v1/users/login": {
+      "post": {
+        "summary": "密码登录",
+        "operationId": "UserService_Login",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.LoginResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.LoginRequest"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/login-by-sms": {
+      "post": {
+        "summary": "验证码登录",
+        "operationId": "UserService_LoginBySMS",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.LoginResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.LoginBySMSRequest"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/logout": {
+      "post": {
+        "summary": "登出",
+        "operationId": "UserService_Logout",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.LogoutResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.LogoutRequest"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/register": {
+      "post": {
+        "summary": "用户注册",
+        "operationId": "UserService_Register",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.RegisterResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.RegisterRequest"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/sms-code": {
+      "post": {
+        "summary": "获取短信验证码",
+        "operationId": "UserService_GetSMSCode",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.GetSMSCodeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.GetSMSCodeRequest"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}": {
+      "get": {
+        "summary": "查询用户信息",
+        "operationId": "UserService_GetUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.GetUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      },
+      "put": {
+        "summary": "更新用户信息",
+        "operationId": "UserService_UpdateUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.UpdateUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.UserService.UpdateUserBody"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/addresses": {
+      "get": {
+        "summary": "查询收货地址列表",
+        "operationId": "UserService_ListAddresses",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.ListAddressesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      },
+      "post": {
+        "summary": "添加收货地址",
+        "operationId": "UserService_CreateAddress",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.CreateAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.UserService.CreateAddressBody"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/addresses/{addressId}": {
+      "get": {
+        "summary": "查询单个收货地址",
+        "operationId": "UserService_GetAddress",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.GetAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "addressId",
+            "description": "地址ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      },
+      "delete": {
+        "summary": "删除收货地址",
+        "operationId": "UserService_DeleteAddress",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.DeleteAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "addressId",
+            "description": "地址ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      },
+      "put": {
+        "summary": "更新收货地址",
+        "operationId": "UserService_UpdateAddress",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.UpdateAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "addressId",
+            "description": "地址ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.UserService.UpdateAddressBody"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/addresses/{addressId}/default": {
+      "put": {
+        "summary": "设置默认地址",
+        "operationId": "UserService_SetDefaultAddress",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.SetDefaultAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "addressId",
+            "description": "地址ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.UserService.SetDefaultAddressBody"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/password": {
+      "put": {
+        "summary": "修改密码",
+        "operationId": "UserService_ChangePassword",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.ChangePasswordResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.UserService.ChangePasswordBody"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/phone": {
+      "put": {
+        "summary": "绑定/更换手机号",
+        "operationId": "UserService_BindPhone",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.BindPhoneResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.UserService.BindPhoneBody"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/status": {
+      "get": {
+        "summary": "查询用户状态",
+        "operationId": "UserService_GetUserStatus",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.GetUserStatusResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "用户ID",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "google.protobuf.Any": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+        }
+      },
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+    },
+    "google.rpc.Status": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/google.protobuf.Any"
+          }
+        }
+      }
+    },
+    "user.v1.Address": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64",
+          "title": "地址ID"
+        },
+        "userId": {
+          "type": "string",
+          "format": "int64",
+          "title": "用户ID"
+        },
+        "receiverName": {
+          "type": "string",
+          "title": "收货人姓名"
+        },
+        "receiverPhone": {
+          "type": "string",
+          "title": "收货人手机号"
+        },
+        "province": {
+          "type": "string",
+          "title": "省份"
+        },
+        "city": {
+          "type": "string",
+          "title": "城市"
+        },
+        "district": {
+          "type": "string",
+          "title": "区县"
+        },
+        "detail": {
+          "type": "string",
+          "title": "详细地址"
+        },
+        "postalCode": {
+          "type": "string",
+          "title": "邮政编码"
+        },
+        "isDefault": {
+          "type": "boolean",
+          "title": "是否默认地址"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "title": "创建时间"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "title": "更新时间"
+        }
+      },
+      "title": "收货地址"
+    },
+    "user.v1.BindPhoneResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "绑定/更换手机号响应（无数据）"
+    },
+    "user.v1.ChangePasswordResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "修改密码响应（无数据）"
+    },
+    "user.v1.CreateAddressResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/user.v1.Address"
+        }
+      },
+      "title": "添加收货地址响应"
+    },
+    "user.v1.DeleteAddressResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "删除收货地址响应（无数据）"
+    },
+    "user.v1.GetAddressResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/user.v1.Address"
+        }
+      },
+      "title": "查询单个收货地址响应"
+    },
+    "user.v1.GetSMSCodeRequest": {
+      "type": "object",
+      "properties": {
+        "phone": {
+          "type": "string",
+          "title": "手机号"
+        }
+      },
+      "title": "获取短信验证码请求"
+    },
+    "user.v1.GetSMSCodeResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "获取短信验证码响应（无数据）"
+    },
+    "user.v1.GetUserResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/user.v1.UserInfo"
+        }
+      },
+      "title": "查询用户信息响应"
+    },
+    "user.v1.GetUserStatusResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/user.v1.UserStatusData"
+        }
+      },
+      "title": "查询用户状态响应"
+    },
+    "user.v1.ListAddressesResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/user.v1.Address"
+          },
+          "title": "地址列表"
+        }
+      },
+      "title": "查询收货地址列表响应"
+    },
+    "user.v1.LoginBySMSRequest": {
+      "type": "object",
+      "properties": {
+        "phone": {
+          "type": "string",
+          "title": "手机号"
+        },
+        "smsCode": {
+          "type": "string",
+          "title": "短信验证码"
+        }
+      },
+      "title": "验证码登录请求"
+    },
+    "user.v1.LoginData": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/user.v1.UserInfo",
+          "title": "用户信息"
+        },
+        "token": {
+          "type": "string",
+          "title": "登录Token"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "int64",
+          "title": "Token过期时间（时间戳）"
+        }
+      },
+      "title": "登录响应数据"
+    },
+    "user.v1.LoginRequest": {
+      "type": "object",
+      "properties": {
+        "phone": {
+          "type": "string",
+          "title": "手机号"
+        },
+        "password": {
+          "type": "string",
+          "title": "密码"
+        },
+        "rememberMe": {
+          "type": "boolean",
+          "title": "记住我（延长Token有效期）"
+        }
+      },
+      "title": "密码登录请求"
+    },
+    "user.v1.LoginResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/user.v1.LoginData"
+        }
+      },
+      "title": "登录响应"
+    },
+    "user.v1.LogoutRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "title": "Token（可选，可以从header获取）"
+        }
+      },
+      "title": "登出请求"
+    },
+    "user.v1.LogoutResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "登出响应（无数据）"
+    },
+    "user.v1.RegisterData": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/user.v1.UserInfo",
+          "title": "用户信息"
+        },
+        "token": {
+          "type": "string",
+          "title": "登录Token"
+        }
+      },
+      "title": "注册响应数据"
+    },
+    "user.v1.RegisterRequest": {
+      "type": "object",
+      "properties": {
+        "phone": {
+          "type": "string",
+          "title": "手机号"
+        },
+        "smsCode": {
+          "type": "string",
+          "title": "短信验证码"
+        },
+        "password": {
+          "type": "string",
+          "title": "密码"
+        },
+        "confirmPassword": {
+          "type": "string",
+          "title": "确认密码"
+        }
+      },
+      "title": "注册请求"
+    },
+    "user.v1.RegisterResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/user.v1.RegisterData"
+        }
+      },
+      "title": "注册响应"
+    },
+    "user.v1.SetDefaultAddressResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "设置默认地址响应（无数据）"
+    },
+    "user.v1.UpdateAddressResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/user.v1.Address"
+        }
+      },
+      "title": "更新收货地址响应"
+    },
+    "user.v1.UpdateUserResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/user.v1.UserInfo"
+        }
+      },
+      "title": "更新用户信息响应"
+    },
+    "user.v1.UserInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64",
+          "title": "用户ID"
+        },
+        "phone": {
+          "type": "string",
+          "title": "手机号（脱敏）"
+        },
+        "nickname": {
+          "type": "string",
+          "title": "昵称"
+        },
+        "avatar": {
+          "type": "string",
+          "title": "头像URL"
+        },
+        "email": {
+          "type": "string",
+          "title": "邮箱"
+        },
+        "gender": {
+          "type": "integer",
+          "format": "int32",
+          "title": "性别：0-未设置，1-男，2-女"
+        },
+        "birthday": {
+          "type": "string",
+          "title": "生日（YYYY-MM-DD）"
+        },
+        "status": {
+          "type": "integer",
+          "format": "int32",
+          "title": "状态：1-正常，2-已锁定，3-已注销"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "title": "注册时间"
+        },
+        "lastLoginAt": {
+          "type": "string",
+          "format": "date-time",
+          "title": "最后登录时间"
+        }
+      },
+      "title": "用户信息"
+    },
+    "user.v1.UserService.BindPhoneBody": {
+      "type": "object",
+      "properties": {
+        "newPhone": {
+          "type": "string",
+          "title": "新手机号"
+        },
+        "newSmsCode": {
+          "type": "string",
+          "title": "新手机号验证码"
+        },
+        "oldSmsCode": {
+          "type": "string",
+          "title": "旧手机号验证码"
+        }
+      },
+      "title": "绑定/更换手机号请求"
+    },
+    "user.v1.UserService.ChangePasswordBody": {
+      "type": "object",
+      "properties": {
+        "oldPassword": {
+          "type": "string",
+          "title": "旧密码"
+        },
+        "newPassword": {
+          "type": "string",
+          "title": "新密码"
+        },
+        "confirmPassword": {
+          "type": "string",
+          "title": "确认新密码"
+        }
+      },
+      "title": "修改密码请求"
+    },
+    "user.v1.UserService.CreateAddressBody": {
+      "type": "object",
+      "properties": {
+        "receiverName": {
+          "type": "string",
+          "title": "收货人姓名"
+        },
+        "receiverPhone": {
+          "type": "string",
+          "title": "收货人手机号"
+        },
+        "province": {
+          "type": "string",
+          "title": "省份"
+        },
+        "city": {
+          "type": "string",
+          "title": "城市"
+        },
+        "district": {
+          "type": "string",
+          "title": "区县"
+        },
+        "detail": {
+          "type": "string",
+          "title": "详细地址"
+        },
+        "postalCode": {
+          "type": "string",
+          "title": "邮政编码（可选）"
+        },
+        "isDefault": {
+          "type": "boolean",
+          "title": "是否设为默认地址"
+        }
+      },
+      "title": "添加收货地址请求"
+    },
+    "user.v1.UserService.SetDefaultAddressBody": {
+      "type": "object",
+      "title": "设置默认地址请求"
+    },
+    "user.v1.UserService.UpdateAddressBody": {
+      "type": "object",
+      "properties": {
+        "receiverName": {
+          "type": "string",
+          "title": "收货人姓名（可选）"
+        },
+        "receiverPhone": {
+          "type": "string",
+          "title": "收货人手机号（可选）"
+        },
+        "province": {
+          "type": "string",
+          "title": "省份（可选）"
+        },
+        "city": {
+          "type": "string",
+          "title": "城市（可选）"
+        },
+        "district": {
+          "type": "string",
+          "title": "区县（可选）"
+        },
+        "detail": {
+          "type": "string",
+          "title": "详细地址（可选）"
+        },
+        "postalCode": {
+          "type": "string",
+          "title": "邮政编码（可选）"
+        },
+        "isDefault": {
+          "type": "boolean",
+          "title": "是否设为默认地址（可选）"
+        }
+      },
+      "title": "更新收货地址请求"
+    },
+    "user.v1.UserService.UpdateUserBody": {
+      "type": "object",
+      "properties": {
+        "nickname": {
+          "type": "string",
+          "title": "昵称（可选）"
+        },
+        "avatar": {
+          "type": "string",
+          "title": "头像URL（可选）"
+        },
+        "email": {
+          "type": "string",
+          "title": "邮箱（可选）"
+        },
+        "gender": {
+          "type": "integer",
+          "format": "int32",
+          "title": "性别（可选）"
+        },
+        "birthday": {
+          "type": "string",
+          "title": "生日（可选）"
+        }
+      },
+      "title": "更新用户信息请求"
+    },
+    "user.v1.UserStatusData": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "integer",
+          "format": "int32",
+          "title": "状态：1-正常，2-已锁定，3-已注销"
+        }
+      },
+      "title": "用户状态数据"
+    }
+  }
+}

@@ -17,4 +17,11 @@ plugins:
     opt:
       - paths=source_relative
       - generate_unbound_methods=true
+  # 使用本地插件（需要 protoc-gen-openapiv2 在 PATH 中）
+  # 每个服务生成独立的 swagger 文档（不合并）
+  - plugin: openapiv2
+    out: docs/openapi/temp
+    opt:
+      - fqn_for_openapi_name=true
+      - openapi_configuration_path=api/proto/user/openapi.yaml
 
