@@ -70,7 +70,7 @@ func (h *UserServiceHandler) UploadAvatarHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	// 4. 获取上传的文件
-	file, header, err := r.FormFile("avatar")
+	file, header, err := r.FormFile("avatar") //获取前端对应的字段
 	if err != nil {
 		http.Error(w, `{"code":1,"message":"请选择图片文件"}`, http.StatusBadRequest)
 		return
@@ -95,4 +95,32 @@ func (h *UserServiceHandler) UploadAvatarHTTP(w http.ResponseWriter, r *http.Req
 	// 7. 返回JSON响应
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *UserServiceHandler) CreateAddress(ctx context.Context, req *userv1.CreateAddressRequest) (*userv1.CreateAddressResponse, error) {
+	return h.userService.CreateAddress(ctx, req)
+}
+
+func (h *UserServiceHandler) ListAddresses(ctx context.Context, req *userv1.ListAddressesRequest) (*userv1.ListAddressesResponse, error) {
+	return h.userService.ListAddresses(ctx, req)
+}
+
+func (h *UserServiceHandler) UpdateAddress(ctx context.Context, req *userv1.UpdateAddressRequest) (*userv1.UpdateAddressResponse, error) {
+	return h.userService.UpdateAddress(ctx, req)
+}
+
+func (h *UserServiceHandler) DeleteAddress(ctx context.Context, req *userv1.DeleteAddressRequest) (*userv1.DeleteAddressResponse, error) {
+	return h.userService.DeleteAddress(ctx, req)
+}
+
+func (h *UserServiceHandler) SetDefaultAddress(ctx context.Context, req *userv1.SetDefaultAddressRequest) (*userv1.SetDefaultAddressResponse, error) {
+	return h.userService.SetDefaultAddress(ctx, req)
+}
+
+func (h *UserServiceHandler) ChangePassword(ctx context.Context, req *userv1.ChangePasswordRequest) (*userv1.ChangePasswordResponse, error) {
+	return h.userService.ChangePassword(ctx, req)
+}
+
+func (h *UserServiceHandler) BindPhone(ctx context.Context, req *userv1.BindPhoneRequest) (*userv1.BindPhoneResponse, error) {
+	return h.userService.BindPhone(ctx, req)
 }

@@ -22,7 +22,7 @@ type Address struct {
 	PostalCode string `json:"postal_code,omitempty"` // 邮政编码（可选）
 
 	// 状态信息
-	IsDefault int8 `json:"is_default"` // 是否默认：0-否，1-是
+	IsDefault bool `json:"is_default"` // 是否默认：0-否，1-是
 }
 
 // TableName 指定表名（GORM 约定：默认使用结构体名的复数形式）

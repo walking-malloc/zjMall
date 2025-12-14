@@ -28,6 +28,14 @@ type UserRepository interface {
 	SetTokenToCache(ctx context.Context, userID string, token string, expiration time.Duration) error
 	GetTokenFromCache(ctx context.Context, userID string) (string, error)
 	DeleteTokenFromCache(ctx context.Context, userID string) error
+
+	//地址相关操作
+	AddAddress(ctx context.Context, address *model.Address) error
+	ListAddresses(ctx context.Context, userID string) ([]*model.Address, error)
+	UpdateAddress(ctx context.Context, address *model.Address) error
+	DeleteAddress(ctx context.Context, userID string, addressID string) error
+	SetDefaultAddress(ctx context.Context, userID string, addressID string) error
+	CreateAddressWithDefault(ctx context.Context, address *model.Address) error
 }
 
 type userRepository struct {
@@ -196,4 +204,62 @@ func (r *userRepository) CheckSMSCodeRateLimit(ctx context.Context, phone string
 		r.cacheRepo.Incr(ctx, countKey)
 	}
 	return nil
+}
+
+func (r *userRepository) AddAddress(ctx context.Context, address *model.Address) error {
+	return r.db.WithContext(ctx).Model(&model.Address{}).Create(address).Error
+}
+
+func (r *userRepository) ListAddresses(ctx context.Context, userID string) ([]*model.Address, error) {
+	var addresses []*model.Address
+	err := r.db.WithContext(ctx).Model(&model.Address{}).Where("user_id = ?", userID).Find(&addresses).Error
+	if err != nil {
+		return nil, err
+	}
+	return addresses, nil
+}
+
+func (r *userRepository) UpdateAddress(ctx context.Context, address *model.Address) error {
+	// 同时根据user_id和id更新，确保只能更新自己的地址
+	return r.db.WithContext(ctx).Model(&model.Address{}).Where("user_id = ? AND id = ?", address.UserID, address.ID).Updates(address).Error
+}
+
+func (r *userRepository) DeleteAddress(ctx context.Context, userID string, addressID string) error {
+	return r.db.WithContext(ctx).Model(&model.Address{}).Where("user_id = ? AND id = ?", userID, addressID).Delete(&model.Address{}).Error
+}
+
+func (r *userRepository) SetDefaultAddress(ctx context.Context, userID string, addressID string) error {
+	// 使用事务确保原子性
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. 先取消该用户所有地址的默认状态
+		if err := tx.Model(&model.Address{}).Where("user_id = ?", userID).Update("is_default", false).Error; err != nil {
+			return err
+		}
+		// 2. 设置新的默认地址
+		return tx.Model(&model.Address{}).Where("user_id = ? AND id = ?", userID, addressID).Update("is_default", true).Error
+	})
+}
+
+func (r *userRepository) CreateAddressWithDefault(ctx context.Context, address *model.Address) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. 创建地址（使用事务中的tx）
+		if err := tx.WithContext(ctx).Model(&model.Address{}).Create(address).Error; err != nil {
+			return err
+		}
+
+		// 取消该用户所有地址的默认状态
+		if err := tx.WithContext(ctx).Model(&model.Address{}).
+			Where("user_id = ?", address.UserID).
+			Update("is_default", false).Error; err != nil {
+			return err
+		}
+		// 设置新地址为默认
+		if err := tx.WithContext(ctx).Model(&model.Address{}).
+			Where("user_id = ? AND id = ?", address.UserID, address.ID).
+			Update("is_default", true).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

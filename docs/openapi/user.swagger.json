@@ -277,8 +277,7 @@
             "description": "用户ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           }
         ],
         "tags": [
@@ -308,8 +307,7 @@
             "description": "用户ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           },
           {
             "name": "body",
@@ -326,45 +324,6 @@
       }
     },
     "/api/v1/users/{userId}/addresses/{addressId}": {
-      "get": {
-        "summary": "查询单个收货地址",
-        "operationId": "UserService_GetAddress",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/user.v1.GetAddressResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/google.rpc.Status"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "description": "用户ID",
-            "in": "path",
-            "required": true,
-            "type": "string",
-            "format": "int64"
-          },
-          {
-            "name": "addressId",
-            "description": "地址ID",
-            "in": "path",
-            "required": true,
-            "type": "string",
-            "format": "int64"
-          }
-        ],
-        "tags": [
-          "UserService"
-        ]
-      },
       "delete": {
         "summary": "删除收货地址",
         "operationId": "UserService_DeleteAddress",
@@ -388,16 +347,14 @@
             "description": "用户ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           },
           {
             "name": "addressId",
             "description": "地址ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           }
         ],
         "tags": [
@@ -427,16 +384,14 @@
             "description": "用户ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           },
           {
             "name": "addressId",
             "description": "地址ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           },
           {
             "name": "body",
@@ -476,16 +431,14 @@
             "description": "用户ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           },
           {
             "name": "addressId",
             "description": "地址ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           },
           {
             "name": "body",
@@ -525,8 +478,7 @@
             "description": "用户ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           },
           {
             "name": "body",
@@ -566,8 +518,7 @@
             "description": "用户ID",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           },
           {
             "name": "body",
@@ -576,39 +527,6 @@
             "schema": {
               "$ref": "#/definitions/user.v1.UserService.BindPhoneBody"
             }
-          }
-        ],
-        "tags": [
-          "UserService"
-        ]
-      }
-    },
-    "/api/v1/users/{userId}/status": {
-      "get": {
-        "summary": "查询用户状态",
-        "operationId": "UserService_GetUserStatus",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/user.v1.GetUserStatusResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/google.rpc.Status"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "description": "用户ID",
-            "in": "path",
-            "required": true,
-            "type": "string",
-            "format": "int64"
           }
         ],
         "tags": [
@@ -652,14 +570,10 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "string",
-          "format": "int64",
-          "title": "地址ID"
+          "type": "string"
         },
         "userId": {
-          "type": "string",
-          "format": "int64",
-          "title": "用户ID"
+          "type": "string"
         },
         "receiverName": {
           "type": "string",
@@ -761,22 +675,6 @@
       },
       "title": "删除收货地址响应（无数据）"
     },
-    "user.v1.GetAddressResponse": {
-      "type": "object",
-      "properties": {
-        "code": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "message": {
-          "type": "string"
-        },
-        "data": {
-          "$ref": "#/definitions/user.v1.Address"
-        }
-      },
-      "title": "查询单个收货地址响应"
-    },
     "user.v1.GetSMSCodeRequest": {
       "type": "object",
       "properties": {
@@ -815,22 +713,6 @@
         }
       },
       "title": "查询用户信息响应"
-    },
-    "user.v1.GetUserStatusResponse": {
-      "type": "object",
-      "properties": {
-        "code": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "message": {
-          "type": "string"
-        },
-        "data": {
-          "$ref": "#/definitions/user.v1.UserStatusData"
-        }
-      },
-      "title": "查询用户状态响应"
     },
     "user.v1.ListAddressesResponse": {
       "type": "object",
@@ -1017,9 +899,6 @@
         },
         "message": {
           "type": "string"
-        },
-        "data": {
-          "$ref": "#/definitions/user.v1.Address"
         }
       },
       "title": "更新收货地址响应"
@@ -1100,10 +979,6 @@
         "newSmsCode": {
           "type": "string",
           "title": "新手机号验证码"
-        },
-        "oldSmsCode": {
-          "type": "string",
-          "title": "旧手机号验证码"
         }
       },
       "title": "绑定/更换手机号请求"
@@ -1228,17 +1103,6 @@
         }
       },
       "title": "更新用户信息请求"
-    },
-    "user.v1.UserStatusData": {
-      "type": "object",
-      "properties": {
-        "status": {
-          "type": "integer",
-          "format": "int32",
-          "title": "状态：1-正常，2-已锁定，3-已注销"
-        }
-      },
-      "title": "用户状态数据"
     }
   }
 }

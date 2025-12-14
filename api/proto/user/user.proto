@@ -66,12 +66,6 @@ service UserService {
     };
   }
 
-  // 查询用户状态
-  rpc GetUserStatus(GetUserStatusRequest) returns (GetUserStatusResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/status"
-    };
-  }
   
   // 添加收货地址
   rpc CreateAddress(CreateAddressRequest) returns (CreateAddressResponse) {
@@ -88,12 +82,6 @@ service UserService {
     };
   }
   
-  // 查询单个收货地址
-  rpc GetAddress(GetAddressRequest) returns (GetAddressResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/addresses/{address_id}"
-    };
-  }
   
   // 更新收货地址
   rpc UpdateAddress(UpdateAddressRequest) returns (UpdateAddressResponse) {
@@ -260,22 +248,6 @@ message UpdateUserResponse {
   UserInfo data = 3;
 }
 
-// 查询用户状态请求
-message GetUserStatusRequest {
-  int64 user_id = 1;       // 用户ID
-}
-
-// 用户状态数据
-message UserStatusData {
-  int32 status = 1;        // 状态：1-正常，2-已锁定，3-已注销
-}
-
-// 查询用户状态响应
-message GetUserStatusResponse {
-  int32 code = 1;
-  string message = 2;
-  UserStatusData data = 3;
-}
 
 // ========== 头像上传 ==========
 // 注意：只定义message，不定义RPC（因为使用自定义HTTP Handler）
@@ -293,8 +265,8 @@ message UploadAvatarResponse {
 
 // 收货地址
 message Address {
-  int64 id = 1;            // 地址ID
-  int64 user_id = 2;       // 用户ID
+  string id = 1;
+  string user_id = 2;
   string receiver_name = 3; // 收货人姓名
   string receiver_phone = 4; // 收货人手机号
   string province = 5;     // 省份
@@ -303,13 +275,14 @@ message Address {
   string detail = 8;       // 详细地址
   string postal_code = 9;  // 邮政编码
   bool is_default = 10;     // 是否默认地址
-  google.protobuf.Timestamp created_at = 11;  // 创建时间
-  google.protobuf.Timestamp updated_at = 12;  // 更新时间
+  google.protobuf.Timestamp created_at = 11; //创建时间
+  google.protobuf.Timestamp updated_at = 12; //更新时间
+
 }
 
 // 添加收货地址请求
 message CreateAddressRequest {
-  int64 user_id = 1;       // 用户ID
+  string user_id = 1;       // 用户ID
   string receiver_name = 2; // 收货人姓名
   string receiver_phone = 3; // 收货人手机号
   string province = 4;     // 省份
@@ -329,7 +302,7 @@ message CreateAddressResponse {
 
 // 查询收货地址列表请求
 message ListAddressesRequest {
-  int64 user_id = 1;       // 用户ID
+  string user_id = 1;       // 用户ID
 }
 
 // 查询收货地址列表响应
@@ -339,23 +312,11 @@ message ListAddressesResponse {
   repeated Address data = 3; // 地址列表
 }
 
-// 查询单个收货地址请求
-message GetAddressRequest {
-  int64 user_id = 1;       // 用户ID
-  int64 address_id = 2;    // 地址ID
-}
-
-// 查询单个收货地址响应
-message GetAddressResponse {
-  int32 code = 1;
-  string message = 2;
-  Address data = 3;
-}
 
 // 更新收货地址请求
 message UpdateAddressRequest {
-  int64 user_id = 1;       // 用户ID
-  int64 address_id = 2;    // 地址ID
+  string user_id = 1;       // 用户ID
+  string address_id = 2;    // 地址ID
   string receiver_name = 3; // 收货人姓名（可选）
   string receiver_phone = 4; // 收货人手机号（可选）
   string province = 5;     // 省份（可选）
@@ -370,13 +331,12 @@ message UpdateAddressRequest {
 message UpdateAddressResponse {
   int32 code = 1;
   string message = 2;
-  Address data = 3;
 }
 
 // 删除收货地址请求
 message DeleteAddressRequest {
-  int64 user_id = 1;       // 用户ID
-  int64 address_id = 2;    // 地址ID
+  string user_id = 1;       // 用户ID
+  string address_id = 2;    // 地址ID
 }
 
 // 删除收货地址响应（无数据）
@@ -387,8 +347,8 @@ message DeleteAddressResponse {
 
 // 设置默认地址请求
 message SetDefaultAddressRequest {
-  int64 user_id = 1;       // 用户ID
-  int64 address_id = 2;    // 地址ID
+  string user_id = 1;       // 用户ID
+  string address_id = 2;    // 地址ID
 }
 
 // 设置默认地址响应（无数据）
@@ -401,7 +361,7 @@ message SetDefaultAddressResponse {
 
 // 修改密码请求
 message ChangePasswordRequest {
-  int64 user_id = 1;       // 用户ID
+  string user_id = 1;       // 用户ID
   string old_password = 2; // 旧密码
   string new_password = 3; // 新密码
   string confirm_password = 4; // 确认新密码
@@ -415,10 +375,9 @@ message ChangePasswordResponse {
 
 // 绑定/更换手机号请求
 message BindPhoneRequest {
-  int64 user_id = 1;       // 用户ID
+  string user_id = 1;       // 用户ID
   string new_phone = 2;    // 新手机号
   string new_sms_code = 3; // 新手机号验证码
-  string old_sms_code = 4; // 旧手机号验证码
 }
 
 // 绑定/更换手机号响应（无数据）

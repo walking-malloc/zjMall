@@ -507,3 +507,284 @@ func (s *UserService) UploadAvatarFromReader(ctx context.Context, userID string,
 		AvatarUrl: avatarURL,
 	}, nil
 }
+
+// =============== 地址管理 ===============
+// 添加单个地址
+func (s *UserService) CreateAddress(ctx context.Context, req *userv1.CreateAddressRequest) (*userv1.CreateAddressResponse, error) {
+
+	address := &model.Address{
+		UserID:        req.UserId,
+		ReceiverName:  req.ReceiverName,
+		ReceiverPhone: req.ReceiverPhone,
+		Province:      req.Province,
+		City:          req.City,
+		District:      req.District,
+		Detail:        req.Detail,
+		PostalCode:    req.PostalCode,
+		IsDefault:     req.IsDefault,
+	}
+
+	// 调用Repository层的方法，事务在Repository层处理
+	err := s.userRepo.CreateAddressWithDefault(ctx, address)
+	if err != nil {
+		return &userv1.CreateAddressResponse{
+			Code:    1,
+			Message: "创建地址失败",
+		}, nil
+	}
+
+	// 转换为proto格式并返回（proto中Address只定义了部分字段）
+	addressData := &userv1.Address{
+		Id:            address.ID,
+		UserId:        address.UserID,
+		ReceiverName:  address.ReceiverName,
+		ReceiverPhone: address.ReceiverPhone,
+		Province:      address.Province,
+		City:          address.City,
+		District:      address.District,
+		Detail:        address.Detail,
+		PostalCode:    address.PostalCode,
+		IsDefault:     address.IsDefault,
+		CreatedAt:     timestamppb.New(address.CreatedAt),
+		UpdatedAt:     timestamppb.New(address.UpdatedAt),
+	}
+
+	return &userv1.CreateAddressResponse{
+		Code:    0,
+		Message: "创建地址成功",
+		Data:    addressData,
+	}, nil
+}
+
+// 查询收货地址列表
+func (s *UserService) ListAddresses(ctx context.Context, req *userv1.ListAddressesRequest) (*userv1.ListAddressesResponse, error) {
+	addresses, err := s.userRepo.ListAddresses(ctx, req.UserId)
+	if err != nil {
+		return &userv1.ListAddressesResponse{
+			Code:    1,
+			Message: "查询地址列表失败",
+		}, nil
+	}
+	addressesData := make([]*userv1.Address, len(addresses))
+	for i, address := range addresses {
+		addressesData[i] = &userv1.Address{
+			Id:            address.ID,
+			UserId:        address.UserID,
+			ReceiverName:  address.ReceiverName,
+			ReceiverPhone: address.ReceiverPhone,
+			Province:      address.Province,
+			City:          address.City,
+			District:      address.District,
+			Detail:        address.Detail,
+			PostalCode:    address.PostalCode,
+			IsDefault:     address.IsDefault,
+			CreatedAt:     timestamppb.New(address.CreatedAt),
+			UpdatedAt:     timestamppb.New(address.UpdatedAt),
+		}
+	}
+	return &userv1.ListAddressesResponse{
+		Code:    0,
+		Message: "查询地址列表成功",
+		Data:    addressesData,
+	}, nil
+}
+
+// 更新收货地址
+func (s *UserService) UpdateAddress(ctx context.Context, req *userv1.UpdateAddressRequest) (*userv1.UpdateAddressResponse, error) {
+	// 如果设置为默认地址，先取消其他地址的默认状态
+	if req.IsDefault {
+		err := s.userRepo.SetDefaultAddress(ctx, req.UserId, req.AddressId)
+		if err != nil {
+			return &userv1.UpdateAddressResponse{
+				Code:    1,
+				Message: "设置默认地址失败",
+			}, nil
+		}
+	}
+
+	address := &model.Address{
+		BaseModel:     pkg.BaseModel{ID: req.AddressId}, // 设置地址ID
+		UserID:        req.UserId,
+		ReceiverName:  req.ReceiverName,
+		ReceiverPhone: req.ReceiverPhone,
+		Province:      req.Province,
+		City:          req.City,
+		District:      req.District,
+		Detail:        req.Detail,
+		PostalCode:    req.PostalCode,
+		IsDefault:     req.IsDefault,
+	}
+	err := s.userRepo.UpdateAddress(ctx, address)
+	if err != nil {
+		return &userv1.UpdateAddressResponse{
+			Code:    1,
+			Message: "更新地址失败",
+		}, nil
+	}
+	return &userv1.UpdateAddressResponse{
+		Code:    0,
+		Message: "更新地址成功",
+	}, nil
+}
+
+// 删除收货地址
+func (s *UserService) DeleteAddress(ctx context.Context, req *userv1.DeleteAddressRequest) (*userv1.DeleteAddressResponse, error) {
+	err := s.userRepo.DeleteAddress(ctx, req.UserId, req.AddressId)
+	if err != nil {
+		return &userv1.DeleteAddressResponse{
+			Code:    1,
+			Message: "删除地址失败",
+		}, nil
+	}
+	return &userv1.DeleteAddressResponse{
+		Code:    0,
+		Message: "删除地址成功",
+	}, nil
+}
+
+// 设置默认收货地址
+func (s *UserService) SetDefaultAddress(ctx context.Context, req *userv1.SetDefaultAddressRequest) (*userv1.SetDefaultAddressResponse, error) {
+	err := s.userRepo.SetDefaultAddress(ctx, req.UserId, req.AddressId)
+	if err != nil {
+		return &userv1.SetDefaultAddressResponse{
+			Code:    1,
+			Message: "设置默认地址失败",
+		}, nil
+	}
+	return &userv1.SetDefaultAddressResponse{
+		Code:    0,
+		Message: "设置默认地址成功",
+	}, nil
+}
+
+func (s *UserService) ChangePassword(ctx context.Context, req *userv1.ChangePasswordRequest) (*userv1.ChangePasswordResponse, error) {
+	validator := NewChangePasswordRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &userv1.ChangePasswordResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+	// 检查用户是否存在
+	user, err := s.userRepo.GetUserByID(ctx, req.UserId)
+	if err != nil {
+		return &userv1.ChangePasswordResponse{
+			Code:    1,
+			Message: "系统错误，稍后重试",
+		}, nil
+	}
+	if user == nil {
+		return &userv1.ChangePasswordResponse{
+			Code:    1,
+			Message: "用户不存在",
+		}, nil
+	}
+	// 检查新密码是否一致
+	if req.NewPassword != req.ConfirmPassword {
+		return &userv1.ChangePasswordResponse{
+			Code:    1,
+			Message: "新密码不一致",
+		}, nil
+	}
+	if req.NewPassword == req.OldPassword {
+		return &userv1.ChangePasswordResponse{
+			Code:    1,
+			Message: "新密码不能与旧密码相同",
+		}, nil
+	}
+	// 检查旧密码是否正确
+	ok := pkg.VerifyPassword(user.Password, req.OldPassword)
+	if !ok {
+		return &userv1.ChangePasswordResponse{
+			Code:    1,
+			Message: "旧密码错误",
+		}, nil
+	}
+
+	newPassword, err := pkg.HashPassword(req.NewPassword)
+	if err != nil {
+		return &userv1.ChangePasswordResponse{
+			Code:    1,
+			Message: "系统错误，稍后重试",
+		}, nil
+	}
+	user.Password = newPassword
+	err = s.userRepo.UpdateUser(ctx, user)
+	if err != nil {
+		return &userv1.ChangePasswordResponse{
+			Code:    1,
+			Message: "更新密码失败",
+		}, nil
+	}
+	return &userv1.ChangePasswordResponse{
+		Code:    0,
+		Message: "更新密码成功",
+	}, nil
+}
+
+func (s *UserService) BindPhone(ctx context.Context, req *userv1.BindPhoneRequest) (*userv1.BindPhoneResponse, error) {
+	validator := NewBindPhoneRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &userv1.BindPhoneResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
+	//先检查该用户是否存在
+	user, err := s.userRepo.GetUserByID(ctx, req.UserId)
+	if err != nil {
+		return &userv1.BindPhoneResponse{
+			Code:    1,
+			Message: "系统错误，稍后重试",
+		}, nil
+	}
+	if user == nil {
+		return &userv1.BindPhoneResponse{
+			Code:    1,
+			Message: "用户不存在",
+		}, nil
+	}
+	// 检查新手机号是否与当前手机号相同
+	if user.Phone == req.NewPhone {
+		return &userv1.BindPhoneResponse{
+			Code:    1,
+			Message: "新手机号与当前手机号相同",
+		}, nil
+	}
+	//检查新手机号是否已注册
+	existingUser, err := s.userRepo.GetUserByPhone(ctx, req.NewPhone)
+	if err != nil {
+		return &userv1.BindPhoneResponse{
+			Code:    1,
+			Message: "系统错误，稍后重试",
+		}, nil
+	}
+	if existingUser != nil {
+		return &userv1.BindPhoneResponse{
+			Code:    1,
+			Message: "新手机号已注册",
+		}, nil
+	}
+	//验证新短信验证码
+	err = s.VerifySMSCode(ctx, req.NewPhone, req.NewSmsCode)
+	if err != nil {
+		return &userv1.BindPhoneResponse{
+			Code:    1,
+			Message: "新短信验证码错误",
+		}, nil
+	}
+	//更新用户手机号
+	user.Phone = req.NewPhone
+	err = s.userRepo.UpdateUser(ctx, user)
+	if err != nil {
+		return &userv1.BindPhoneResponse{
+			Code:    1,
+			Message: "更新手机号失败",
+		}, nil
+	}
+	return &userv1.BindPhoneResponse{
+		Code:    0,
+		Message: "更新手机号成功",
+	}, nil
+}

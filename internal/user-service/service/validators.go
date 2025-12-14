@@ -91,3 +91,41 @@ func (u *UpdateUserRequestValidator) Validate() error {
 	}
 	return nil
 }
+
+type ChangePasswordRequestValidator struct {
+	OldPassword     string `validate:"required,password" label:"旧密码"`
+	NewPassword     string `validate:"required,password" label:"新密码"`
+	ConfirmPassword string `validate:"required,eqfield=NewPassword" label:"确认新密码"`
+}
+
+func NewChangePasswordRequestValidator(req *userv1.ChangePasswordRequest) *ChangePasswordRequestValidator {
+	return &ChangePasswordRequestValidator{
+		OldPassword:     req.OldPassword,
+		NewPassword:     req.NewPassword,
+		ConfirmPassword: req.ConfirmPassword,
+	}
+}
+func (c *ChangePasswordRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(c); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type BindPhoneRequestValidator struct {
+	NewPhone   string `validate:"required,phone" label:"新手机号"`
+	NewSmsCode string `validate:"required,sms_code" label:"新短信验证码"`
+}
+
+func NewBindPhoneRequestValidator(req *userv1.BindPhoneRequest) *BindPhoneRequestValidator {
+	return &BindPhoneRequestValidator{
+		NewPhone:   req.NewPhone,
+		NewSmsCode: req.NewSmsCode,
+	}
+}
+func (b *BindPhoneRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(b); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
