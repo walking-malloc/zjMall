@@ -1045,7 +1045,6 @@
       "properties": {
         "id": {
           "type": "string",
-          "format": "int64",
           "title": "用户ID"
         },
         "phone": {
@@ -1213,10 +1212,6 @@
         "nickname": {
           "type": "string",
           "title": "昵称（可选）"
-        },
-        "avatar": {
-          "type": "string",
-          "title": "头像URL（可选）"
         },
         "email": {
           "type": "string",

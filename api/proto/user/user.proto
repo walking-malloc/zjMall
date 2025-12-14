@@ -57,6 +57,7 @@ service UserService {
     };
   }
   
+
   // 更新用户信息
   rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {
     option (google.api.http) = {
@@ -64,7 +65,7 @@ service UserService {
       body: "*"
     };
   }
-  
+
   // 查询用户状态
   rpc GetUserStatus(GetUserStatusRequest) returns (GetUserStatusResponse) {
     option (google.api.http) = {
@@ -219,7 +220,7 @@ message GetSMSCodeResponse {
 
 // 用户信息
 message UserInfo {
-  int64 id = 1;            // 用户ID
+  string id = 1;            // 用户ID
   string phone = 2;        // 手机号（脱敏）
   string nickname = 3;     // 昵称
   string avatar = 4;       // 头像URL
@@ -247,7 +248,6 @@ message GetUserResponse {
 message UpdateUserRequest {
   int64 user_id = 1;       // 用户ID
   string nickname = 2;     // 昵称（可选）
-  string avatar = 3;       // 头像URL（可选）
   string email = 4;        // 邮箱（可选）
   int32 gender = 5;        // 性别（可选）
   string birthday = 6;     // 生日（可选）
@@ -275,6 +275,18 @@ message GetUserStatusResponse {
   int32 code = 1;
   string message = 2;
   UserStatusData data = 3;
+}
+
+// ========== 头像上传 ==========
+// 注意：只定义message，不定义RPC（因为使用自定义HTTP Handler）
+message UploadAvatarRequest {
+  bytes avatar = 1;  // 二进制数据（实际用FormData传，这里定义只是为了类型兼容）
+}
+
+message UploadAvatarResponse {
+  int32 code = 1;
+  string message = 2;
+  string avatar_url = 3;  // OSS上的URL
 }
 
 // ========== 收货地址 ==========

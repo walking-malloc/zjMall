@@ -1,6 +1,6 @@
 -- 用户表
 CREATE TABLE IF NOT EXISTS users (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    id VARCHAR(26) not null PRIMARY KEY,
     phone VARCHAR(11) UNIQUE NOT NULL COMMENT '手机号',
     password VARCHAR(255) NOT NULL COMMENT '密码（加密）',
     nickname VARCHAR(50) COMMENT '昵称',
@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- 收获地址表
 CREATE TABLE IF NOT EXISTS addresses (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL COMMENT '用户ID',
+    id VARCHAR(26) NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(26) NOT NULL COMMENT '用户ID',
     receiver_name VARCHAR(50) NOT NULL COMMENT '收货人姓名',
     receiver_phone VARCHAR(11) NOT NULL COMMENT '收货人手机号',
     province VARCHAR(50) NOT NULL COMMENT '省份',

@@ -12,9 +12,10 @@ var v *validator.Validate
 func Init() {
 	v = validator.New()
 
-	v.RegisterValidation("phone", validatePhone)
+	v.RegisterValidation("phone", validatePhone) //注册后会自动获取标签，然后用对应的方法校验
 	v.RegisterValidation("password", validatePassword)
 	v.RegisterValidation("sms_code", validateSMSCode)
+	v.RegisterValidation("email", validateEmail)
 
 	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		name := fld.Tag.Get("label")
@@ -41,10 +42,51 @@ func validatePassword(fl validator.FieldLevel) bool {
 	return hasLetter && hasDigit
 }
 
-// validateSMSCode 校验短信验证码（6位数字）
+// ValidateSMSCode 校验短信验证码（6位数字）
 func validateSMSCode(fl validator.FieldLevel) bool {
 	code := fl.Field().String()
 	matched, _ := regexp.MatchString(`^\d{6}$`, code)
+	return matched
+}
+
+func validateEmail(fl validator.FieldLevel) bool {
+	email := fl.Field().String()
+	matched, _ := regexp.MatchString(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`, email)
+	return matched
+}
+
+// ========== 单个字段校验函数（接受 string 参数）==========
+
+// IsValidPhone 校验手机号（接受 string 参数）
+// phone: 手机号
+// 返回: true 表示有效，false 表示无效
+func IsValidPhone(phone string) bool {
+	match, _ := regexp.MatchString(`^1[3-9]\d{9}$`, phone)
+	return match
+}
+
+// IsValidPassword 校验密码（接受 string 参数）
+// password: 密码
+// 返回: true 表示有效，false 表示无效
+func IsValidPassword(password string) bool {
+	if len(password) < 6 || len(password) > 20 {
+		return false
+	}
+	hasLetter := regexp.MustCompile(`[a-zA-Z]`).MatchString(password)
+	hasDigit := regexp.MustCompile(`[0-9]`).MatchString(password)
+	return hasLetter && hasDigit
+}
+
+// IsValidSMSCode 校验短信验证码（接受 string 参数）
+// code: 短信验证码
+// 返回: true 表示有效，false 表示无效
+func IsValidSMSCode(code string) bool {
+	matched, _ := regexp.MatchString(`^\d{6}$`, code)
+	return matched
+}
+
+func IsValidEmail(email string) bool {
+	matched, _ := regexp.MatchString(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`, email)
 	return matched
 }
 

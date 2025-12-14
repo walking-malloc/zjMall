@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>头像上传测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .file-info {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+
+        .result.loading {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+
+        .preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .preview img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-top: 10px;
+        }
+
+        .preview-url {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+            word-break: break-all;
+        }
+
+        .preview-url a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .preview-url a:hover {
+            text-decoration: underline;
+        }
+
+        .tips {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .tips h3 {
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .tips ul {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ 头像上传测试</h1>
+
+        <div class="form-group">
+            <label for="tokenInput">Token（登录后获取）</label>
+            <input type="text" id="tokenInput" placeholder="请输入你的 JWT Token">
+        </div>
+
+        <div class="form-group">
+            <label for="fileInput">选择头像图片</label>
+            <input type="file" id="fileInput" accept="image/*">
+            <div class="file-info" id="fileInfo"></div>
+        </div>
+
+        <button id="uploadBtn" onclick="uploadAvatar()">上传头像</button>
+
+        <div id="result" class="result"></div>
+
+        <div class="preview" id="preview" style="display: none;">
+            <h3>上传成功！</h3>
+            <img id="previewImg" src="" alt="头像预览">
+            <div class="preview-url" id="previewUrl"></div>
+        </div>
+
+        <div class="tips">
+            <h3>💡 使用提示</h3>
+            <ul>
+                <li>1. 先登录获取 Token，复制到上面的输入框</li>
+                <li>2. 选择一张图片（建议小于 5MB）</li>
+                <li>3. 点击上传按钮</li>
+                <li>4. 上传成功后，头像URL会自动保存到你的账户</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const apiBase = 'http://localhost:8081'; // 修改为你的服务器地址
+        const tokenInput = document.getElementById('tokenInput');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const resultDiv = document.getElementById('result');
+        const previewDiv = document.getElementById('preview');
+        const previewImg = document.getElementById('previewImg');
+        const previewUrl = document.getElementById('previewUrl');
+        const fileInfo = document.getElementById('fileInfo');
+
+        // 显示文件信息
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                fileInfo.textContent = `文件名: ${file.name} | 大小: ${fileSize} MB | 类型: ${file.type}`;
+            } else {
+                fileInfo.textContent = '';
+            }
+        });
+
+        async function uploadAvatar() {
+            // 1. 获取输入值
+            let token = tokenInput.value.trim();
+            const file = fileInput.files[0];
+
+            // 2. 校验输入
+            if (!token) {
+                showResult('请先输入 Token', 'error');
+                return;
+            }
+
+            if (!file) {
+                showResult('请选择图片文件', 'error');
+                return;
+            }
+
+            // 3. 校验文件大小（5MB）
+            if (file.size > 5 * 1024 * 1024) {
+                showResult('图片大小不能超过 5MB', 'error');
+                return;
+            }
+
+            // 4. 确保Token格式正确
+            if (!token.startsWith('Bearer ')) {
+                token = 'Bearer ' + token;
+            }
+
+            // 5. 显示加载状态
+            uploadBtn.disabled = true;
+            showResult('正在上传...', 'loading');
+
+            try {
+                // 6. 创建FormData
+                const formData = new FormData();
+                formData.append('avatar', file);
+
+                console.log('开始上传，URL:', `${apiBase}/api/v1/users/avatar`);
+                console.log('Token:', token.substring(0, 20) + '...');
+                console.log('文件:', file.name, file.size, 'bytes');
+
+                // 7. 发送请求
+                const response = await fetch(`${apiBase}/api/v1/users/avatar`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': token
+                        // 注意：不要设置 Content-Type，浏览器会自动设置 multipart/form-data
+                    },
+                    body: formData,
+                    mode: 'cors' // 明确指定 CORS
+                });
+
+                console.log('响应状态:', response.status, response.statusText);
+
+                // 8. 检查响应状态
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('响应错误:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+                }
+
+                // 9. 解析响应
+                const result = await response.json();
+                console.log('响应数据:', result);
+                console.log('code 值:', result.code, '类型:', typeof result.code);
+
+                // 判断成功：code === 0 或者有 avatar_url 且 message 包含"成功"
+                const isSuccess = result.code === 0 || 
+                                 (result.avatar_url && (result.message && result.message.includes('成功')));
+                
+                if (isSuccess) {
+                    // 上传成功
+                    showResult('✅ 上传成功！', 'success');
+                    
+                    // 显示预览
+                    if (result.avatar_url) {
+                        previewImg.src = result.avatar_url;
+                        previewUrl.innerHTML = `头像URL: <a href="${result.avatar_url}" target="_blank">${result.avatar_url}</a>`;
+                        previewDiv.style.display = 'block';
+                    }
+                    
+                    // 清空文件选择
+                    fileInput.value = '';
+                    fileInfo.textContent = '';
+                } else {
+                    // 上传失败
+                    showResult(`❌ 上传失败: ${result.message || '未知错误'}`, 'error');
+                    previewDiv.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('上传错误:', error);
+                let errorMsg = `❌ 错误: ${error.message}`;
+                
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    errorMsg += '<br><br>💡 可能的原因：<br>1. 服务器未运行（检查 http://localhost:8081）<br>2. CORS 问题（建议通过 HTTP 服务器打开此页面）<br>3. 网络连接问题<br>4. 请检查浏览器控制台（F12）获取详细错误信息';
+                }
+                
+                showResult(errorMsg, 'error');
+                previewDiv.style.display = 'none';
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+
+        function showResult(message, type) {
+            resultDiv.innerHTML = message; // 使用 innerHTML 支持 HTML 格式
+            resultDiv.className = `result ${type}`;
+        }
+
+        // 支持回车键上传
+        tokenInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                uploadAvatar();
+            }
+        });
+    </script>
+</body>
+</html>
+

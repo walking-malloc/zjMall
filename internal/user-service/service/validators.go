@@ -54,18 +54,39 @@ func (l *LoginRequestValidator) Validate() error {
 	return nil
 }
 
-type GetSMSCodeRequestValidator struct {
-	Phone string `validate:"required,phone" label:"手机号"`
+type LoginBySMSRequestValidator struct {
+	Phone   string `validate:"required,phone" label:"手机号"`
+	SmsCode string `validate:"required,sms_code" label:"短信验证码"`
 }
 
-func NewGetSMSCodeRequestValidator(req *userv1.GetSMSCodeRequest) *GetSMSCodeRequestValidator {
-	return &GetSMSCodeRequestValidator{
-		Phone: req.Phone,
+func NewLoginBySMSRequestValidator(req *userv1.LoginBySMSRequest) *LoginBySMSRequestValidator {
+	return &LoginBySMSRequestValidator{
+		Phone:   req.Phone,
+		SmsCode: req.SmsCode,
 	}
 }
+func (l *LoginBySMSRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(l); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
 
-func (g *GetSMSCodeRequestValidator) Validate() error {
-	if err := validator.ValidateStruct(g); err != nil {
+type UpdateUserRequestValidator struct {
+	Email    string `validate:"required,email" label:"邮箱"`
+	Gender   int32  `validate:"required,oneof=0 1 2" label:"性别"`
+	Birthday string `validate:"required,date" label:"生日"`
+}
+
+func NewUpdateUserRequestValidator(req *userv1.UpdateUserRequest) *UpdateUserRequestValidator {
+	return &UpdateUserRequestValidator{
+		Email:    req.Email,
+		Gender:   req.Gender,
+		Birthday: req.Birthday,
+	}
+}
+func (u *UpdateUserRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(u); err != nil {
 		return errors.New(validator.FormatError(err))
 	}
 	return nil

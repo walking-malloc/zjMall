@@ -49,11 +49,27 @@ type SMSConfig struct {
 	SendInterval int `yaml:"send_interval"`
 	MaxSendCount int `yaml:"max_send_count"`
 }
+
+type JWTConfig struct {
+	Secret              string        `yaml:"secret"`
+	ExpiresIn           time.Duration `yaml:"expires_in"`
+	RememberMeExpiresIn time.Duration `yaml:"remember_me_expires_in"`
+}
+type OSSConfig struct {
+	Endpoint        string `yaml:"endpoint"`          // OSS 访问端点
+	AccessKeyID     string `yaml:"access_key_id"`     // AccessKey ID
+	AccessKeySecret string `yaml:"access_key_secret"` // AccessKey Secret
+	BucketName      string `yaml:"bucket_name"`       // Bucket 名称
+	BaseURL         string `yaml:"base_url"`          // 访问的基础 URL（CDN 地址或 OSS 地址）
+	AvatarPath      string `yaml:"avatar_path"`       // 头像存储路径前缀
+}
 type Config struct {
 	Services map[string]ServiceConfig `yaml:"services"`
 	MySQL    DatabaseConfig           `yaml:"mysql"`
 	Redis    RedisConfig              `yaml:"redis"`
 	SMS      SMSConfig                `yaml:"sms"`
+	JWT      JWTConfig                `yaml:"jwt"`
+	OSS      OSSConfig                `yaml:"oss"`
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -90,4 +106,12 @@ func (c *Config) GetRedisConfig() *RedisConfig {
 
 func (c *Config) GetSMSConfig() *SMSConfig {
 	return &c.SMS
+}
+
+func (c *Config) GetJWTConfig() *JWTConfig {
+	return &c.JWT
+}
+
+func (c *Config) GetOSSConfig() *OSSConfig {
+	return &c.OSS
 }

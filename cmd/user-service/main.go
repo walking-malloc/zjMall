@@ -8,6 +8,7 @@ import (
 	userv1 "zjMall/gen/go/api/proto/user"
 	"zjMall/internal/common/cache"
 	"zjMall/internal/common/middleware"
+	upload "zjMall/internal/common/oss"
 	"zjMall/internal/common/server"
 	"zjMall/internal/config"
 	"zjMall/internal/database"
@@ -15,6 +16,7 @@ import (
 	"zjMall/internal/user-service/handler"
 	"zjMall/internal/user-service/repository"
 	"zjMall/internal/user-service/service"
+	"zjMall/pkg"
 	"zjMall/pkg/validator"
 
 	"google.golang.org/grpc"
@@ -46,19 +48,30 @@ func main() {
 	//4.初始化校验器
 	validator.Init()
 
-	// 5. 创建通用的缓存仓库（所有服务共享）
+	// 5. 初始化 JWT
+	jwtConfig := config.GetJWTConfig()
+	pkg.InitJWT(jwtConfig)
+
+	// 6. 创建通用的缓存仓库（所有服务共享）
 	baseCacheRepo := cache.NewCacheRepository(redisClient)
 
-	// 6. 创建用户仓库
+	// 7. 创建用户仓库
 	userRepo := repository.NewUserRepository(db, baseCacheRepo)
 
-	// 7. 获取短信配置并创建短信客户端（Mock）
+	// 8. 获取短信配置并创建短信客户端（Mock）
 	smsConfig := config.GetSMSConfig()
 	smsClient := sms.NewMockSMSClient()
 	log.Println("✅ 使用 Mock 短信服务（学习模式）")
 
-	// 8. 创建Service
-	userService := service.NewUserService(userRepo, smsClient, *smsConfig)
+	// 9. 创建OSS客户端
+	ossConfig := config.GetOSSConfig()
+	ossClient, err := upload.NewOSSClient(ossConfig)
+	if err != nil {
+		log.Fatalf("Error initializing OSS: %v", err)
+	}
+
+	// 10. 创建Service
+	userService := service.NewUserService(userRepo, smsClient, *smsConfig, ossClient)
 
 	//7.创建Handler
 	userServiceHandler := handler.NewUserServiceHandler(userService)
@@ -81,6 +94,9 @@ func main() {
 		userv1.RegisterUserServiceServer(grpcServer, userServiceHandler)
 	})
 
+	// 注册自定义HTTP路由（头像上传）- 必须在 gRPC-Gateway 之前注册，确保优先匹配
+	srv.AddRoute("/api/v1/users/avatar", userServiceHandler.UploadAvatarHTTP)
+
 	// 注册 HTTP 网关处理器
 	if err := srv.RegisterHTTPGateway(commonv1.RegisterHealthServiceHandlerFromEndpoint); err != nil {
 		log.Fatalf("failed to register health service gateway: %v", err)
@@ -89,7 +105,6 @@ func main() {
 	if err := srv.RegisterHTTPGateway(userv1.RegisterUserServiceHandlerFromEndpoint); err != nil {
 		log.Fatalf("failed to register user service gateway: %v", err)
 	}
-
 	// 注册 Swagger 文档
 	srv.RegisterSwagger(
 		server.SwaggerDoc{
@@ -101,12 +116,11 @@ func main() {
 		},
 	)
 
-	// 使用中间件
 	srv.UseMiddleware(
-		middleware.Recovery(),
-		middleware.CORS(middleware.DefaultCORSConfig()),
-		middleware.TraceID(),
-		middleware.Logging(),
+		middleware.CORS(middleware.DefaultCORSConfig()), // 1. 最外层：处理跨域（所有响应都需要）
+		middleware.Recovery(),                           // 2. 捕获 panic（需要 TraceID）
+		middleware.Logging(),                            // 3. 记录日志（需要 TraceID）
+		middleware.TraceID(),                            // 4. 生成 TraceID（供 Logging 和 Recovery 使用）
 	)
 
 	// 启动服务器（阻塞）

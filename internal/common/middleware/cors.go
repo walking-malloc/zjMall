@@ -34,9 +34,15 @@ func CORS(config CORSConfig) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
 
-			// 检查 Origin 是否在允许列表中
-			if isOriginAllowed(origin, config.AllowedOrigins) {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
+			// 检查 Origin 是否在允许列表中（支持 * 和 null）
+			// 对于空 origin（file:// 协议）或 "null"，也允许
+			if isOriginAllowed(origin, config.AllowedOrigins) || origin == "" || origin == "null" {
+				// 对于 file:// 协议（origin 为空或 "null"），设置为 *
+				if origin == "" || origin == "null" {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+				} else {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+				}
 			}
 
 			// 设置允许的方法

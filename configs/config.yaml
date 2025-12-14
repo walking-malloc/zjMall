@@ -39,3 +39,23 @@ sms:
   expire_time: 300
   send_interval: 60
   max_send_count: 20
+
+jwt:
+  secret: "your-secret-key-change-in-production"
+  expires_in: 168h  # 7 天 (7 * 24 小时)
+  remember_me_expires_in: 720h  # 30 天 (30 * 24 小时)
+
+oss:
+  endpoint: "oss-cn-beijing.aliyuncs.com"
+  access_key_id: "LTAI5t5eoRxM5CxHYEgYBE2q"
+  access_key_secret: "3EOOuFvK38wA92XEhxXsayBQtuXHTF"
+  bucket_name: "zjmall88"
+  base_url: "https://zjmall88.oss-cn-beijing.aliyuncs.com"
+  avatar_path: "avatar"
+
+ignore_paths:
+  - /api/v1/users/register
+  - /api/v1/users/login
+  - /api/v1/users/login-by-sms
+  - /healthz
+  - /swagger/

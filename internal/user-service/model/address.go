@@ -8,7 +8,7 @@ type Address struct {
 	pkg.BaseModel
 
 	// 关联信息
-	UserID int64 `json:"user_id"`
+	UserID string `json:"user_id" gorm:"type:varchar(26);index"`
 
 	// 收货人信息
 	ReceiverName  string `json:"receiver_name"`
