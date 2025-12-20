@@ -450,6 +450,7 @@ func (s *UserService) UpdateUser(ctx context.Context, req *userv1.UpdateUserRequ
 		}, nil
 	}
 
+	user.Nickname = req.Nickname
 	user.Email = req.Email
 	user.Gender = int8(req.Gender)
 
