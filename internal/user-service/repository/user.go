@@ -12,7 +12,16 @@ import (
 	"gorm.io/gorm"
 )
 
+type UserAuthInfo struct {
+	ID       string `json:"id" gorm:"column:id"`
+	Phone    string `json:"phone" gorm:"column:phone"`
+	Password string `json:"password" gorm:"column:password"`
+}
 type UserRepository interface {
+	//单独密码获取操作
+	GetUserPasswordByPhone(ctx context.Context, phone string) (*UserAuthInfo, error)
+	GetUserPasswordByID(ctx context.Context, id string) (*UserAuthInfo, error)
+
 	CreateUser(ctx context.Context, user *model.User) error
 	GetUserByID(ctx context.Context, id string) (*model.User, error)
 	GetUserByPhone(ctx context.Context, phone string) (*model.User, error)
@@ -262,4 +271,26 @@ func (r *userRepository) CreateAddressWithDefault(ctx context.Context, address *
 
 		return nil
 	})
+}
+func (r *userRepository) GetUserPasswordByPhone(ctx context.Context, phone string) (*UserAuthInfo, error) {
+	var userAuthInfo UserAuthInfo
+	err := r.db.WithContext(ctx).Model(&model.User{}).Where("phone = ?", phone).Select("id", "phone", "password").First(&userAuthInfo).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil // 用户不存在
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &userAuthInfo, nil
+}
+func (r *userRepository) GetUserPasswordByID(ctx context.Context, id string) (*UserAuthInfo, error) {
+	var userAuthInfo UserAuthInfo
+	err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", id).Select("id", "phone", "password").First(&userAuthInfo).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil // 用户不存在
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &userAuthInfo, nil
 }

@@ -40,9 +40,11 @@ func NewUserService(userRepo repository.UserRepository, smsClient sms.SMSClient,
 
 // 用户注册接口
 func (s *UserService) Register(ctx context.Context, req *userv1.RegisterRequest) (*userv1.RegisterResponse, error) {
+
 	// 校验请求参数
 	validator := NewRegisterRequestValidator(req)
 	if err := validator.Validate(); err != nil {
+		log.Printf("参数校验失败: %v", err)
 		return &userv1.RegisterResponse{
 			Code:    1,
 			Message: err.Error(),
@@ -98,11 +100,13 @@ func (s *UserService) Register(ctx context.Context, req *userv1.RegisterRequest)
 	//创建用户
 	err = s.userRepo.CreateUser(ctx, user)
 	if err != nil {
+		log.Printf("创建用户失败: Phone=%s, Error=%v", req.Phone, err)
 		return &userv1.RegisterResponse{
 			Code:    1,
 			Message: err.Error(),
 		}, nil
 	}
+	log.Printf("用户创建成功: ID=%s, Phone=%s", user.ID, user.Phone)
 
 	//生成JWT Token（注册后自动登录，使用默认过期时间）
 	expirationTime := 7 * 24 * time.Hour
@@ -143,22 +147,25 @@ func (s *UserService) Login(ctx context.Context, req *userv1.LoginRequest) (*use
 	}
 
 	// 先查看是否用户存在
-	user, err := s.userRepo.GetUserByPhone(ctx, req.Phone)
+	userAuthInfo, err := s.userRepo.GetUserPasswordByPhone(ctx, req.Phone)
 	if err != nil {
+		log.Printf("获取用户密码失败: %v", err)
 		return &userv1.LoginResponse{
 			Code:    1,
 			Message: "系统错误，稍后重试",
 		}, nil
 	}
-	if user == nil {
+	if userAuthInfo == nil {
 		return &userv1.LoginResponse{
 			Code:    1,
 			Message: "用户不存在，请先注册",
 		}, nil
 	}
+
 	//验证密码是否正确
-	ok := pkg.VerifyPassword(user.Password, req.Password)
+	ok := pkg.VerifyPassword(userAuthInfo.Password, req.Password)
 	if !ok {
+		log.Printf("密码错误: Phone=%s", req.Phone)
 		return &userv1.LoginResponse{
 			Code:    1,
 			Message: "密码错误",
@@ -171,12 +178,12 @@ func (s *UserService) Login(ctx context.Context, req *userv1.LoginRequest) (*use
 	var expirationTime time.Duration
 
 	if req.RememberMe {
-		token, expiresAt, err = pkg.GenerateJWTWithRememberMe(user.ID, req.RememberMe)
+		token, expiresAt, err = pkg.GenerateJWTWithRememberMe(userAuthInfo.ID, req.RememberMe)
 		// 计算过期时长：从当前时间到过期时间戳的时长
 		expirationTime = time.Until(time.Unix(expiresAt, 0))
 	} else {
 		expirationTime = 7 * 24 * time.Hour
-		token, expiresAt, err = pkg.GenerateJWT(user.ID, expirationTime)
+		token, expiresAt, err = pkg.GenerateJWT(userAuthInfo.ID, expirationTime)
 	}
 
 	// 先检查错误，再存储 token
@@ -189,19 +196,19 @@ func (s *UserService) Login(ctx context.Context, req *userv1.LoginRequest) (*use
 
 	//在缓存中记录token（异步，使用 Background context）
 	go func() {
-		if err := s.userRepo.SetTokenToCache(context.Background(), user.ID, token, expirationTime); err != nil {
+		if err := s.userRepo.SetTokenToCache(context.Background(), userAuthInfo.ID, token, expirationTime); err != nil {
 			log.Printf("存储 Token 到缓存失败: %v", err)
 		}
 	}()
-
-	// 转换为 UserInfo
-	userInfo := s.convertToUserInfo(user)
 
 	return &userv1.LoginResponse{
 		Code:    0,
 		Message: "登录成功",
 		Data: &userv1.LoginData{
-			User:      userInfo,
+			User: &userv1.UserInfo{
+				Id:    userAuthInfo.ID,
+				Phone: s.maskPhone(userAuthInfo.Phone),
+			},
 			Token:     token,
 			ExpiresAt: expiresAt,
 		},
