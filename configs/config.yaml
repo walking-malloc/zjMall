@@ -10,12 +10,16 @@ services:
     http:
       port: 8081
 
+# 服务名到数据库名的映射（可选，如果不配置则使用命名约定）
+service_databases:
+  user-service: user_db
+  product-service: product_db
+
 mysql:
   host: 47.95.221.177
   port: 3306
   username: root
   password: root123456
-  db_name: zjmall
   charset: utf8mb4
   parseTime: true
   max_idle_conns: 10

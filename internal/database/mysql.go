@@ -20,7 +20,7 @@ func InitMySQL(config *config.DatabaseConfig) (*gorm.DB, error) {
 		config.DBName,
 		config.Charset,
 		config.ParseTime)
-
+	fmt.Println("--------dsn", dsn)
 	gormConfig := &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	}

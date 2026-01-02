@@ -29,8 +29,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
-	//2.初始化数据库
-	mysqlConfig := config.GetMySQLConfig()
+	//2.初始化数据库（使用服务特定的数据库配置）
+	serviceName := "user-service"
+	mysqlConfig, err := config.GetDatabaseConfigForService(serviceName)
+	if err != nil {
+		log.Fatalf("Error getting database config for %s: %v", serviceName, err)
+	}
 	db, err := database.InitMySQL(mysqlConfig)
 	if err != nil {
 		log.Fatalf("Error initializing MySQL: %v", err)
@@ -76,7 +80,6 @@ func main() {
 	//7.创建Handler
 	userServiceHandler := handler.NewUserServiceHandler(userService)
 
-	serviceName := "user-service"
 	serviceCfg, err := config.GetServiceConfig(serviceName)
 	if err != nil {
 		log.Fatalf("Error getting service config: %v", err)

@@ -64,12 +64,13 @@ type OSSConfig struct {
 	AvatarPath      string `yaml:"avatar_path"`       // 头像存储路径前缀
 }
 type Config struct {
-	Services map[string]ServiceConfig `yaml:"services"`
-	MySQL    DatabaseConfig           `yaml:"mysql"`
-	Redis    RedisConfig              `yaml:"redis"`
-	SMS      SMSConfig                `yaml:"sms"`
-	JWT      JWTConfig                `yaml:"jwt"`
-	OSS      OSSConfig                `yaml:"oss"`
+	Services         map[string]ServiceConfig `yaml:"services"`
+	MySQL            DatabaseConfig           `yaml:"mysql"`
+	ServiceDatabases map[string]string        `yaml:"service_databases"` // 服务名到数据库名的映射
+	Redis            RedisConfig              `yaml:"redis"`
+	SMS              SMSConfig                `yaml:"sms"`
+	JWT              JWTConfig                `yaml:"jwt"`
+	OSS              OSSConfig                `yaml:"oss"`
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -114,4 +115,42 @@ func (c *Config) GetJWTConfig() *JWTConfig {
 
 func (c *Config) GetOSSConfig() *OSSConfig {
 	return &c.OSS
+}
+
+// GetDatabaseConfigForService 根据服务名返回对应的数据库配置
+// 优先从配置文件中的 service_databases 映射获取，如果没有则使用命名约定
+func (c *Config) GetDatabaseConfigForService(serviceName string) (*DatabaseConfig, error) {
+	// 验证服务是否存在
+	_, exists := c.Services[serviceName]
+	if !exists {
+		return nil, fmt.Errorf("service %s not found in config", serviceName)
+	}
+
+	var dbName string
+
+	// 优先从配置文件中获取映射
+	if c.ServiceDatabases != nil {
+		if mappedDbName, ok := c.ServiceDatabases[serviceName]; ok {
+			dbName = mappedDbName
+		}
+	}
+
+	// 如果配置文件中没有映射，使用命名约定：service-name -> service_db
+	if dbName == "" {
+		// 去掉 "-service" 后缀，然后加上 "_db"
+		// 例如：user-service -> user_db
+		if len(serviceName) > 8 && serviceName[len(serviceName)-8:] == "-service" {
+			dbName = serviceName[:len(serviceName)-8] + "_db"
+		} else {
+			// 如果没有 "-service" 后缀，直接加上 "_db"
+			dbName = serviceName + "_db"
+		}
+	}
+
+	// 复制基础 MySQL 配置
+	dbConfig := c.MySQL
+	// 设置服务特定的数据库名
+	dbConfig.DBName = dbName
+
+	return &dbConfig, nil
 }
