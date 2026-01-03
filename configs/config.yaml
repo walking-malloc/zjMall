@@ -9,7 +9,12 @@ services:
       port: 50052
     http:
       port: 8081
-
+  product-service:
+    grpc:
+      port: 50053
+    http:
+      port: 8082
+      
 # 服务名到数据库名的映射（可选，如果不配置则使用命名约定）
 service_databases:
   user-service: user_db

@@ -12,6 +12,16 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	// Redis Key 前缀常量
+	CacheKeyUserByID    = "user:id:%s"           // 用户ID缓存
+	CacheKeyUserByPhone = "user:phone:%s"        // 用户手机号缓存
+	CacheKeyUserToken   = "user:token:%s"        // 用户Token缓存
+	CacheKeySMSCode     = "user:sms:code:%s"     // 短信验证码
+	CacheKeySMSRate     = "user:sms:rate:%s"     // 短信频率限制
+	CacheKeySMSCount    = "user:sms:count:%s:%s" // 短信每日计数（phone + date）
+)
+
 type UserAuthInfo struct {
 	ID       string `json:"id" gorm:"column:id"`
 	Phone    string `json:"phone" gorm:"column:phone"`
@@ -32,11 +42,6 @@ type UserRepository interface {
 	GetSMSCode(ctx context.Context, phone string) (string, error)
 	DeleteSMSCode(ctx context.Context, phone string) error
 	CheckSMSCodeRateLimit(ctx context.Context, phone string, interval int64, dailyLimit int64) error
-
-	//token相关操作
-	SetTokenToCache(ctx context.Context, userID string, token string, expiration time.Duration) error
-	GetTokenFromCache(ctx context.Context, userID string) (string, error)
-	DeleteTokenFromCache(ctx context.Context, userID string) error
 
 	//地址相关操作
 	AddAddress(ctx context.Context, address *model.Address) error
@@ -59,6 +64,8 @@ func NewUserRepository(db *gorm.DB, cacheRepo cache.CacheRepository) UserReposit
 	}
 }
 
+//TODO: 用户信息缓存需要防止缓存击穿
+
 func (r *userRepository) CreateUser(ctx context.Context, user *model.User) error {
 	// ULID 会在 BeforeCreate 钩子中自动生成
 	if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
@@ -66,17 +73,17 @@ func (r *userRepository) CreateUser(ctx context.Context, user *model.User) error
 	}
 	// 清除并设置相关缓存
 	go func() {
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf("user:id:%s", user.ID))
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf("user:phone:%s", user.Phone))
-		r.setToCache(context.Background(), fmt.Sprintf("user:id:%s", user.ID), user, 30*time.Minute)
-		r.setToCache(context.Background(), fmt.Sprintf("user:phone:%s", user.Phone), user, 30*time.Minute)
+		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CacheKeyUserByID, user.ID))
+		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CacheKeyUserByPhone, user.Phone))
+		r.setToCache(context.Background(), fmt.Sprintf(CacheKeyUserByID, user.ID), user, 30*time.Minute)
+		r.setToCache(context.Background(), fmt.Sprintf(CacheKeyUserByPhone, user.Phone), user, 30*time.Minute)
 	}()
 	return nil
 }
 
 func (r *userRepository) GetUserByID(ctx context.Context, id string) (*model.User, error) {
 	//先从redis中获取用户信息
-	cacheKey := fmt.Sprintf("user:id:%s", id)
+	cacheKey := fmt.Sprintf(CacheKeyUserByID, id)
 	if user := r.getFromCache(ctx, cacheKey); user != nil {
 		return user, nil
 	}
@@ -96,7 +103,7 @@ func (r *userRepository) GetUserByID(ctx context.Context, id string) (*model.Use
 
 func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (*model.User, error) {
 	// 1. 先查缓存
-	cacheKey := fmt.Sprintf("user:phone:%s", phone)
+	cacheKey := fmt.Sprintf(CacheKeyUserByPhone, phone)
 	if user := r.getFromCache(ctx, cacheKey); user != nil {
 		return user, nil
 	}
@@ -127,9 +134,9 @@ func (r *userRepository) UpdateUser(ctx context.Context, user *model.User) error
 		return err
 	}
 	go func() {
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf("user:id:%s", oldUser.ID))
+		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CacheKeyUserByID, oldUser.ID))
 		if oldUser.Phone != "" {
-			r.cacheRepo.Delete(context.Background(), fmt.Sprintf("user:phone:%s", oldUser.Phone))
+			r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CacheKeyUserByPhone, oldUser.Phone))
 		}
 	}()
 	return nil
@@ -157,58 +164,46 @@ func (r *userRepository) setToCache(ctx context.Context, key string, user *model
 		return // 序列化失败，不写入缓存
 	}
 
-	r.cacheRepo.Set(ctx, key, data, expiration)
-}
-func (r *userRepository) SetTokenToCache(ctx context.Context, userID string, token string, expiration time.Duration) error {
-	key := fmt.Sprintf("user:token:%s", userID)
-	return r.cacheRepo.Set(ctx, key, token, expiration)
-}
-func (r *userRepository) GetTokenFromCache(ctx context.Context, userID string) (string, error) {
-	key := fmt.Sprintf("user:token:%s", userID)
-	return r.cacheRepo.Get(ctx, key)
-}
-func (r *userRepository) DeleteTokenFromCache(ctx context.Context, userID string) error {
-	key := fmt.Sprintf("user:token:%s", userID)
-	return r.cacheRepo.Delete(ctx, key)
+	r.cacheRepo.Set(ctx, key, string(data), expiration)
 }
 
 // 设置短信验证码
 func (r *userRepository) SetSMSCode(ctx context.Context, phone, code string, expiration time.Duration) error {
-	key := fmt.Sprintf("user:sms:code:%s", phone)
+	key := fmt.Sprintf(CacheKeySMSCode, phone)
 	return r.cacheRepo.Set(ctx, key, code, expiration)
 }
 
 // 获取短信验证码
 func (r *userRepository) GetSMSCode(ctx context.Context, phone string) (string, error) {
-	key := fmt.Sprintf("user:sms:code:%s", phone)
+	key := fmt.Sprintf(CacheKeySMSCode, phone)
 	log.Printf("GetSMSCode %s:%v", key, phone)
 	return r.cacheRepo.Get(ctx, key)
 }
 
 // 删除短信验证码
 func (r *userRepository) DeleteSMSCode(ctx context.Context, phone string) error {
-	key := fmt.Sprintf("user:sms:code:%s", phone)
+	key := fmt.Sprintf(CacheKeySMSCode, phone)
 	log.Printf("DeleteSMSCode %s:%v", key, phone)
 	return r.cacheRepo.Delete(ctx, key)
 }
 
 func (r *userRepository) CheckSMSCodeRateLimit(ctx context.Context, phone string, interval int64, dailyLimit int64) error {
-	rateKey := fmt.Sprintf("user:sms:rate:%s", phone)
-	ok, _ := r.cacheRepo.SetNX(ctx, rateKey, 1, time.Duration(interval)*time.Second) //如果key存在，表示在interval秒内已经发送过短信验证码
+	rateKey := fmt.Sprintf(CacheKeySMSRate, phone)
+	ok, _ := r.cacheRepo.SetNXInt(ctx, rateKey, 1, time.Duration(interval)*time.Second) //如果key存在，表示在interval秒内已经发送过短信验证码
 	if !ok {
 		return fmt.Errorf("短信验证码发送频率过高，请%d秒后再试", interval)
 	}
 
 	//每日发送次数检查
 	today := time.Now().Format("2006-01-02")
-	countKey := fmt.Sprintf("user:sms:count:%s:%s", phone, today)
+	countKey := fmt.Sprintf(CacheKeySMSCount, phone, today)
 	count, _ := r.cacheRepo.GetInt(ctx, countKey)
 	if count >= dailyLimit {
 		return fmt.Errorf("短信验证码发送次数过多，请明日再试")
 	}
 
 	if count == 0 {
-		r.cacheRepo.Set(ctx, countKey, 1, 24*time.Hour)
+		r.cacheRepo.SetInt(ctx, countKey, 1, 24*time.Hour)
 	} else {
 		r.cacheRepo.Incr(ctx, countKey)
 	}

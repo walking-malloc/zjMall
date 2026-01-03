@@ -10,13 +10,18 @@ import (
 // CacheRepository 通用缓存仓库接口（基础方法）
 type CacheRepository interface {
 	// 基础方法
-	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
+	//string类型
+	Set(ctx context.Context, key string, value string, expiration time.Duration) error
 	Get(ctx context.Context, key string) (string, error)
+	//int类型
+	SetInt(ctx context.Context, key string, value int64, expiration time.Duration) error
+	GetInt(ctx context.Context, key string) (int64, error)
+	SetNXInt(ctx context.Context, key string, value int64, expiration time.Duration) (bool, error)
+
 	Delete(ctx context.Context, key string) error
 	Exists(ctx context.Context, key string) (bool, error)
-	SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) (bool, error)
+	SetNX(ctx context.Context, key string, value string, expiration time.Duration) (bool, error)
 	Expire(ctx context.Context, key string, expiration time.Duration) error
-	GetInt(ctx context.Context, key string) (int64, error)
 	Incr(ctx context.Context, key string) error
 }
 
@@ -32,12 +37,11 @@ func NewCacheRepository(client *redis.Client) CacheRepository {
 	}
 }
 
-// Set 设置缓存
-func (r *RedisCacheRepository) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+// string类型
+func (r *RedisCacheRepository) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
 	return r.client.Set(ctx, key, value, expiration).Err()
 }
 
-// Get 获取缓存
 func (r *RedisCacheRepository) Get(ctx context.Context, key string) (string, error) {
 	return r.client.Get(ctx, key).Result()
 }
@@ -54,7 +58,7 @@ func (r *RedisCacheRepository) Exists(ctx context.Context, key string) (bool, er
 }
 
 // SetNX 设置缓存（如果不存在）
-func (r *RedisCacheRepository) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) (bool, error) {
+func (r *RedisCacheRepository) SetNX(ctx context.Context, key string, value string, expiration time.Duration) (bool, error) {
 	return r.client.SetNX(ctx, key, value, expiration).Result()
 }
 
@@ -63,10 +67,19 @@ func (r *RedisCacheRepository) Expire(ctx context.Context, key string, expiratio
 	return r.client.Expire(ctx, key, expiration).Err()
 }
 
+// int类型
+func (r *RedisCacheRepository) SetInt(ctx context.Context, key string, value int64, expiration time.Duration) error {
+	return r.client.Set(ctx, key, value, expiration).Err()
+}
+
 func (r *RedisCacheRepository) GetInt(ctx context.Context, key string) (int64, error) {
 	return r.client.Get(ctx, key).Int64()
 }
 
 func (r *RedisCacheRepository) Incr(ctx context.Context, key string) error {
 	return r.client.Incr(ctx, key).Err()
+}
+
+func (r *RedisCacheRepository) SetNXInt(ctx context.Context, key string, value int64, expiration time.Duration) (bool, error) {
+	return r.client.SetNX(ctx, key, value, expiration).Result()
 }

@@ -66,6 +66,7 @@ func (s *UserService) Register(ctx context.Context, req *userv1.RegisterRequest)
 			Message: "手机号已注册",
 		}, nil
 	}
+	//TODO: 校验码不能明文存储，需要加密存储
 	//验证校验码
 	err = s.VerifySMSCode(ctx, req.Phone, req.SmsCode)
 	if err != nil {
@@ -117,12 +118,6 @@ func (s *UserService) Register(ctx context.Context, req *userv1.RegisterRequest)
 			Message: "生成 Token 失败",
 		}, nil
 	}
-	//在缓存中记录token（异步，使用 Background context）
-	go func() {
-		if err := s.userRepo.SetTokenToCache(context.Background(), user.ID, token, expirationTime); err != nil {
-			log.Printf("存储 Token 到缓存失败: %v", err)
-		}
-	}()
 
 	// 转换为 UserInfo
 	userInfo := s.convertToUserInfo(user)
@@ -194,13 +189,6 @@ func (s *UserService) Login(ctx context.Context, req *userv1.LoginRequest) (*use
 		}, nil
 	}
 
-	//在缓存中记录token（异步，使用 Background context）
-	go func() {
-		if err := s.userRepo.SetTokenToCache(context.Background(), userAuthInfo.ID, token, expirationTime); err != nil {
-			log.Printf("存储 Token 到缓存失败: %v", err)
-		}
-	}()
-
 	return &userv1.LoginResponse{
 		Code:    0,
 		Message: "登录成功",
@@ -254,13 +242,6 @@ func (s *UserService) LoginBySMS(ctx context.Context, req *userv1.LoginBySMSRequ
 			Message: "生成 Token 失败",
 		}, nil
 	}
-
-	//在缓存中记录token（异步，使用 Background context）
-	go func() {
-		if err := s.userRepo.SetTokenToCache(context.Background(), user.ID, token, expirationTime); err != nil {
-			log.Printf("存储 Token 到缓存失败: %v", err)
-		}
-	}()
 
 	//转换为UserInfo
 	userInfo := s.convertToUserInfo(user)

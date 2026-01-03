@@ -1,0 +1,1206 @@
+syntax = "proto3";
+
+package product.v1;
+
+option go_package = "zjMall/api/proto/gen/go/product/v1;productv1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+// 商品服务
+service ProductService {
+  // ============================================
+  // 类目管理接口
+  // ============================================
+  
+  // 创建类目
+    rpc CreateCategory(CreateCategoryRequest) returns (CreateCategoryResponse) {
+        option (google.api.http) = {
+      post: "/api/v1/product/categories"
+      body: "*"
+    };
+  }
+
+  // 查询类目详情
+  rpc GetCategory(GetCategoryRequest) returns (GetCategoryResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/categories/{category_id}"
+    };
+  }
+
+  // 更新类目
+  rpc UpdateCategory(UpdateCategoryRequest) returns (UpdateCategoryResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/categories/{category_id}"
+      body: "*"
+    };
+  }
+
+  // 删除类目
+  rpc DeleteCategory(DeleteCategoryRequest) returns (DeleteCategoryResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/categories/{category_id}"
+    };
+  }
+
+  // 查询类目列表（支持分页、按父级查询、按状态筛选）
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/categories"
+    };
+  }
+
+  // 查询类目树（返回树形结构）
+  rpc GetCategoryTree(GetCategoryTreeRequest) returns (GetCategoryTreeResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/categories/tree"
+    };
+  }
+
+  // 查询子类目列表（根据父类目ID）
+  rpc GetCategoryChildren(GetCategoryChildrenRequest) returns (GetCategoryChildrenResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/categories/{parent_id}/children"
+    };
+  }
+
+  // ============================================
+  // 品牌管理接口
+  // ============================================
+
+  // 创建品牌
+  rpc CreateBrand(CreateBrandRequest) returns (CreateBrandResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/brands"
+      body: "*"
+    };
+  }
+
+  // 查询品牌详情
+  rpc GetBrand(GetBrandRequest) returns (GetBrandResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/brands/{brand_id}"
+    };
+  }
+
+  // 更新品牌
+  rpc UpdateBrand(UpdateBrandRequest) returns (UpdateBrandResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/brands/{brand_id}"
+      body: "*"
+    };
+  }
+
+  // 删除品牌
+  rpc DeleteBrand(DeleteBrandRequest) returns (DeleteBrandResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/brands/{brand_id}"
+    };
+  }
+
+  // 查询品牌列表（支持分页、按首字母、按状态筛选）
+  rpc ListBrands(ListBrandsRequest) returns (ListBrandsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/brands"
+    };
+  }
+
+  // 按首字母分组查询品牌列表
+  rpc GetBrandsByFirstLetter(GetBrandsByFirstLetterRequest) returns (GetBrandsByFirstLetterResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/brands/by-letter"
+    };
+  }
+
+  // ============================================
+  // 品牌类目关联管理接口
+  // ============================================
+
+  // 添加品牌类目关联
+  rpc AddBrandCategory(AddBrandCategoryRequest) returns (AddBrandCategoryResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/brands/{brand_id}/categories"
+      body: "*"
+    };
+  }
+
+  // 删除品牌类目关联
+  rpc RemoveBrandCategory(RemoveBrandCategoryRequest) returns (RemoveBrandCategoryResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/brands/{brand_id}/categories/{category_id}"
+    };
+  }
+
+  // 查询品牌的类目列表
+  rpc GetBrandCategories(GetBrandCategoriesRequest) returns (GetBrandCategoriesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/brands/{brand_id}/categories"
+    };
+  }
+
+  // 批量设置品牌类目关联
+  rpc BatchSetBrandCategories(BatchSetBrandCategoriesRequest) returns (BatchSetBrandCategoriesResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/brands/{brand_id}/categories/batch"
+      body: "*"
+    };
+  }
+
+  // ============================================
+  // 商品（SPU）管理接口
+  // ============================================
+
+  // 创建商品（SPU）
+  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/products"
+      body: "*"
+    };
+  }
+
+  // 查询商品详情
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/products/{product_id}"
+    };
+  }
+
+  // 更新商品
+  rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/products/{product_id}"
+      body: "*"
+    };
+  }
+
+  // 删除商品
+  rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/products/{product_id}"
+    };
+  }
+
+  // 查询商品列表（支持分页、按类目、品牌、状态筛选）
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/products"
+    };
+  }
+
+  // 上架商品
+  rpc OnShelfProduct(OnShelfProductRequest) returns (OnShelfProductResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/products/{product_id}/on-shelf"
+      body: "*"
+    };
+  }
+
+  // 下架商品
+  rpc OffShelfProduct(OffShelfProductRequest) returns (OffShelfProductResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/products/{product_id}/off-shelf"
+      body: "*"
+    };
+  }
+
+  // 提交审核
+  rpc SubmitProductAudit(SubmitProductAuditRequest) returns (SubmitProductAuditResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/products/{product_id}/submit-audit"
+      body: "*"
+    };
+  }
+
+  // 审核商品（通过/驳回）
+  rpc AuditProduct(AuditProductRequest) returns (AuditProductResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/products/{product_id}/audit"
+      body: "*"
+    };
+  }
+
+  // ============================================
+  // 商品标签关联管理接口
+  // ============================================
+
+  // 添加商品标签关联
+  rpc AddProductTag(AddProductTagRequest) returns (AddProductTagResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/products/{product_id}/tags"
+      body: "*"
+    };
+  }
+
+  // 删除商品标签关联
+  rpc RemoveProductTag(RemoveProductTagRequest) returns (RemoveProductTagResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/products/{product_id}/tags/{tag_id}"
+    };
+  }
+
+  // 查询商品的标签列表
+  rpc GetProductTags(GetProductTagsRequest) returns (GetProductTagsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/products/{product_id}/tags"
+    };
+  }
+
+  // 批量设置商品标签关联
+  rpc BatchSetProductTags(BatchSetProductTagsRequest) returns (BatchSetProductTagsResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/products/{product_id}/tags/batch"
+      body: "*"
+    };
+  }
+
+  // ============================================
+  // SKU管理接口
+  // ============================================
+
+  // 创建SKU
+  rpc CreateSku(CreateSkuRequest) returns (CreateSkuResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/skus"
+      body: "*"
+    };
+  }
+
+  // 查询SKU详情
+  rpc GetSku(GetSkuRequest) returns (GetSkuResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/skus/{sku_id}"
+    };
+  }
+
+  // 更新SKU
+  rpc UpdateSku(UpdateSkuRequest) returns (UpdateSkuResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/skus/{sku_id}"
+      body: "*"
+    };
+  }
+
+  // 删除SKU
+  rpc DeleteSku(DeleteSkuRequest) returns (DeleteSkuResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/skus/{sku_id}"
+    };
+  }
+
+  // 查询SKU列表（支持分页、按商品、状态筛选）
+  rpc ListSkus(ListSkusRequest) returns (ListSkusResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/skus"
+    };
+  }
+
+  // 批量创建SKU（用于商品创建时批量创建多个SKU）
+  rpc BatchCreateSkus(BatchCreateSkusRequest) returns (BatchCreateSkusResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/skus/batch"
+      body: "*"
+    };
+  }
+
+  // ============================================
+  // SKU属性关联管理接口
+  // ============================================
+
+  // 添加SKU属性关联
+  rpc AddSkuAttribute(AddSkuAttributeRequest) returns (AddSkuAttributeResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/skus/{sku_id}/attributes"
+      body: "*"
+    };
+  }
+
+  // 删除SKU属性关联
+  rpc RemoveSkuAttribute(RemoveSkuAttributeRequest) returns (RemoveSkuAttributeResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/skus/{sku_id}/attributes/{attribute_value_id}"
+    };
+  }
+
+  // 查询SKU的属性列表
+  rpc GetSkuAttributes(GetSkuAttributesRequest) returns (GetSkuAttributesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/skus/{sku_id}/attributes"
+    };
+  }
+
+  // 批量设置SKU属性关联
+  rpc BatchSetSkuAttributes(BatchSetSkuAttributesRequest) returns (BatchSetSkuAttributesResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/skus/{sku_id}/attributes/batch"
+      body: "*"
+    };
+  }
+
+  // ============================================
+  // 标签管理接口
+  // ============================================
+
+  // 创建标签
+  rpc CreateTag(CreateTagRequest) returns (CreateTagResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/tags"
+      body: "*"
+    };
+  }
+
+  // 查询标签详情
+  rpc GetTag(GetTagRequest) returns (GetTagResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/tags/{tag_id}"
+    };
+  }
+
+  // 更新标签
+  rpc UpdateTag(UpdateTagRequest) returns (UpdateTagResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/tags/{tag_id}"
+            body: "*"
+        };
+    }
+
+  // 删除标签
+  rpc DeleteTag(DeleteTagRequest) returns (DeleteTagResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/tags/{tag_id}"
+    };
+  }
+
+  // 查询标签列表（支持分页、按类型、状态筛选）
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/tags"
+    };
+  }
+
+}
+
+// ============================================
+// 类目管理请求和响应体
+// ============================================
+
+// 创建类目请求
+message CreateCategoryRequest {
+  string name = 1;              // 类目名称
+  int32 level = 2;              // 类目层级：1-一级，2-二级，3-三级
+  bool is_visible = 3;          // 是否在前台展示
+  int32 sort_order = 4;         // 排序权重，数字越大越靠前
+  string parent_id = 5;         // 父类目ID（可选，顶级类目为空）
+  string icon = 6;              // 类目图标URL（可选）
+  int32 status = 7;             // 状态：1-启用，2-停用
+  bool is_leaf = 8;             // 是否为叶子节点
+}
+
+// 创建类目响应
+message CreateCategoryResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询类目详情请求
+message GetCategoryRequest {
+  string category_id = 1; // 类目ID
+}
+
+// 查询类目详情响应
+message GetCategoryResponse {
+  int32 code = 1;
+  string message = 2;
+  CategoryInfo category = 3; // 类目信息
+}
+
+// 更新类目请求
+message UpdateCategoryRequest {
+  string category_id = 1;       // 类目ID
+  string name = 2;              // 类目名称（可选）
+  int32 level = 3;              // 类目层级（可选）
+  bool is_leaf = 4;             // 是否为叶子节点（可选）
+  bool is_visible = 5;          // 是否在前台展示（可选）
+  int32 sort_order = 6;         // 排序权重（可选）
+  string icon = 7;              // 类目图标URL（可选）
+  int32 status = 8;             // 状态：1-启用，2-停用（可选）
+}
+
+// 更新类目响应
+message UpdateCategoryResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除类目请求
+message DeleteCategoryRequest {
+  string category_id = 1; // 类目ID
+}
+
+// 删除类目响应
+message DeleteCategoryResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询类目列表请求
+message ListCategoriesRequest {
+  int32 page = 1;           // 页码，从1开始
+  int32 page_size = 2;      // 每页数量
+  string parent_id = 3;     // 父类目ID（可选，用于筛选子类目）
+  int32 level = 4;           // 类目层级（可选，1-一级，2-二级，3-三级）
+  int32 status = 5;         // 状态（可选，1-启用，2-停用）
+  bool is_visible = 6;      // 是否前台展示（可选）
+  string keyword = 7;       // 关键词搜索（可选，搜索类目名称）
+}
+
+// 查询类目列表响应
+message ListCategoriesResponse {
+  int32 code = 1;
+  string message = 2;
+  int64 total = 3;              // 总记录数
+  repeated CategoryInfo categories = 4; // 类目列表
+}
+
+// 查询类目树请求
+message GetCategoryTreeRequest {
+  int32 max_level = 1;       // 最大层级（可选，默认返回所有层级）
+  bool only_visible = 2;     // 是否只返回前台展示的类目（可选，默认false）
+  int32 status = 3;         // 状态筛选（可选，1-启用，2-停用）
+}
+
+// 查询类目树响应
+message GetCategoryTreeResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated CategoryTreeNode tree = 3; // 类目树（顶级节点列表）
+}
+
+// 查询子类目列表请求
+message GetCategoryChildrenRequest {
+  string parent_id = 1;     // 父类目ID
+  bool only_visible = 2;    // 是否只返回前台展示的类目（可选）
+  int32 status = 3;        // 状态筛选（可选）
+}
+
+// 查询子类目列表响应
+message GetCategoryChildrenResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated CategoryInfo children = 3; // 子类目列表
+}
+
+// ============================================
+// 类目信息类型定义
+// ============================================
+
+// 类目信息
+message CategoryInfo {
+  string id = 1;                              // 类目ID
+  string parent_id = 2;                       // 父类目ID（顶级类目为空）
+  string name = 3;                            // 类目名称
+  int32 level = 4;                           // 类目层级：1-一级，2-二级，3-三级
+  bool is_leaf = 5;                           // 是否为叶子节点：false-否，true-是
+  bool is_visible = 6;                        // 是否在前台展示：false-否，true-是
+  int32 sort_order = 7;                       // 排序权重，数字越大越靠前
+  string icon = 8;                            // 类目图标URL
+  int32 status = 9;                           // 状态：1-启用，2-停用
+  google.protobuf.Timestamp created_at = 10;  // 创建时间
+  google.protobuf.Timestamp updated_at = 11;   // 更新时间
+}
+
+// 类目树节点（支持嵌套子节点）
+message CategoryTreeNode {
+  CategoryInfo category = 1;                  // 类目信息
+  repeated CategoryTreeNode children = 2;     // 子节点列表（递归结构）
+}
+
+// ============================================
+// 品牌管理请求和响应体
+// ============================================
+
+// 创建品牌请求
+message CreateBrandRequest {
+  string name = 1;              // 品牌名称
+  string logo_url = 2;         // 品牌LOGO地址（可选）
+  string country = 3;            // 所属国家/地区（可选）
+  string description = 4;       // 品牌描述（可选）
+  string first_letter = 5;      // 品牌首字母（可选，用于排序，如：A、B、C）
+  int32 sort_order = 6;         // 排序权重（可选，数字越大越靠前）
+  int32 status = 7;             // 状态：1-启用，2-停用（可选，默认1）
+}
+
+// 创建品牌响应
+message CreateBrandResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;              // 品牌ID
+}
+
+// 查询品牌详情请求
+message GetBrandRequest {
+  string brand_id = 1; // 品牌ID
+}
+
+// 查询品牌详情响应
+message GetBrandResponse {
+  int32 code = 1;
+  string message = 2;
+  BrandInfo brand = 3;           // 品牌信息
+}
+
+// 更新品牌请求
+message UpdateBrandRequest {
+  string brand_id = 1;          // 品牌ID
+  string name = 2;              // 品牌名称（可选）
+  string logo_url = 3;         // 品牌LOGO地址（可选）
+  string country = 4;            // 所属国家/地区（可选）
+  string description = 5;       // 品牌描述（可选）
+  string first_letter = 6;      // 品牌首字母（可选）
+  int32 sort_order = 7;         // 排序权重（可选）
+  int32 status = 8;             // 状态：1-启用，2-停用（可选）
+}
+
+// 更新品牌响应
+message UpdateBrandResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除品牌请求
+message DeleteBrandRequest {
+  string brand_id = 1; // 品牌ID
+}
+
+// 删除品牌响应
+message DeleteBrandResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询品牌列表请求
+message ListBrandsRequest {
+  int32 page = 1;           // 页码，从1开始
+  int32 page_size = 2;      // 每页数量
+  string first_letter = 3;  // 首字母筛选（可选，如：A、B、C）
+  int32 status = 4;         // 状态筛选（可选，1-启用，2-停用）
+  string keyword = 5;       // 关键词搜索（可选，搜索品牌名称）
+  string country = 6;       // 国家/地区筛选（可选）
+}
+
+// 查询品牌列表响应
+message ListBrandsResponse {
+  int32 code = 1;
+  string message = 2;
+  int64 total = 3;              // 总记录数
+  repeated BrandInfo brands = 4; // 品牌列表
+}
+
+// 按首字母分组查询品牌请求
+message GetBrandsByFirstLetterRequest {
+  int32 status = 1;         // 状态筛选（可选，1-启用，2-停用）
+}
+
+// 按首字母分组查询品牌响应
+message GetBrandsByFirstLetterResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated BrandGroupByLetter groups = 3; // 按首字母分组的品牌列表
+}
+
+// ============================================
+// 品牌类目关联管理请求和响应体
+// ============================================
+
+// 添加品牌类目关联请求
+message AddBrandCategoryRequest {
+  string brand_id = 1;      // 品牌ID
+  string category_id = 2;  // 类目ID
+}
+
+// 添加品牌类目关联响应
+message AddBrandCategoryResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除品牌类目关联请求
+message RemoveBrandCategoryRequest {
+  string brand_id = 1;      // 品牌ID
+  string category_id = 2;  // 类目ID
+}
+
+// 删除品牌类目关联响应
+message RemoveBrandCategoryResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询品牌的类目列表请求
+message GetBrandCategoriesRequest {
+  string brand_id = 1; // 品牌ID
+}
+
+// 查询品牌的类目列表响应
+message GetBrandCategoriesResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated CategoryInfo categories = 3; // 类目列表
+}
+
+// 批量设置品牌类目关联请求
+message BatchSetBrandCategoriesRequest {
+  string brand_id = 1;                    // 品牌ID
+  repeated string category_ids = 2;      // 类目ID列表（将替换原有的所有关联）
+}
+
+// 批量设置品牌类目关联响应
+message BatchSetBrandCategoriesResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// ============================================
+// 品牌信息类型定义
+// ============================================
+
+// 品牌信息
+message BrandInfo {
+  string id = 1;                              // 品牌ID
+  string name = 2;                            // 品牌名称
+  string logo_url = 3;                        // 品牌LOGO地址
+  string country = 4;                          // 所属国家/地区
+  string description = 5;                     // 品牌描述
+  string first_letter = 6;                     // 品牌首字母（用于排序）
+  int32 sort_order = 7;                       // 排序权重，数字越大越靠前
+  int32 status = 8;                           // 状态：1-启用，2-停用
+  google.protobuf.Timestamp created_at = 9;    // 创建时间
+  google.protobuf.Timestamp updated_at = 10;   // 更新时间
+}
+
+// 按首字母分组的品牌
+message BrandGroupByLetter {
+  string first_letter = 1;                     // 首字母（如：A、B、C）
+  repeated BrandInfo brands = 2;               // 该首字母下的品牌列表
+}
+
+// ============================================
+// 商品（SPU）管理请求和响应体
+// ============================================
+
+// 创建商品请求
+message CreateProductRequest {
+  string category_id = 1;       // 所属类目ID
+  string brand_id = 2;          // 品牌ID（可选）
+  string title = 3;             // 商品标题
+  string subtitle = 4;           // 商品副标题/卖点（可选）
+  string main_image = 5;         // 主图URL
+  repeated string images = 6;    // 轮播图URL列表（可选）
+  string description = 7;        // 商品详情（富文本，可选）
+  int32 status = 8;             // 状态：1-草稿，2-待审核（可选，默认1）
+  google.protobuf.Timestamp on_shelf_time = 9; // 定时上架时间（可选）
+}
+
+// 创建商品响应
+message CreateProductResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;              // 商品ID
+}
+
+// 查询商品详情请求
+message GetProductRequest {
+  string product_id = 1;        // 商品ID
+  bool include_skus = 2;         // 是否包含SKU列表（可选，默认false）
+  bool include_tags = 3;        // 是否包含标签列表（可选，默认false）
+}
+
+// 查询商品详情响应
+message GetProductResponse {
+  int32 code = 1;
+  string message = 2;
+  ProductInfo product = 3;       // 商品信息
+  repeated SkuInfo skus = 4;    // SKU列表（可选）
+  repeated TagInfo tags = 5;    // 标签列表（可选）
+}
+
+// 更新商品请求
+message UpdateProductRequest {
+  string product_id = 1;        // 商品ID
+  string category_id = 2;       // 所属类目ID（可选）
+  string brand_id = 3;          // 品牌ID（可选）
+  string title = 4;             // 商品标题（可选）
+  string subtitle = 5;           // 商品副标题/卖点（可选）
+  string main_image = 6;         // 主图URL（可选）
+  repeated string images = 7;    // 轮播图URL列表（可选）
+  string description = 8;        // 商品详情（可选）
+  int32 status = 9;             // 状态（可选）
+}
+
+// 更新商品响应
+message UpdateProductResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除商品请求
+message DeleteProductRequest {
+  string product_id = 1;        // 商品ID
+}
+
+// 删除商品响应
+message DeleteProductResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询商品列表请求
+message ListProductsRequest {
+  int32 page = 1;               // 页码，从1开始
+  int32 page_size = 2;          // 每页数量
+  string category_id = 3;        // 类目ID筛选（可选）
+  string brand_id = 4;          // 品牌ID筛选（可选）
+  int32 status = 5;             // 状态筛选（可选，1-草稿，2-待审核，3-已上架，4-已下架，5-已删除）
+  string keyword = 6;            // 关键词搜索（可选，搜索商品标题、副标题）
+  google.protobuf.Timestamp start_time = 7; // 创建时间起始（可选）
+  google.protobuf.Timestamp end_time = 8;   // 创建时间结束（可选）
+  string sort_by = 9;           // 排序字段（可选，如：created_at、on_shelf_time）
+  string sort_order = 10;        // 排序方向（可选，asc、desc）
+}
+
+// 查询商品列表响应
+message ListProductsResponse {
+  int32 code = 1;
+  string message = 2;
+  int64 total = 3;              // 总记录数
+  repeated ProductInfo products = 4; // 商品列表
+}
+
+// 上架商品请求
+message OnShelfProductRequest {
+  string product_id = 1;         // 商品ID
+  google.protobuf.Timestamp on_shelf_time = 2; // 上架时间（可选，不传则立即上架）
+}
+
+// 上架商品响应
+message OnShelfProductResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 下架商品请求
+message OffShelfProductRequest {
+  string product_id = 1;         // 商品ID
+  string reason = 2;             // 下架原因（可选）
+}
+
+// 下架商品响应
+message OffShelfProductResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 提交审核请求
+message SubmitProductAuditRequest {
+  string product_id = 1;         // 商品ID
+  string remark = 2;             // 备注（可选）
+}
+
+// 提交审核响应
+message SubmitProductAuditResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 审核商品请求
+message AuditProductRequest {
+  string product_id = 1;         // 商品ID
+  int32 result = 2;              // 审核结果：1-通过，2-驳回
+  string reason = 3;             // 审核原因/驳回原因（可选）
+  string operator_id = 4;        // 操作人ID（可选）
+  string operator_name = 5;      // 操作人姓名（可选）
+}
+
+// 审核商品响应
+message AuditProductResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// ============================================
+// 商品标签关联管理请求和响应体
+// ============================================
+
+// 添加商品标签关联请求
+message AddProductTagRequest {
+  string product_id = 1;         // 商品ID
+  string tag_id = 2;            // 标签ID
+}
+
+// 添加商品标签关联响应
+message AddProductTagResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除商品标签关联请求
+message RemoveProductTagRequest {
+  string product_id = 1;         // 商品ID
+  string tag_id = 2;            // 标签ID
+}
+
+// 删除商品标签关联响应
+message RemoveProductTagResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询商品的标签列表请求
+message GetProductTagsRequest {
+  string product_id = 1;         // 商品ID
+}
+
+// 查询商品的标签列表响应
+message GetProductTagsResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated TagInfo tags = 3;     // 标签列表
+}
+
+// 批量设置商品标签关联请求
+message BatchSetProductTagsRequest {
+  string product_id = 1;          // 商品ID
+  repeated string tag_ids = 2;   // 标签ID列表（将替换原有的所有关联）
+}
+
+// 批量设置商品标签关联响应
+message BatchSetProductTagsResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// ============================================
+// 商品信息类型定义
+// ============================================
+
+// 商品信息（SPU）
+message ProductInfo {
+  string id = 1;                                // 商品ID
+  string category_id = 2;                       // 所属类目ID
+  string brand_id = 3;                          // 品牌ID
+  string title = 4;                             // 商品标题
+  string subtitle = 5;                           // 商品副标题/卖点
+  string main_image = 6;                         // 主图URL
+  repeated string images = 7;                    // 轮播图URL列表
+  string description = 8;                        // 商品详情（富文本）
+  int32 status = 9;                             // 状态：1-草稿，2-待审核，3-已上架，4-已下架，5-已删除
+  google.protobuf.Timestamp on_shelf_time = 10;  // 上架时间
+  google.protobuf.Timestamp off_shelf_time = 11; // 下架时间
+  google.protobuf.Timestamp created_at = 12;      // 创建时间
+  google.protobuf.Timestamp updated_at = 13;      // 更新时间
+  // 关联信息（可选，根据查询参数决定是否返回）
+  CategoryInfo category = 14;                    // 类目信息（可选）
+  BrandInfo brand = 15;                          // 品牌信息（可选）
+}
+
+// SKU信息
+message SkuInfo {
+  string id = 1;                                // SKU ID
+  string product_id = 2;                        // 所属商品ID（SPU）
+  string sku_code = 3;                          // SKU编码（内部编码）
+  string barcode = 4;                           // 条形码
+  string name = 5;                              // SKU名称（如：黑色 128G）
+  double price = 6;                             // 销售价格
+  double original_price = 7;                    // 划线价/原价
+  double cost_price = 8;                        // 成本价
+  double weight = 9;                            // 重量（单位：kg）
+  double volume = 10;                           // 体积（单位：m³）
+  string image = 11;                            // SKU图片
+  int32 status = 12;                            // 状态：1-上架，2-下架，3-禁用
+  google.protobuf.Timestamp created_at = 13;     // 创建时间
+  google.protobuf.Timestamp updated_at = 14;     // 更新时间
+}
+
+// 标签信息
+message TagInfo {
+  string id = 1;                                // 标签ID
+  string name = 2;                              // 标签名称（如：新品、爆款、清仓）
+  int32 type = 3;                               // 标签类型：1-系统标签，2-运营标签
+  string color = 4;                             // 标签颜色（用于前端展示）
+  int32 sort_order = 5;                         // 排序权重
+  int32 status = 6;                             // 状态：1-启用，2-停用
+  google.protobuf.Timestamp created_at = 7;      // 创建时间
+  google.protobuf.Timestamp updated_at = 8;      // 更新时间
+}
+
+// ============================================
+// SKU管理请求和响应体
+// ============================================
+
+// 创建SKU请求
+message CreateSkuRequest {
+  string product_id = 1;        // 所属商品ID（SPU）
+  string sku_code = 2;          // SKU编码（内部编码，可选）
+  string barcode = 3;          // 条形码（可选）
+  string name = 4;              // SKU名称（如：黑色 128G，可选）
+  double price = 5;             // 销售价格
+  double original_price = 6;    // 划线价/原价（可选）
+  double cost_price = 7;        // 成本价（可选）
+  double weight = 8;            // 重量（单位：kg，可选）
+  double volume = 9;            // 体积（单位：m³，可选）
+  string image = 10;            // SKU图片（可选）
+  int32 status = 11;            // 状态：1-上架，2-下架，3-禁用（可选，默认1）
+  repeated string attribute_value_ids = 12; // 属性值ID列表（可选，用于关联属性）
+}
+
+// 创建SKU响应
+message CreateSkuResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;              // SKU ID
+}
+
+// 查询SKU详情请求
+message GetSkuRequest {
+  string sku_id = 1;            // SKU ID
+  bool include_attributes = 2;  // 是否包含属性列表（可选，默认false）
+}
+
+// 查询SKU详情响应
+message GetSkuResponse {
+  int32 code = 1;
+  string message = 2;
+  SkuInfo sku = 3;              // SKU信息
+  repeated AttributeValueInfo attributes = 4; // 属性列表（可选）
+}
+
+// 更新SKU请求
+message UpdateSkuRequest {
+  string sku_id = 1;            // SKU ID
+  string sku_code = 2;          // SKU编码（可选）
+  string barcode = 3;          // 条形码（可选）
+  string name = 4;              // SKU名称（可选）
+  double price = 5;             // 销售价格（可选）
+  double original_price = 6;    // 划线价/原价（可选）
+  double cost_price = 7;        // 成本价（可选）
+  double weight = 8;            // 重量（可选）
+  double volume = 9;            // 体积（可选）
+  string image = 10;            // SKU图片（可选）
+  int32 status = 11;            // 状态（可选）
+}
+
+// 更新SKU响应
+message UpdateSkuResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除SKU请求
+message DeleteSkuRequest {
+  string sku_id = 1;            // SKU ID
+}
+
+// 删除SKU响应
+message DeleteSkuResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询SKU列表请求
+message ListSkusRequest {
+  int32 page = 1;               // 页码，从1开始
+  int32 page_size = 2;          // 每页数量
+  string product_id = 3;        // 商品ID筛选（可选）
+  int32 status = 4;             // 状态筛选（可选，1-上架，2-下架，3-禁用）
+  string keyword = 5;            // 关键词搜索（可选，搜索SKU编码、名称）
+  double min_price = 6;          // 最低价格（可选）
+  double max_price = 7;          // 最高价格（可选）
+}
+
+// 查询SKU列表响应
+message ListSkusResponse {
+  int32 code = 1;
+  string message = 2;
+  int64 total = 3;              // 总记录数
+  repeated SkuInfo skus = 4;     // SKU列表
+}
+
+// 批量创建SKU请求
+message BatchCreateSkusRequest {
+  string product_id = 1;        // 所属商品ID（SPU）
+  repeated CreateSkuRequest skus = 2; // SKU列表
+}
+
+// 批量创建SKU响应
+message BatchCreateSkusResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated string sku_ids = 3;   // 创建的SKU ID列表
+}
+
+// ============================================
+// SKU属性关联管理请求和响应体
+// ============================================
+
+// 添加SKU属性关联请求
+message AddSkuAttributeRequest {
+  string sku_id = 1;            // SKU ID
+  string attribute_value_id = 2; // 属性值ID
+}
+
+// 添加SKU属性关联响应
+message AddSkuAttributeResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除SKU属性关联请求
+message RemoveSkuAttributeRequest {
+  string sku_id = 1;            // SKU ID
+  string attribute_value_id = 2; // 属性值ID
+}
+
+// 删除SKU属性关联响应
+message RemoveSkuAttributeResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询SKU的属性列表请求
+message GetSkuAttributesRequest {
+  string sku_id = 1;            // SKU ID
+}
+
+// 查询SKU的属性列表响应
+message GetSkuAttributesResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated AttributeValueInfo attributes = 3; // 属性值列表
+}
+
+// 批量设置SKU属性关联请求
+message BatchSetSkuAttributesRequest {
+  string sku_id = 1;            // SKU ID
+  repeated string attribute_value_ids = 2; // 属性值ID列表（将替换原有的所有关联）
+}
+
+// 批量设置SKU属性关联响应
+message BatchSetSkuAttributesResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// ============================================
+// 标签管理请求和响应体
+// ============================================
+
+// 创建标签请求
+message CreateTagRequest {
+  string name = 1;              // 标签名称（如：新品、爆款、清仓）
+  int32 type = 2;               // 标签类型：1-系统标签，2-运营标签
+  string color = 3;             // 标签颜色（用于前端展示，可选，如：#FF0000）
+  int32 sort_order = 4;         // 排序权重（可选，数字越大越靠前）
+  int32 status = 5;             // 状态：1-启用，2-停用（可选，默认1）
+}
+
+// 创建标签响应
+message CreateTagResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;              // 标签ID
+}
+
+// 查询标签详情请求
+message GetTagRequest {
+  string tag_id = 1;            // 标签ID
+}
+
+// 查询标签详情响应
+message GetTagResponse {
+  int32 code = 1;
+  string message = 2;
+  TagInfo tag = 3;              // 标签信息
+}
+
+// 更新标签请求
+message UpdateTagRequest {
+  string tag_id = 1;            // 标签ID
+  string name = 2;              // 标签名称（可选）
+  int32 type = 3;               // 标签类型（可选）
+  string color = 4;             // 标签颜色（可选）
+  int32 sort_order = 5;         // 排序权重（可选）
+  int32 status = 6;             // 状态（可选）
+}
+
+// 更新标签响应
+message UpdateTagResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除标签请求
+message DeleteTagRequest {
+  string tag_id = 1;            // 标签ID
+}
+
+// 删除标签响应
+message DeleteTagResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询标签列表请求
+message ListTagsRequest {
+  int32 page = 1;               // 页码，从1开始
+  int32 page_size = 2;          // 每页数量
+  int32 type = 3;               // 标签类型筛选（可选，1-系统标签，2-运营标签）
+  int32 status = 4;             // 状态筛选（可选，1-启用，2-停用）
+  string keyword = 5;            // 关键词搜索（可选，搜索标签名称）
+}
+
+// 查询标签列表响应
+message ListTagsResponse {
+  int32 code = 1;
+  string message = 2;
+  int64 total = 3;              // 总记录数
+  repeated TagInfo tags = 4;    // 标签列表
+}
+
+// ============================================
+// 属性值信息类型定义
+// ============================================
+
+// 属性值信息
+message AttributeValueInfo {
+  string id = 1;                                // 属性值ID
+  string attribute_id = 2;                      // 所属属性ID
+  string attribute_name = 3;                    // 属性名称（如：颜色、尺寸）
+  string value = 4;                             // 属性值名称（如：红色、XL、128G）
+  int32 sort_order = 5;                        // 排序权重
+  google.protobuf.Timestamp created_at = 6;     // 创建时间
+  google.protobuf.Timestamp updated_at = 7;     // 更新时间
+}
+
