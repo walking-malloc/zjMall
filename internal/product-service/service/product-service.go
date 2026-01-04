@@ -2,13 +2,18 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"log"
 	productv1 "zjMall/gen/go/api/proto/product"
+	"zjMall/internal/product-service/model"
+	"zjMall/internal/product-service/repository"
+	"zjMall/pkg"
 )
 
 // ProductService 商品服务（业务逻辑层）
 type ProductService struct {
 	// TODO: 添加需要的依赖，例如：
-	// categoryRepo repository.CategoryRepository
+	categoryRepo repository.CategoryRepository
 	// brandRepo    repository.BrandRepository
 	// productRepo  repository.ProductRepository
 	// skuRepo      repository.SkuRepository
@@ -17,15 +22,11 @@ type ProductService struct {
 
 // NewProductService 创建商品服务实例
 func NewProductService(
-// TODO: 添加需要的参数，例如：
-// categoryRepo repository.CategoryRepository,
-// brandRepo repository.BrandRepository,
-// productRepo repository.ProductRepository,
-// skuRepo repository.SkuRepository,
-// tagRepo repository.TagRepository,
+	categoryRepo repository.CategoryRepository,
+
 ) *ProductService {
 	return &ProductService{
-		// TODO: 初始化依赖
+		categoryRepo: categoryRepo,
 	}
 }
 
@@ -35,71 +36,247 @@ func NewProductService(
 
 // CreateCategory 创建类目
 func (s *ProductService) CreateCategory(ctx context.Context, req *productv1.CreateCategoryRequest) (*productv1.CreateCategoryResponse, error) {
+	log.Printf("CreateCategory request: %+v", req)
+	// 调试：打印 is_leaf 的实际值（因为 %+v 不显示零值）
+	log.Printf("DEBUG - IsLeaf: %v, IsVisible: %v, ParentId: '%s'",
+		req.IsLeaf, req.IsVisible, req.ParentId)
+
 	// 参数校验
 	validator := NewCreateCategoryRequestValidator(req)
+	log.Printf("DEBUG - Validator IsLeaf: %v, IsVisible: %v", validator.IsLeaf, validator.IsVisible)
 	if err := validator.Validate(); err != nil {
+		log.Printf("DEBUG - Validation error: %v", err)
 		return &productv1.CreateCategoryResponse{
 			Code:    1,
 			Message: err.Error(),
 		}, nil
 	}
+	category := &model.Category{
+		Name:      req.Name,
+		ParentID:  req.ParentId,
+		Level:     int8(req.Level),
+		IsLeaf:    req.IsLeaf,
+		IsVisible: req.IsVisible,
+		SortOrder: req.SortOrder,
+		Icon:      req.Icon,
+		Status:    int8(req.Status),
+	}
+	err := s.categoryRepo.CreateCategory(ctx, category)
+	if err != nil {
+		return &productv1.CreateCategoryResponse{
+			Code:    1,
+			Message: fmt.Sprintf("创建类目失败: %v", err),
+		}, nil
+	}
 	return &productv1.CreateCategoryResponse{
 		Code:    1,
-		Message: "未实现",
+		Message: "创建成功",
+		Data:    category.ID,
 	}, nil
 }
 
 // GetCategory 查询类目详情
 func (s *ProductService) GetCategory(ctx context.Context, req *productv1.GetCategoryRequest) (*productv1.GetCategoryResponse, error) {
-	// TODO: 实现查询类目详情的业务逻辑
+	category, err := s.categoryRepo.GetCategoryByID(ctx, req.CategoryId)
+	if err != nil {
+		return &productv1.GetCategoryResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询类目详情失败: %v", err),
+		}, nil
+	}
+
+	if category == nil {
+		return &productv1.GetCategoryResponse{
+			Code:    1,
+			Message: "类目不存在",
+		}, nil
+	}
 	return &productv1.GetCategoryResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询成功",
+		Data: &productv1.CategoryInfo{
+			Id:        category.ID,
+			Name:      category.Name,
+			ParentId:  category.ParentID,
+			Level:     int32(category.Level),
+			IsLeaf:    category.IsLeaf,
+			IsVisible: category.IsVisible,
+			SortOrder: category.SortOrder,
+			Icon:      category.Icon,
+			Status:    int32(category.Status),
+		},
 	}, nil
 }
 
 // UpdateCategory 更新类目
 func (s *ProductService) UpdateCategory(ctx context.Context, req *productv1.UpdateCategoryRequest) (*productv1.UpdateCategoryResponse, error) {
-	// TODO: 实现更新类目的业务逻辑
+	validator := NewUpdateCategoryRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.UpdateCategoryResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+	category := &model.Category{
+		BaseModel: pkg.BaseModel{
+			ID: req.CategoryId,
+		},
+		Name:      req.Name,
+		Level:     int8(req.Level),
+		IsLeaf:    req.IsLeaf,
+		IsVisible: req.IsVisible,
+		SortOrder: req.SortOrder,
+		Icon:      req.Icon,
+		Status:    int8(req.Status),
+	}
+	err := s.categoryRepo.UpdateCategory(ctx, category)
+	if err != nil {
+		return &productv1.UpdateCategoryResponse{
+			Code:    1,
+			Message: fmt.Sprintf("更新类目失败: %v", err),
+		}, nil
+	}
 	return &productv1.UpdateCategoryResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "更新成功",
 	}, nil
 }
 
 // DeleteCategory 删除类目
 func (s *ProductService) DeleteCategory(ctx context.Context, req *productv1.DeleteCategoryRequest) (*productv1.DeleteCategoryResponse, error) {
-	// TODO: 实现删除类目的业务逻辑
+	//先查找是否有子类目
+	children, err := s.categoryRepo.ListCategories(ctx, req.CategoryId)
+	if err != nil {
+		return &productv1.DeleteCategoryResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询子类目列表失败: %v", err),
+		}, nil
+	}
+	if len(children) > 0 {
+		return &productv1.DeleteCategoryResponse{
+			Code:    1,
+			Message: "该类目有子类目，不能删除",
+		}, nil
+	}
+	if err := s.categoryRepo.DeleteCategory(ctx, req.CategoryId); err != nil {
+		return &productv1.DeleteCategoryResponse{
+			Code:    1,
+			Message: fmt.Sprintf("删除类目失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.DeleteCategoryResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "删除成功",
 	}, nil
 }
 
 // ListCategories 查询类目列表
 func (s *ProductService) ListCategories(ctx context.Context, req *productv1.ListCategoriesRequest) (*productv1.ListCategoriesResponse, error) {
-	// TODO: 实现查询类目列表的业务逻辑
+	categories, err := s.categoryRepo.ListCategories(ctx, req.ParentId)
+	if err != nil {
+		return &productv1.ListCategoriesResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询类目列表失败: %v", err),
+		}, nil
+	}
+
+	// 转换为响应格式
+	categoryList := make([]*productv1.CategoryInfo, 0, len(categories))
+	for _, category := range categories {
+		categoryList = append(categoryList, &productv1.CategoryInfo{
+			Id:        category.ID,
+			Name:      category.Name,
+			ParentId:  category.ParentID,
+			Level:     int32(category.Level),
+			IsLeaf:    category.IsLeaf,
+			IsVisible: category.IsVisible,
+			SortOrder: category.SortOrder,
+			Icon:      category.Icon,
+			Status:    int32(category.Status),
+		})
+	}
+
 	return &productv1.ListCategoriesResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询成功",
+		Data:    categoryList,
+		Total:   int64(len(categories)),
 	}, nil
 }
 
 // GetCategoryTree 查询类目树
 func (s *ProductService) GetCategoryTree(ctx context.Context, req *productv1.GetCategoryTreeRequest) (*productv1.GetCategoryTreeResponse, error) {
-	// TODO: 实现查询类目树的业务逻辑
+	tree, err := s.categoryRepo.GetCategoryTree(ctx)
+	if err != nil {
+		return &productv1.GetCategoryTreeResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询类目树失败: %v", err),
+		}, nil
+	}
+
+	// 转换为响应格式
+	treeNodes := convertTreeNodesToProto(tree)
+
 	return &productv1.GetCategoryTreeResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询成功",
+		Data:    treeNodes,
 	}, nil
+}
+
+// 辅助函数：转换树节点为 proto 格式
+func convertTreeNodesToProto(nodes []*repository.CategoryTreeNode) []*productv1.CategoryTreeNode {
+	result := make([]*productv1.CategoryTreeNode, 0, len(nodes))
+	for _, node := range nodes {
+		result = append(result, &productv1.CategoryTreeNode{
+			Category: &productv1.CategoryInfo{
+				Id:        node.ID,
+				Name:      node.Name,
+				Level:     int32(node.Level),
+				IsLeaf:    node.IsLeaf,
+				IsVisible: node.IsVisible,
+				SortOrder: node.SortOrder,
+				Icon:      node.Icon,
+				Status:    int32(node.Status),
+			},
+			Children: convertTreeNodesToProto(node.Children),
+		})
+	}
+	return result
 }
 
 // GetCategoryChildren 查询子类目列表
 func (s *ProductService) GetCategoryChildren(ctx context.Context, req *productv1.GetCategoryChildrenRequest) (*productv1.GetCategoryChildrenResponse, error) {
-	// TODO: 实现查询子类目列表的业务逻辑
+	// 和 ListCategories 类似，只是参数来源不同
+	categories, err := s.categoryRepo.ListCategories(ctx, req.ParentId)
+	if err != nil {
+		return &productv1.GetCategoryChildrenResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询子类目列表失败: %v", err),
+		}, nil
+	}
+
+	// 转换为响应格式
+	categoryList := make([]*productv1.CategoryInfo, 0, len(categories))
+	for _, category := range categories {
+		categoryList = append(categoryList, &productv1.CategoryInfo{
+			Id:        category.ID,
+			Name:      category.Name,
+			ParentId:  category.ParentID,
+			Level:     int32(category.Level),
+			IsLeaf:    category.IsLeaf,
+			IsVisible: category.IsVisible,
+			SortOrder: category.SortOrder,
+			Icon:      category.Icon,
+			Status:    int32(category.Status),
+		})
+	}
+
 	return &productv1.GetCategoryChildrenResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询成功",
+		Data:    categoryList,
 	}, nil
 }
 

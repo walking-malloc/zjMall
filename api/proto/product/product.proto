@@ -411,7 +411,7 @@ message GetCategoryRequest {
 message GetCategoryResponse {
   int32 code = 1;
   string message = 2;
-  CategoryInfo category = 3; // 类目信息
+  CategoryInfo data = 3; // 类目信息
 }
 
 // 更新类目请求
@@ -461,7 +461,7 @@ message ListCategoriesResponse {
   int32 code = 1;
   string message = 2;
   int64 total = 3;              // 总记录数
-  repeated CategoryInfo categories = 4; // 类目列表
+  repeated CategoryInfo data = 4; // 类目列表
 }
 
 // 查询类目树请求
@@ -475,7 +475,7 @@ message GetCategoryTreeRequest {
 message GetCategoryTreeResponse {
   int32 code = 1;
   string message = 2;
-  repeated CategoryTreeNode tree = 3; // 类目树（顶级节点列表）
+  repeated CategoryTreeNode data = 3; // 类目树（顶级节点列表）
 }
 
 // 查询子类目列表请求
@@ -489,7 +489,7 @@ message GetCategoryChildrenRequest {
 message GetCategoryChildrenResponse {
   int32 code = 1;
   string message = 2;
-  repeated CategoryInfo children = 3; // 子类目列表
+  repeated CategoryInfo data = 3; // 子类目列表
 }
 
 // ============================================

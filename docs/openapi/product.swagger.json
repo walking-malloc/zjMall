@@ -2658,7 +2658,7 @@
         "message": {
           "type": "string"
         },
-        "children": {
+        "data": {
           "type": "array",
           "items": {
             "type": "object",
@@ -2679,7 +2679,7 @@
         "message": {
           "type": "string"
         },
-        "category": {
+        "data": {
           "$ref": "#/definitions/product.v1.CategoryInfo",
           "title": "类目信息"
         }
@@ -2696,7 +2696,7 @@
         "message": {
           "type": "string"
         },
-        "tree": {
+        "data": {
           "type": "array",
           "items": {
             "type": "object",
@@ -2865,7 +2865,7 @@
           "format": "int64",
           "title": "总记录数"
         },
-        "categories": {
+        "data": {
           "type": "array",
           "items": {
             "type": "object",

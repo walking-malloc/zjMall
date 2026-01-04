@@ -5,86 +5,84 @@ import (
 	"log"
 	"path/filepath"
 	commonv1 "zjMall/gen/go/api/proto/common"
-	userv1 "zjMall/gen/go/api/proto/user"
+	productv1 "zjMall/gen/go/api/proto/product"
 	"zjMall/internal/common/cache"
 	"zjMall/internal/common/middleware"
-	upload "zjMall/internal/common/oss"
 	"zjMall/internal/common/server"
 	"zjMall/internal/config"
 	"zjMall/internal/database"
-	"zjMall/internal/sms"
-	"zjMall/internal/user-service/handler"
-	"zjMall/internal/user-service/repository"
-	"zjMall/internal/user-service/service"
-	"zjMall/pkg"
+	"zjMall/internal/product-service/handler"
+	"zjMall/internal/product-service/repository"
+	"zjMall/internal/product-service/service"
 	"zjMall/pkg/validator"
 
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc"
 )
 
 // todo 需要改为商品服务的配置
 func main() {
+	log.Println("🚀 开始启动商品服务...")
+
 	//1.加载配置
+	log.Println("📝 加载配置文件...")
 	configPath := filepath.Join("./configs", "config.yaml")
 	config, err := config.LoadConfig(configPath)
 	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+		log.Fatalf("❌ 加载配置失败: %v", err)
 	}
+	log.Println("✅ 配置文件加载成功")
 	//2.初始化数据库（使用服务特定的数据库配置）
 	serviceName := "product-service"
+	log.Printf("🔧 初始化数据库连接 (服务: %s)...", serviceName)
 	mysqlConfig, err := config.GetDatabaseConfigForService(serviceName)
 	if err != nil {
-		log.Fatalf("Error getting database config for %s: %v", serviceName, err)
+		log.Fatalf("❌ 获取数据库配置失败 (%s): %v", serviceName, err)
 	}
 	db, err := database.InitMySQL(mysqlConfig)
 	if err != nil {
-		log.Fatalf("Error initializing MySQL: %v", err)
+		log.Fatalf("❌ MySQL 初始化失败: %v", err)
 	}
 	defer database.CloseMySQL()
+	log.Println("✅ MySQL 连接成功")
 
 	//3.初始化redis
+	log.Println("🔧 初始化 Redis 连接...")
 	redisConfig := config.GetRedisConfig()
 	redisClient, err := database.InitRedis(redisConfig)
 	if err != nil {
-		log.Fatalf("Error initializing Redis: %v", err)
+		log.Fatalf("❌ Redis 初始化失败: %v", err)
 	}
 	defer database.CloseRedis()
+	log.Println("✅ Redis 连接成功")
 
 	//4.初始化校验器
+	log.Println("🔧 初始化校验器...")
 	validator.Init()
+	log.Println("✅ 校验器初始化成功")
 
-	// 5. 初始化 JWT
-	jwtConfig := config.GetJWTConfig()
-	pkg.InitJWT(jwtConfig)
-
-	// 6. 创建通用的缓存仓库（所有服务共享）
-	baseCacheRepo := cache.NewCacheRepository(redisClient)
-
-	// 7. 创建用户仓库
-	userRepo := repository.NewUserRepository(db, baseCacheRepo)
-
-	// 8. 获取短信配置并创建短信客户端（Mock）
-	smsConfig := config.GetSMSConfig()
-	smsClient := sms.NewMockSMSClient()
-	log.Println("✅ 使用 Mock 短信服务（学习模式）")
-
-	// 9. 创建OSS客户端
-	ossConfig := config.GetOSSConfig()
-	ossClient, err := upload.NewOSSClient(ossConfig)
-	if err != nil {
-		log.Fatalf("Error initializing OSS: %v", err)
-	}
+	// 6. 创建仓库
+	log.Println("🔧 创建 Repository...")
+	cacheRepo := cache.NewCacheRepository(redisClient)
+	categoryRepo := repository.NewCategoryRepository(db, cacheRepo, singleflight.Group{})
+	log.Println("✅ Repository 创建成功")
 
 	// 10. 创建Service
-	productService := service.NewProductService()
+	log.Println("🔧 创建 Service...")
+	productService := service.NewProductService(categoryRepo)
+	log.Println("✅ Service 创建成功")
 
 	//7.创建Handler
-	productServiceHandler := handler.NewUserServiceHandler(productService)
+	log.Println("🔧 创建 Handler...")
+	productServiceHandler := handler.NewProductServiceHandler(productService)
+	log.Println("✅ Handler 创建成功")
 
+	log.Println("🔧 获取服务配置...")
 	serviceCfg, err := config.GetServiceConfig(serviceName)
 	if err != nil {
-		log.Fatalf("Error getting service config: %v", err)
+		log.Fatalf("❌ 获取服务配置失败: %v", err)
 	}
+	log.Printf("✅ 服务配置获取成功 (gRPC: :%d, HTTP: :%d)", serviceCfg.GRPC.Port, serviceCfg.HTTP.Port)
 
 	// 创建服务器实例
 	srv := server.NewServer(&server.Config{
@@ -95,18 +93,18 @@ func main() {
 	// 注册 gRPC 服务
 	srv.RegisterGRPCService(func(grpcServer *grpc.Server) {
 		// 注册用户服务
-		userv1.RegisterUserServiceServer(grpcServer, productServiceHandler)
+		productv1.RegisterProductServiceServer(grpcServer, productServiceHandler)
 	})
 
 	// 注册自定义HTTP路由（头像上传）- 必须在 gRPC-Gateway 之前注册，确保优先匹配
-	srv.AddRoute("/api/v1/users/avatar", userServiceHandler.UploadAvatarHTTP)
+	// srv.AddRoute("/api/v1/users/avatar", productServiceHandler.UploadAvatarHTTP)
 
 	// 注册 HTTP 网关处理器
 	if err := srv.RegisterHTTPGateway(commonv1.RegisterHealthServiceHandlerFromEndpoint); err != nil {
 		log.Fatalf("failed to register health service gateway: %v", err)
 	}
 
-	if err := srv.RegisterHTTPGateway(userv1.RegisterUserServiceHandlerFromEndpoint); err != nil {
+	if err := srv.RegisterHTTPGateway(productv1.RegisterProductServiceHandlerFromEndpoint); err != nil {
 		log.Fatalf("failed to register user service gateway: %v", err)
 	}
 	// 注册 Swagger 文档
@@ -128,7 +126,8 @@ func main() {
 	)
 
 	// 启动服务器（阻塞）
+	log.Println("🚀 启动服务器...")
 	if err := srv.Start(); err != nil {
-		log.Fatalf("failed to start server: %v", err)
+		log.Fatalf("❌ 服务器启动失败: %v", err)
 	}
 }
