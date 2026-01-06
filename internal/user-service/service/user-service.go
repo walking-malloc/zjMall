@@ -14,7 +14,6 @@ import (
 	"zjMall/internal/user-service/model"
 	"zjMall/internal/user-service/repository"
 	"zjMall/pkg"
-	"zjMall/pkg/validator"
 
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -40,16 +39,6 @@ func NewUserService(userRepo repository.UserRepository, smsClient sms.SMSClient,
 
 // 用户注册接口
 func (s *UserService) Register(ctx context.Context, req *userv1.RegisterRequest) (*userv1.RegisterResponse, error) {
-
-	// 校验请求参数
-	validator := NewRegisterRequestValidator(req)
-	if err := validator.Validate(); err != nil {
-		log.Printf("参数校验失败: %v", err)
-		return &userv1.RegisterResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
 
 	//检查手机号是否已注册
 	user, err := s.userRepo.GetUserByPhone(ctx, req.Phone)
@@ -133,13 +122,6 @@ func (s *UserService) Register(ctx context.Context, req *userv1.RegisterRequest)
 }
 
 func (s *UserService) Login(ctx context.Context, req *userv1.LoginRequest) (*userv1.LoginResponse, error) {
-	validator := NewLoginRequestValidator(req)
-	if err := validator.Validate(); err != nil {
-		return &userv1.LoginResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
 
 	// 先查看是否用户存在
 	userAuthInfo, err := s.userRepo.GetUserPasswordByPhone(ctx, req.Phone)
@@ -204,13 +186,7 @@ func (s *UserService) Login(ctx context.Context, req *userv1.LoginRequest) (*use
 }
 
 func (s *UserService) LoginBySMS(ctx context.Context, req *userv1.LoginBySMSRequest) (*userv1.LoginResponse, error) {
-	validator := NewLoginBySMSRequestValidator(req)
-	if err := validator.Validate(); err != nil {
-		return &userv1.LoginResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
+
 	if err := s.VerifySMSCode(ctx, req.Phone, req.SmsCode); err != nil {
 		return &userv1.LoginResponse{
 			Code:    1,
@@ -259,12 +235,6 @@ func (s *UserService) LoginBySMS(ctx context.Context, req *userv1.LoginBySMSRequ
 
 // 获取短信验证码
 func (s *UserService) GetSMSCode(ctx context.Context, req *userv1.GetSMSCodeRequest) (*userv1.GetSMSCodeResponse, error) {
-	if !validator.IsValidPhone(req.Phone) {
-		return &userv1.GetSMSCodeResponse{
-			Code:    1,
-			Message: "手机号格式错误，请输入11位手机号",
-		}, nil
-	}
 
 	smsConfig := s.smsConfig
 	//检查发送频率
@@ -416,13 +386,6 @@ func (s *UserService) GetUser(ctx context.Context, req *userv1.GetUserRequest) (
 }
 
 func (s *UserService) UpdateUser(ctx context.Context, req *userv1.UpdateUserRequest) (*userv1.UpdateUserResponse, error) {
-	validator := NewUpdateUserRequestValidator(req)
-	if err := validator.Validate(); err != nil {
-		return &userv1.UpdateUserResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
 
 	user, err := s.userRepo.GetUserByID(ctx, strconv.FormatInt(req.UserId, 10))
 	if err != nil {
@@ -647,13 +610,7 @@ func (s *UserService) SetDefaultAddress(ctx context.Context, req *userv1.SetDefa
 }
 
 func (s *UserService) ChangePassword(ctx context.Context, req *userv1.ChangePasswordRequest) (*userv1.ChangePasswordResponse, error) {
-	validator := NewChangePasswordRequestValidator(req)
-	if err := validator.Validate(); err != nil {
-		return &userv1.ChangePasswordResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
+
 	// 检查用户是否存在
 	user, err := s.userRepo.GetUserByID(ctx, req.UserId)
 	if err != nil {
@@ -712,13 +669,6 @@ func (s *UserService) ChangePassword(ctx context.Context, req *userv1.ChangePass
 }
 
 func (s *UserService) BindPhone(ctx context.Context, req *userv1.BindPhoneRequest) (*userv1.BindPhoneResponse, error) {
-	validator := NewBindPhoneRequestValidator(req)
-	if err := validator.Validate(); err != nil {
-		return &userv1.BindPhoneResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
 
 	//先检查该用户是否存在
 	user, err := s.userRepo.GetUserByID(ctx, req.UserId)

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"log"
 	productv1 "zjMall/gen/go/api/proto/product"
 	"zjMall/internal/product-service/service"
 )
@@ -22,22 +23,60 @@ func NewProductServiceHandler(productService *service.ProductService) *ProductSe
 // ============================================
 
 func (h *ProductServiceHandler) CreateCategory(ctx context.Context, req *productv1.CreateCategoryRequest) (*productv1.CreateCategoryResponse, error) {
+	// 参数校验
+	validator := service.NewCreateCategoryRequestValidator(req)
+	log.Printf("DEBUG - Validator IsLeaf: %v, IsVisible: %v", validator.IsLeaf, validator.IsVisible)
+	if err := validator.Validate(); err != nil {
+		log.Printf("DEBUG - Validation error: %v", err)
+		return &productv1.CreateCategoryResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.CreateCategory(ctx, req)
 }
 
 func (h *ProductServiceHandler) GetCategory(ctx context.Context, req *productv1.GetCategoryRequest) (*productv1.GetCategoryResponse, error) {
+	if req.CategoryId == "" {
+		return &productv1.GetCategoryResponse{
+			Code:    1,
+			Message: "类目ID不能为空",
+		}, nil
+	}
+
 	return h.productService.GetCategory(ctx, req)
 }
 
 func (h *ProductServiceHandler) UpdateCategory(ctx context.Context, req *productv1.UpdateCategoryRequest) (*productv1.UpdateCategoryResponse, error) {
+	validator := service.NewUpdateCategoryRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.UpdateCategoryResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.UpdateCategory(ctx, req)
 }
 
 func (h *ProductServiceHandler) DeleteCategory(ctx context.Context, req *productv1.DeleteCategoryRequest) (*productv1.DeleteCategoryResponse, error) {
+	if req.CategoryId == "" {
+		return &productv1.DeleteCategoryResponse{
+			Code:    1,
+			Message: "类目ID不能为空",
+		}, nil
+	}
 	return h.productService.DeleteCategory(ctx, req)
 }
 
 func (h *ProductServiceHandler) ListCategories(ctx context.Context, req *productv1.ListCategoriesRequest) (*productv1.ListCategoriesResponse, error) {
+	log.Printf("DEBUG - ListCategories request: %+v", req)
+	validator := service.NewListCategoriesRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.ListCategoriesResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.ListCategories(ctx, req)
 }
 

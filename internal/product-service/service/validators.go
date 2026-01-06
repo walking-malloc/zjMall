@@ -39,20 +39,18 @@ func (v *CreateCategoryRequestValidator) Validate() error {
 
 type UpdateCategoryRequestValidator struct {
 	CategoryID string `validate:"required" label:"类目ID"`
-	Name       string `validate:"required,min=2,max=100" label:"类目名称"`
-	Level      int32  `validate:"required,oneof=1 2 3" label:"类目层级"`
+	Name       string `validate:"omitempty,min=2,max=100" label:"类目名称"`
 	IsLeaf     bool   `validate:"-" label:"是否为叶子节点"`
 	IsVisible  bool   `validate:"-" label:"是否在前台展示"`
-	SortOrder  int32  `validate:"required" label:"排序权重"`
+	SortOrder  int32  `validate:"-" label:"排序权重"`
 	Icon       string `validate:"omitempty,url" label:"类目图标URL"`
-	Status     int32  `validate:"required,oneof=1 2" label:"状态"`
+	Status     int32  `validate:"omitempty,oneof=1 2" label:"状态"`
 }
 
 func NewUpdateCategoryRequestValidator(req *productv1.UpdateCategoryRequest) *UpdateCategoryRequestValidator {
 	return &UpdateCategoryRequestValidator{
 		CategoryID: req.CategoryId,
 		Name:       req.Name,
-		Level:      req.Level,
 		IsLeaf:     req.IsLeaf,
 		IsVisible:  req.IsVisible,
 		SortOrder:  req.SortOrder,
@@ -71,8 +69,8 @@ func (v *UpdateCategoryRequestValidator) Validate() error {
 type ListCategoriesRequestValidator struct {
 	Page      int32  `validate:"omitempty,min=1" label:"页码"`
 	PageSize  int32  `validate:"omitempty,min=1" label:"每页条数"`
-	ParentID  string `validate:"omitempty" label:"父类目ID"`
-	Level     int32  `validate:"required,oneof=1 2 3" label:"类目层级"`
+	ParentID  string `validate:"-" label:"父类目ID"`
+	Level     int32  `validate:"-" label:"类目层级"`
 	Status    int32  `validate:"required,oneof=1 2" label:"状态"`
 	IsVisible bool   `validate:"-" label:"是否在前台展示"`
 	Keyword   string `validate:"omitempty,min=2,max=100" label:"关键词"`

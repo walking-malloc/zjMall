@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
 	productv1 "zjMall/gen/go/api/proto/product"
 	"zjMall/internal/product-service/model"
 	"zjMall/internal/product-service/repository"
@@ -36,21 +35,6 @@ func NewProductService(
 
 // CreateCategory 创建类目
 func (s *ProductService) CreateCategory(ctx context.Context, req *productv1.CreateCategoryRequest) (*productv1.CreateCategoryResponse, error) {
-	log.Printf("CreateCategory request: %+v", req)
-	// 调试：打印 is_leaf 的实际值（因为 %+v 不显示零值）
-	log.Printf("DEBUG - IsLeaf: %v, IsVisible: %v, ParentId: '%s'",
-		req.IsLeaf, req.IsVisible, req.ParentId)
-
-	// 参数校验
-	validator := NewCreateCategoryRequestValidator(req)
-	log.Printf("DEBUG - Validator IsLeaf: %v, IsVisible: %v", validator.IsLeaf, validator.IsVisible)
-	if err := validator.Validate(); err != nil {
-		log.Printf("DEBUG - Validation error: %v", err)
-		return &productv1.CreateCategoryResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
 	category := &model.Category{
 		Name:      req.Name,
 		ParentID:  req.ParentId,
@@ -110,13 +94,7 @@ func (s *ProductService) GetCategory(ctx context.Context, req *productv1.GetCate
 
 // UpdateCategory 更新类目
 func (s *ProductService) UpdateCategory(ctx context.Context, req *productv1.UpdateCategoryRequest) (*productv1.UpdateCategoryResponse, error) {
-	validator := NewUpdateCategoryRequestValidator(req)
-	if err := validator.Validate(); err != nil {
-		return &productv1.UpdateCategoryResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
+
 	category := &model.Category{
 		BaseModel: pkg.BaseModel{
 			ID: req.CategoryId,
@@ -145,7 +123,9 @@ func (s *ProductService) UpdateCategory(ctx context.Context, req *productv1.Upda
 // DeleteCategory 删除类目
 func (s *ProductService) DeleteCategory(ctx context.Context, req *productv1.DeleteCategoryRequest) (*productv1.DeleteCategoryResponse, error) {
 	//先查找是否有子类目
-	children, err := s.categoryRepo.ListCategories(ctx, req.CategoryId)
+	children, err := s.categoryRepo.ListCategories(ctx, &repository.CategoryListFliter{
+		ParentID: req.CategoryId,
+	})
 	if err != nil {
 		return &productv1.DeleteCategoryResponse{
 			Code:    1,
@@ -173,7 +153,28 @@ func (s *ProductService) DeleteCategory(ctx context.Context, req *productv1.Dele
 
 // ListCategories 查询类目列表
 func (s *ProductService) ListCategories(ctx context.Context, req *productv1.ListCategoriesRequest) (*productv1.ListCategoriesResponse, error) {
-	categories, err := s.categoryRepo.ListCategories(ctx, req.ParentId)
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	isVisible := &req.IsVisible
+	filter := repository.CategoryListFliter{
+		ParentID:  req.ParentId,
+		Level:     req.Level,
+		Status:    req.Status,
+		IsVisible: isVisible,
+		Keyword:   req.Keyword,
+		Offset:    (page - 1) * pageSize,
+		Limit:     pageSize,
+	}
+	categories, err := s.categoryRepo.ListCategories(ctx, &filter)
 	if err != nil {
 		return &productv1.ListCategoriesResponse{
 			Code:    1,
@@ -207,7 +208,7 @@ func (s *ProductService) ListCategories(ctx context.Context, req *productv1.List
 
 // GetCategoryTree 查询类目树
 func (s *ProductService) GetCategoryTree(ctx context.Context, req *productv1.GetCategoryTreeRequest) (*productv1.GetCategoryTreeResponse, error) {
-	tree, err := s.categoryRepo.GetCategoryTree(ctx)
+	tree, err := s.categoryRepo.GetCategoryTree(ctx, req.MaxLevel, req.OnlyVisible, req.Status)
 	if err != nil {
 		return &productv1.GetCategoryTreeResponse{
 			Code:    1,
@@ -249,7 +250,13 @@ func convertTreeNodesToProto(nodes []*repository.CategoryTreeNode) []*productv1.
 // GetCategoryChildren 查询子类目列表
 func (s *ProductService) GetCategoryChildren(ctx context.Context, req *productv1.GetCategoryChildrenRequest) (*productv1.GetCategoryChildrenResponse, error) {
 	// 和 ListCategories 类似，只是参数来源不同
-	categories, err := s.categoryRepo.ListCategories(ctx, req.ParentId)
+	categories, err := s.categoryRepo.ListCategories(ctx, &repository.CategoryListFliter{
+		ParentID:  req.ParentId,
+		Status:    req.Status,
+		IsVisible: &req.OnlyVisible,
+		Offset:    (req.Page - 1) * req.PageSize,
+		Limit:     req.PageSize,
+	})
 	if err != nil {
 		return &productv1.GetCategoryChildrenResponse{
 			Code:    1,

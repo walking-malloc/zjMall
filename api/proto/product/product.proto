@@ -418,12 +418,11 @@ message GetCategoryResponse {
 message UpdateCategoryRequest {
   string category_id = 1;       // 类目ID
   string name = 2;              // 类目名称（可选）
-  int32 level = 3;              // 类目层级（可选）
-  bool is_leaf = 4;             // 是否为叶子节点（可选）
-  bool is_visible = 5;          // 是否在前台展示（可选）
-  int32 sort_order = 6;         // 排序权重（可选）
-  string icon = 7;              // 类目图标URL（可选）
-  int32 status = 8;             // 状态：1-启用，2-停用（可选）
+  bool is_leaf = 3;             // 是否为叶子节点（可选）
+  bool is_visible = 4;          // 是否在前台展示（可选）
+  int32 sort_order = 5;         // 排序权重（可选）
+  string icon = 6;              // 类目图标URL（可选）
+  int32 status = 7;             // 状态：1-启用，2-停用（可选）
 }
 
 // 更新类目响应
@@ -483,6 +482,8 @@ message GetCategoryChildrenRequest {
   string parent_id = 1;     // 父类目ID
   bool only_visible = 2;    // 是否只返回前台展示的类目（可选）
   int32 status = 3;        // 状态筛选（可选）
+  int32 page = 4;
+  int32 page_size=5;
 }
 
 // 查询子类目列表响应

@@ -9,6 +9,7 @@ import (
 	userv1 "zjMall/gen/go/api/proto/user"
 	"zjMall/internal/common/middleware"
 	"zjMall/internal/user-service/service"
+	"zjMall/pkg/validator"
 )
 
 type UserServiceHandler struct {
@@ -23,26 +24,69 @@ func NewUserServiceHandler(userService *service.UserService) *UserServiceHandler
 }
 
 func (h *UserServiceHandler) GetSMSCode(ctx context.Context, req *userv1.GetSMSCodeRequest) (*userv1.GetSMSCodeResponse, error) {
+	if !validator.IsValidPhone(req.Phone) {
+		return &userv1.GetSMSCodeResponse{
+			Code:    1,
+			Message: "手机号格式错误，请输入11位手机号",
+		}, nil
+	}
 	return h.userService.GetSMSCode(ctx, req)
 }
 
 func (h *UserServiceHandler) Register(ctx context.Context, req *userv1.RegisterRequest) (*userv1.RegisterResponse, error) {
+	// 校验请求参数
+	validator := service.NewRegisterRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		log.Printf("参数校验失败: %v", err)
+		return &userv1.RegisterResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return h.userService.Register(ctx, req)
 }
 
 func (h *UserServiceHandler) Login(ctx context.Context, req *userv1.LoginRequest) (*userv1.LoginResponse, error) {
+	validator := service.NewLoginRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &userv1.LoginResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.userService.Login(ctx, req)
 }
 
 func (h *UserServiceHandler) LoginBySMS(ctx context.Context, req *userv1.LoginBySMSRequest) (*userv1.LoginResponse, error) {
+	validator := service.NewLoginBySMSRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &userv1.LoginResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.userService.LoginBySMS(ctx, req)
 }
 
 func (h *UserServiceHandler) GetUser(ctx context.Context, req *userv1.GetUserRequest) (*userv1.GetUserResponse, error) {
+	if req.UserId == 0 {
+		return &userv1.GetUserResponse{
+			Code:    1,
+			Message: "用户ID不能为空",
+		}, nil
+	}
 	return h.userService.GetUser(ctx, req)
 }
 
 func (h *UserServiceHandler) UpdateUser(ctx context.Context, req *userv1.UpdateUserRequest) (*userv1.UpdateUserResponse, error) {
+	validator := service.NewUpdateUserRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &userv1.UpdateUserResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.userService.UpdateUser(ctx, req)
 }
 
@@ -98,29 +142,74 @@ func (h *UserServiceHandler) UploadAvatarHTTP(w http.ResponseWriter, r *http.Req
 }
 
 func (h *UserServiceHandler) CreateAddress(ctx context.Context, req *userv1.CreateAddressRequest) (*userv1.CreateAddressResponse, error) {
+	if req.UserId == "" {
+		return &userv1.CreateAddressResponse{
+			Code:    1,
+			Message: "用户ID不能为空",
+		}, nil
+	}
 	return h.userService.CreateAddress(ctx, req)
 }
 
 func (h *UserServiceHandler) ListAddresses(ctx context.Context, req *userv1.ListAddressesRequest) (*userv1.ListAddressesResponse, error) {
+	if req.UserId == "" {
+		return &userv1.ListAddressesResponse{
+			Code:    1,
+			Message: "用户ID不能为空",
+		}, nil
+	}
 	return h.userService.ListAddresses(ctx, req)
 }
 
 func (h *UserServiceHandler) UpdateAddress(ctx context.Context, req *userv1.UpdateAddressRequest) (*userv1.UpdateAddressResponse, error) {
+	if req.AddressId == "" || req.UserId == "" {
+		return &userv1.UpdateAddressResponse{
+			Code:    1,
+			Message: "地址ID或用户ID不能为空",
+		}, nil
+	}
 	return h.userService.UpdateAddress(ctx, req)
 }
 
 func (h *UserServiceHandler) DeleteAddress(ctx context.Context, req *userv1.DeleteAddressRequest) (*userv1.DeleteAddressResponse, error) {
+	if req.AddressId == "" || req.UserId == "" {
+		return &userv1.DeleteAddressResponse{
+			Code:    1,
+			Message: "地址ID或用户ID不能为空",
+		}, nil
+	}
 	return h.userService.DeleteAddress(ctx, req)
 }
 
 func (h *UserServiceHandler) SetDefaultAddress(ctx context.Context, req *userv1.SetDefaultAddressRequest) (*userv1.SetDefaultAddressResponse, error) {
+	if req.AddressId == "" || req.UserId == "" {
+		return &userv1.SetDefaultAddressResponse{
+			Code:    1,
+			Message: "地址ID或用户ID不能为空",
+		}, nil
+	}
 	return h.userService.SetDefaultAddress(ctx, req)
 }
 
 func (h *UserServiceHandler) ChangePassword(ctx context.Context, req *userv1.ChangePasswordRequest) (*userv1.ChangePasswordResponse, error) {
+	validator := service.NewChangePasswordRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &userv1.ChangePasswordResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.userService.ChangePassword(ctx, req)
 }
 
 func (h *UserServiceHandler) BindPhone(ctx context.Context, req *userv1.BindPhoneRequest) (*userv1.BindPhoneResponse, error) {
+	validator := service.NewBindPhoneRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &userv1.BindPhoneResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return h.userService.BindPhone(ctx, req)
 }

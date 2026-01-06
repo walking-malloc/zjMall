@@ -110,9 +110,6 @@ func FormatError(err error) string {
 	}
 
 	for _, e := range validationErrors {
-		// 调试：打印详细错误信息（可以在开发时启用）
-		// fmt.Printf("DEBUG Validation: Field=%s, Tag=%s, Value=%v, Param=%s\n",
-		//     e.Field(), e.Tag(), e.Value(), e.Param())
 		return getErrorMessage(e)
 	}
 	return "参数校验失败"
