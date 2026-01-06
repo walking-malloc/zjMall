@@ -28,7 +28,7 @@ type Category struct {
 	Status int8 `gorm:"type:tinyint(1);default:1;index:idx_level_status,idx_parent_visible_status;comment:状态：1-启用，2-停用" json:"status"`
 
 	// 软删除
-	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index;comment:软删除时间" json:"deleted_at,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at"`
 }
 
 // TableName 指定表名

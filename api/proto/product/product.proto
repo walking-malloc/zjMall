@@ -448,7 +448,6 @@ message DeleteCategoryResponse {
 message ListCategoriesRequest {
   int32 page = 1;           // 页码，从1开始
   int32 page_size = 2;      // 每页数量
-  string parent_id = 3;     // 父类目ID（可选，用于筛选子类目）
   int32 level = 4;           // 类目层级（可选，1-一级，2-二级，3-三级）
   int32 status = 5;         // 状态（可选，1-启用，2-停用）
   bool is_visible = 6;      // 是否前台展示（可选）

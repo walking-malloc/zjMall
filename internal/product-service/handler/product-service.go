@@ -85,6 +85,13 @@ func (h *ProductServiceHandler) GetCategoryTree(ctx context.Context, req *produc
 }
 
 func (h *ProductServiceHandler) GetCategoryChildren(ctx context.Context, req *productv1.GetCategoryChildrenRequest) (*productv1.GetCategoryChildrenResponse, error) {
+	validator := service.NewGetCategoryChildrenRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.GetCategoryChildrenResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.GetCategoryChildren(ctx, req)
 }
 

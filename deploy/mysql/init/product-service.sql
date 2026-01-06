@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS categories (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL COMMENT '软删除时间',
     INDEX idx_parent_visible_status (parent_id, is_visible, status),
-    INDEX idx_level_status  (level,status)
+    UNIQUE KEY uk_parent_name (parent_id, name, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品类目表';
 
 -- ============================================

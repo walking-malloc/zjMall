@@ -39,13 +39,15 @@ type CategoryTreeNode struct {
 	Icon      string
 	Status    int8
 	Children  []*CategoryTreeNode // 子类目
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type CategoryListFliter struct {
 	ParentID  string
 	Level     int32
 	Status    int32
-	IsVisible *bool
+	IsVisible bool
 	Keyword   string
 	Offset    int32
 	Limit     int32
@@ -163,7 +165,15 @@ func (r *categoryRepository) GetCategoryByID(ctx context.Context, id string) (*m
 }
 
 func (r *categoryRepository) UpdateCategory(ctx context.Context, category *model.Category) error {
-	err := r.db.WithContext(ctx).Where("id = ?", category.ID).Updates(category).Error
+	updates := map[string]interface{}{
+		"name":       category.Name,
+		"is_leaf":    category.IsLeaf,    // false 也会更新
+		"is_visible": category.IsVisible, // false 也会更新
+		"sort_order": category.SortOrder, // 0 也会更新
+		"icon":       category.Icon,
+		"status":     category.Status,
+	}
+	err := r.db.WithContext(ctx).Model(&model.Category{}).Where("id = ?", category.ID).Updates(updates).Error
 	if err != nil {
 		log.Printf("[CategoryRepository] UpdateCategory DB error, id=%s, err=%v", category.ID, err)
 		return err
@@ -171,10 +181,10 @@ func (r *categoryRepository) UpdateCategory(ctx context.Context, category *model
 	log.Printf("[CategoryRepository] UpdateCategory success, id=%s", category.ID)
 	go func() {
 		log.Printf("[CategoryRepository] UpdateCategory invalidate caches for id=%s", category.ID)
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(CategoryDetailCacheKey, category.ID)) //删除单个类目详情缓存
-		r.cacheRepo.Delete(ctx, CategoryAllListCacheKey)                          //删除所有类目扁平列表缓存
-		r.cacheRepo.Delete(ctx, CategoryTreeCacheKey)                             //删除完整树形结构缓存
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(CategoryNullCacheKey, category.ID))   //删除空值缓存
+		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryDetailCacheKey, category.ID)) //删除单个类目详情缓存
+		r.cacheRepo.Delete(context.Background(), CategoryAllListCacheKey)                          //删除所有类目扁平列表缓存
+		r.cacheRepo.Delete(context.Background(), CategoryTreeCacheKey)                             //删除完整树形结构缓存
+		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryNullCacheKey, category.ID))   //删除空值缓存
 	}()
 	return nil
 }
@@ -194,10 +204,10 @@ func (r *categoryRepository) DeleteCategory(ctx context.Context, id string) erro
 	log.Printf("[CategoryRepository] DeleteCategory success (soft delete), id=%s", id)
 	go func() {
 		log.Printf("[CategoryRepository] DeleteCategory invalidate caches for id=%s", category.ID)
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(CategoryDetailCacheKey, category.ID)) //删除单个类目详情缓存
-		r.cacheRepo.Delete(ctx, CategoryAllListCacheKey)                          //删除所有类目扁平列表缓存
-		r.cacheRepo.Delete(ctx, CategoryTreeCacheKey)                             //删除完整树形结构缓存
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(CategoryNullCacheKey, category.ID))   //删除空值缓存
+		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryDetailCacheKey, category.ID)) //删除单个类目详情缓存
+		r.cacheRepo.Delete(context.Background(), CategoryAllListCacheKey)                          //删除所有类目扁平列表缓存
+		r.cacheRepo.Delete(context.Background(), CategoryTreeCacheKey)                             //删除完整树形结构缓存
+		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryNullCacheKey, category.ID))   //删除空值缓存
 	}()
 	return err
 }
@@ -214,8 +224,9 @@ func (r *categoryRepository) ListCategories(ctx context.Context, filter *Categor
 			log.Printf("[CategoryRepository] ListCategories unmarshal cache error: %v", err)
 			return nil, err
 		}
-		filteredCategories := filterByParentID(categories, filter)
-		log.Printf("[CategoryRepository] ListCategories return from cache, total=%d, filtered=%d", len(categories), len(filteredCategories))
+		log.Printf("[CategoryRepository] ListCategories categories=%+v", categories)
+		filteredCategories := filterCategories(categories, filter)
+		log.Printf("[CategoryRepository] ListCategories filteredCategories=%+v", filteredCategories)
 		return filteredCategories, nil
 	}
 	if err != nil {
@@ -234,12 +245,12 @@ func (r *categoryRepository) ListCategories(ctx context.Context, filter *Categor
 		}
 		go func() {
 			data, _ := json.Marshal(categories)
-			if cacheErr := r.cacheRepo.Set(ctx, CategoryAllListCacheKey, string(data), time.Hour*24); cacheErr != nil {
+			if cacheErr := r.cacheRepo.Set(context.Background(), CategoryAllListCacheKey, string(data), time.Hour*24); cacheErr != nil {
 				log.Printf("[CategoryRepository] ListCategories set all-list cache error: %v", cacheErr)
 			}
 		}()
 
-		filteredCategories := filterByParentID(categories, filter)
+		filteredCategories := filterCategories(categories, filter)
 		log.Printf("[CategoryRepository] ListCategories DB query done, total=%d, filtered=%d", len(categories), len(filteredCategories))
 		return filteredCategories, nil
 	})
@@ -259,11 +270,7 @@ func (r *categoryRepository) ListCategories(ctx context.Context, filter *Categor
 func (r *categoryRepository) GetCategoryTree(ctx context.Context, maxlevel int32, isvisible bool, status int32) ([]*CategoryTreeNode, error) {
 	log.Printf("[CategoryRepository] GetCategoryTree called, maxlevel=%d, isvisible=%v, status=%d", maxlevel, isvisible, status)
 	result, err := r.cacheRepo.Get(ctx, CategoryTreeCacheKey)
-	if err != nil {
-		log.Printf("[CategoryRepository] GetCategoryTree cache Get error: %v", err)
-		return nil, err
-	}
-	if result != "" {
+	if err == nil && result != "" {
 		log.Printf("[CategoryRepository] GetCategoryTree cache hit")
 		var tree []*CategoryTreeNode
 		err = json.Unmarshal([]byte(result), &tree)
@@ -272,7 +279,7 @@ func (r *categoryRepository) GetCategoryTree(ctx context.Context, maxlevel int32
 	//如果缓存没有，则从redis查询扁平列表并构建树形结构
 	allcategories, err := r.ListCategories(ctx, &CategoryListFliter{
 		Level:     maxlevel,
-		IsVisible: &isvisible,
+		IsVisible: isvisible,
 		Status:    status,
 	})
 	if err != nil {
@@ -283,32 +290,38 @@ func (r *categoryRepository) GetCategoryTree(ctx context.Context, maxlevel int32
 	tree := buildTreeFromFlatList(allcategories)
 	go func() {
 		data, _ := json.Marshal(tree)
-		if cacheErr := r.cacheRepo.Set(ctx, CategoryTreeCacheKey, string(data), time.Hour*24); cacheErr != nil {
+		if cacheErr := r.cacheRepo.Set(context.Background(), CategoryTreeCacheKey, string(data), time.Hour*24); cacheErr != nil {
 			log.Printf("[CategoryRepository] GetCategoryTree set tree cache error: %v", cacheErr)
 		}
 	}()
 	log.Printf("[CategoryRepository] GetCategoryTree built tree, root_count=%d", len(tree))
 	return tree, nil
 }
-func filterByParentID(allcategories []*model.Category, filter *CategoryListFliter) []*model.Category {
+func filterCategories(allcategories []*model.Category, filter *CategoryListFliter) []*model.Category {
+	log.Printf("[CategoryRepository] filterCategories called, allcategories=%d, filter=%+v", len(allcategories), filter)
 	if len(allcategories) == 0 || filter == nil {
 		return allcategories
 	}
 	var result []*model.Category = make([]*model.Category, 0, len(allcategories))
 	for _, category := range allcategories {
 		if filter.ParentID != "" && category.ParentID != filter.ParentID {
+			log.Printf("[CategoryRepository] filterCategories skip, category.ParentID=%s, filter.ParentID=%s", category.ParentID, filter.ParentID)
 			continue
 		}
-		if filter.Level > 0 && category.Level != (int8)(filter.Level) {
+		if filter.Level > 0 && category.Level > (int8)(filter.Level) {
+			log.Printf("[CategoryRepository] filterCategories skip, category.Level=%d, filter.Level=%d", category.Level, filter.Level)
 			continue
 		}
 		if filter.Status > 0 && category.Status != (int8)(filter.Status) {
+			log.Printf("[CategoryRepository] filterCategories skip, category.Status=%d, filter.Status=%d", category.Status, filter.Status)
 			continue
 		}
-		if filter.IsVisible != nil && category.IsVisible != *filter.IsVisible {
+		if category.IsVisible != filter.IsVisible {
+			log.Printf("[CategoryRepository] filterCategories skip, category.IsVisible=%v, filter.IsVisible=%v", category.IsVisible, filter.IsVisible)
 			continue
 		}
 		if filter.Keyword != "" && !strings.Contains(category.Name, filter.Keyword) {
+			log.Printf("[CategoryRepository] filterCategories skip, category.Name=%s, filter.Keyword=%s", category.Name, filter.Keyword)
 			continue
 		}
 		result = append(result, category)
@@ -342,6 +355,8 @@ func buildTreeFromFlatList(flatList []*model.Category) []*CategoryTreeNode {
 			Icon:      category.Icon,
 			Status:    category.Status,
 			Children:  []*CategoryTreeNode{},
+			CreatedAt: category.CreatedAt,
+			UpdatedAt: category.UpdatedAt,
 		}
 		nodeMap[category.ID] = node
 	}

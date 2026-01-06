@@ -7,6 +7,8 @@ import (
 	"zjMall/internal/product-service/model"
 	"zjMall/internal/product-service/repository"
 	"zjMall/pkg"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ProductService 商品服务（业务逻辑层）
@@ -88,6 +90,8 @@ func (s *ProductService) GetCategory(ctx context.Context, req *productv1.GetCate
 			SortOrder: category.SortOrder,
 			Icon:      category.Icon,
 			Status:    int32(category.Status),
+			CreatedAt: timestamppb.New(category.CreatedAt),
+			UpdatedAt: timestamppb.New(category.UpdatedAt),
 		},
 	}, nil
 }
@@ -100,7 +104,6 @@ func (s *ProductService) UpdateCategory(ctx context.Context, req *productv1.Upda
 			ID: req.CategoryId,
 		},
 		Name:      req.Name,
-		Level:     int8(req.Level),
 		IsLeaf:    req.IsLeaf,
 		IsVisible: req.IsVisible,
 		SortOrder: req.SortOrder,
@@ -164,12 +167,11 @@ func (s *ProductService) ListCategories(ctx context.Context, req *productv1.List
 	if pageSize > 100 {
 		pageSize = 100
 	}
-	isVisible := &req.IsVisible
+
 	filter := repository.CategoryListFliter{
-		ParentID:  req.ParentId,
 		Level:     req.Level,
 		Status:    req.Status,
-		IsVisible: isVisible,
+		IsVisible: req.IsVisible,
 		Keyword:   req.Keyword,
 		Offset:    (page - 1) * pageSize,
 		Limit:     pageSize,
@@ -240,6 +242,8 @@ func convertTreeNodesToProto(nodes []*repository.CategoryTreeNode) []*productv1.
 				SortOrder: node.SortOrder,
 				Icon:      node.Icon,
 				Status:    int32(node.Status),
+				CreatedAt: timestamppb.New(node.CreatedAt),
+				UpdatedAt: timestamppb.New(node.UpdatedAt),
 			},
 			Children: convertTreeNodesToProto(node.Children),
 		})
@@ -253,7 +257,7 @@ func (s *ProductService) GetCategoryChildren(ctx context.Context, req *productv1
 	categories, err := s.categoryRepo.ListCategories(ctx, &repository.CategoryListFliter{
 		ParentID:  req.ParentId,
 		Status:    req.Status,
-		IsVisible: &req.OnlyVisible,
+		IsVisible: req.OnlyVisible,
 		Offset:    (req.Page - 1) * req.PageSize,
 		Limit:     req.PageSize,
 	})

@@ -435,13 +435,6 @@
             "format": "int32"
           },
           {
-            "name": "parentId",
-            "description": "父类目ID（可选，用于筛选子类目）",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
             "name": "level",
             "description": "类目层级（可选，1-一级，2-二级，3-三级）",
             "in": "query",
@@ -3240,11 +3233,6 @@
         "name": {
           "type": "string",
           "title": "类目名称（可选）"
-        },
-        "level": {
-          "type": "integer",
-          "format": "int32",
-          "title": "类目层级（可选）"
         },
         "isLeaf": {
           "type": "boolean",
