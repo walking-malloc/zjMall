@@ -54,9 +54,11 @@ CREATE TABLE IF NOT EXISTS brand_categories (
     brand_id VARCHAR(26) NOT NULL COMMENT '品牌ID',
     category_id VARCHAR(26) NOT NULL COMMENT '类目ID',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_brand_category (brand_id, category_id),
-    INDEX idx_brand_id (brand_id),
-    INDEX idx_category_id (category_id)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL COMMENT '软删除时间',
+    UNIQUE KEY uk_brand_category (brand_id, category_id, deleted_at),
+    INDEX idx_brand_id (brand_id, deleted_at),
+    INDEX idx_category_id (category_id, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='品牌类目关联表';
 
 -- ============================================

@@ -47,6 +47,12 @@ type BrandRepository interface {
 	DeleteBrand(ctx context.Context, id string) error
 	ListBrands(ctx context.Context, filter *BrandListFliter) ([]*model.Brand, error)
 	GetBrandsByFirstLetter(ctx context.Context, status int32) ([]*BrandGroupByLetter, error)
+
+	// 品牌类目关联方法
+	AddBrandCategory(ctx context.Context, brandID, categoryID string) error
+	RemoveBrandCategory(ctx context.Context, brandID, categoryID string) error
+	GetBrandCategories(ctx context.Context, brandID string) ([]*model.Category, error)
+	BatchSetBrandCategories(ctx context.Context, brandID string, categoryIDs []string) error
 }
 
 type brandRepository struct {
@@ -378,4 +384,155 @@ func filterBrandGroupsByStatus(groups []*BrandGroupByLetter, status int32) []*Br
 		}
 	}
 	return filteredGroups
+}
+
+// ============================================
+// 品牌类目关联方法
+// ============================================
+
+// AddBrandCategory 添加品牌类目关联
+// 注意：不需要加锁，因为：
+// 1. 数据库唯一索引 uk_brand_category 已经提供了并发保护
+// 2. 即使两个请求同时插入相同的关联，唯一索引会保证只有一个成功
+// 3. 错误处理已经捕获了唯一约束冲突，返回友好的错误信息
+func (r *brandRepository) AddBrandCategory(ctx context.Context, brandID, categoryID string) error {
+	// 使用事务 + FOR UPDATE 锁定记录，防止在检查后被删除
+	// 这样可以避免"检查时存在，插入时已被删除"的并发问题
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 检查品牌是否存在，并锁定记录（FOR UPDATE）
+		var brand model.Brand
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("id = ?", brandID).
+			First(&brand).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("品牌不存在: %s", brandID)
+			}
+			return err
+		}
+
+		// 检查类目是否存在，并锁定记录（FOR UPDATE）
+		var category model.Category
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("id = ?", categoryID).
+			First(&category).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("类目不存在: %s", categoryID)
+			}
+			return err
+		}
+
+		// 创建关联（唯一索引会自动防止重复）
+		brandCategory := &model.BrandCategory{
+			BrandID:    brandID,
+			CategoryID: categoryID,
+		}
+		if err := tx.Create(brandCategory).Error; err != nil {
+			if strings.Contains(err.Error(), "Duplicate entry") ||
+				strings.Contains(err.Error(), "UNIQUE constraint") {
+				return fmt.Errorf("该品牌已关联该类目")
+			}
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[BrandRepository] AddBrandCategory success, brand_id=%s, category_id=%s", brandID, categoryID)
+	return nil
+}
+
+// RemoveBrandCategory 删除品牌类目关联
+func (r *brandRepository) RemoveBrandCategory(ctx context.Context, brandID, categoryID string) error {
+	result := r.db.WithContext(ctx).Where("brand_id = ? AND category_id = ?", brandID, categoryID).
+		Delete(&model.BrandCategory{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("品牌类目关联不存在")
+	}
+
+	log.Printf("[BrandRepository] RemoveBrandCategory success, brand_id=%s, category_id=%s", brandID, categoryID)
+	return nil
+}
+
+// GetBrandCategories 查询品牌的类目列表
+func (r *brandRepository) GetBrandCategories(ctx context.Context, brandID string) ([]*model.Category, error) {
+	var categories []*model.Category
+
+	// 通过关联表查询类目
+	err := r.db.WithContext(ctx).
+		Table("categories").
+		Joins("INNER JOIN brand_categories ON categories.id = brand_categories.category_id").
+		Where("brand_categories.brand_id = ? AND brand_categories.deleted_at IS NULL", brandID).
+		Where("categories.deleted_at IS NULL").
+		Find(&categories).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("[BrandRepository] GetBrandCategories success, brand_id=%s, count=%d", brandID, len(categories))
+	return categories, nil
+}
+
+// BatchSetBrandCategories 批量设置品牌类目关联（先删除旧的，再插入新的）
+func (r *brandRepository) BatchSetBrandCategories(ctx context.Context, brandID string, categoryIDs []string) error {
+	// 检查品牌是否存在
+	var brand model.Brand
+	if err := r.db.WithContext(ctx).Where("id = ?", brandID).First(&brand).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("品牌不存在: %s", brandID)
+		}
+		return err
+	}
+
+	// 检查所有类目是否存在
+	if len(categoryIDs) > 0 {
+		var count int64
+		err := r.db.WithContext(ctx).Model(&model.Category{}).
+			Where("id IN ?", categoryIDs).
+			Count(&count).Error
+		if err != nil {
+			return err
+		}
+		if int(count) != len(categoryIDs) {
+			return fmt.Errorf("部分类目不存在")
+		}
+	}
+
+	// 使用事务批量替换
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. 删除该品牌的所有旧关联
+		if err := tx.Where("brand_id = ?", brandID).Delete(&model.BrandCategory{}).Error; err != nil {
+			return err
+		}
+
+		// 2. 如果有关联要添加，批量插入新关联
+		if len(categoryIDs) > 0 {
+			brandCategories := make([]*model.BrandCategory, 0, len(categoryIDs))
+			for _, categoryID := range categoryIDs {
+				brandCategories = append(brandCategories, &model.BrandCategory{
+					BrandID:    brandID,
+					CategoryID: categoryID,
+				})
+			}
+			if err := tx.CreateInBatches(brandCategories, 50).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[BrandRepository] BatchSetBrandCategories success, brand_id=%s, category_count=%d", brandID, len(categoryIDs))
+	return nil
 }

@@ -487,37 +487,142 @@ func (s *ProductService) GetBrandsByFirstLetter(ctx context.Context, req *produc
 
 // AddBrandCategory 添加品牌类目关联
 func (s *ProductService) AddBrandCategory(ctx context.Context, req *productv1.AddBrandCategoryRequest) (*productv1.AddBrandCategoryResponse, error) {
-	// TODO: 实现添加品牌类目关联的业务逻辑
+	// 参数校验
+	if req.BrandId == "" {
+		return &productv1.AddBrandCategoryResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
+	if req.CategoryId == "" {
+		return &productv1.AddBrandCategoryResponse{
+			Code:    1,
+			Message: "类目ID不能为空",
+		}, nil
+	}
+
+	// 调用repository添加关联
+	err := s.brandRepo.AddBrandCategory(ctx, req.BrandId, req.CategoryId)
+	if err != nil {
+		return &productv1.AddBrandCategoryResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.AddBrandCategoryResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "添加成功",
 	}, nil
 }
 
 // RemoveBrandCategory 删除品牌类目关联
 func (s *ProductService) RemoveBrandCategory(ctx context.Context, req *productv1.RemoveBrandCategoryRequest) (*productv1.RemoveBrandCategoryResponse, error) {
-	// TODO: 实现删除品牌类目关联的业务逻辑
+	// 参数校验
+	if req.BrandId == "" {
+		return &productv1.RemoveBrandCategoryResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
+	if req.CategoryId == "" {
+		return &productv1.RemoveBrandCategoryResponse{
+			Code:    1,
+			Message: "类目ID不能为空",
+		}, nil
+	}
+
+	// 调用repository删除关联
+	err := s.brandRepo.RemoveBrandCategory(ctx, req.BrandId, req.CategoryId)
+	if err != nil {
+		return &productv1.RemoveBrandCategoryResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.RemoveBrandCategoryResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "删除成功",
 	}, nil
 }
 
 // GetBrandCategories 查询品牌的类目列表
 func (s *ProductService) GetBrandCategories(ctx context.Context, req *productv1.GetBrandCategoriesRequest) (*productv1.GetBrandCategoriesResponse, error) {
-	// TODO: 实现查询品牌类目列表的业务逻辑
+	// 参数校验
+	if req.BrandId == "" {
+		return &productv1.GetBrandCategoriesResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
+
+	// 调用repository查询类目列表
+	categories, err := s.brandRepo.GetBrandCategories(ctx, req.BrandId)
+	if err != nil {
+		return &productv1.GetBrandCategoriesResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询失败: %v", err),
+		}, nil
+	}
+
+	// 转换为响应格式
+	categoryList := make([]*productv1.CategoryInfo, 0, len(categories))
+	for _, category := range categories {
+		categoryList = append(categoryList, &productv1.CategoryInfo{
+			Id:        category.ID,
+			Name:      category.Name,
+			ParentId:  category.ParentID,
+			Level:     int32(category.Level),
+			IsLeaf:    category.IsLeaf,
+			IsVisible: category.IsVisible,
+			SortOrder: category.SortOrder,
+			Icon:      category.Icon,
+			Status:    int32(category.Status),
+			CreatedAt: timestamppb.New(category.CreatedAt),
+			UpdatedAt: timestamppb.New(category.UpdatedAt),
+		})
+	}
+
 	return &productv1.GetBrandCategoriesResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:       0,
+		Message:    "查询成功",
+		Categories: categoryList,
 	}, nil
 }
 
 // BatchSetBrandCategories 批量设置品牌类目关联
 func (s *ProductService) BatchSetBrandCategories(ctx context.Context, req *productv1.BatchSetBrandCategoriesRequest) (*productv1.BatchSetBrandCategoriesResponse, error) {
-	// TODO: 实现批量设置品牌类目关联的业务逻辑
+	// 参数校验
+	if req.BrandId == "" {
+		return &productv1.BatchSetBrandCategoriesResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
+
+	// 去重category_ids
+	categoryIDMap := make(map[string]bool)
+	uniqueCategoryIDs := make([]string, 0)
+	for _, categoryID := range req.CategoryIds {
+		if categoryID != "" && !categoryIDMap[categoryID] {
+			categoryIDMap[categoryID] = true
+			uniqueCategoryIDs = append(uniqueCategoryIDs, categoryID)
+		}
+	}
+
+	// 调用repository批量设置关联
+	err := s.brandRepo.BatchSetBrandCategories(ctx, req.BrandId, uniqueCategoryIDs)
+	if err != nil {
+		return &productv1.BatchSetBrandCategoriesResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.BatchSetBrandCategoriesResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "批量设置成功",
 	}, nil
 }
 
