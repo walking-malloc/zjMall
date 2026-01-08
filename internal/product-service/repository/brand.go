@@ -65,63 +65,59 @@ func NewBrandRepository(db *gorm.DB, cacheRepo cache.CacheRepository, sf singlef
 func (r *brandRepository) CreateBrand(ctx context.Context, brand *model.Brand) error {
 	err := r.db.WithContext(ctx).Create(brand).Error
 	if err != nil {
+		if strings.Contains(err.Error(), "Duplicate entry") ||
+			strings.Contains(err.Error(), "UNIQUE constraint") {
+			return fmt.Errorf("品牌名称已存在")
+		}
 		return err
 	}
-	go func() {
-		// 删除详情缓存和空值缓存
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(BrandDetailCacheKey, brand.ID))
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(BrandNullCacheKey, brand.ID))
-		// 删除列表缓存（因为新增了品牌）
-		r.cacheRepo.Delete(context.Background(), BrandListCacheKey)
-		// 删除按首字母分组缓存（因为新增了品牌，所有分组都需要更新）
-		r.cacheRepo.Delete(context.Background(), BrandGroupByLetterCacheKey)
-	}()
+	newCtx := context.Background()
+	// 删除详情缓存和空值缓存
+	r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandDetailCacheKey, brand.ID))
+	r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandNullCacheKey, brand.ID))
+	// 删除列表缓存（因为新增了品牌）
+	r.cacheRepo.Delete(newCtx, BrandListCacheKey)
+	// 删除按首字母分组缓存（因为新增了品牌，所有分组都需要更新）
+	r.cacheRepo.Delete(newCtx, BrandGroupByLetterCacheKey)
+
 	return nil
 }
 func (r *brandRepository) GetBrandByID(ctx context.Context, id string) (*model.Brand, error) {
-	//先从缓存中获取
-	result, err := r.cacheRepo.Get(ctx, fmt.Sprintf(BrandDetailCacheKey, id))
-	if err == nil && result != "" {
-		var brand model.Brand
-		err = json.Unmarshal([]byte(result), &brand)
-		return &brand, nil
-	}
-
-	//检查空值缓存
-	nullKey := fmt.Sprintf(BrandNullCacheKey, id)
-	nullResult, _ := r.cacheRepo.Get(ctx, nullKey)
-	if nullResult == "1" {
-		log.Printf("[BrandRepository] GetBrandByID null-cache hit, id=%s", id)
-		return nil, nil
-	}
 
 	//缓存中没有，则从数据库中获取
 	sfKey := fmt.Sprintf(SingleFlightBrandDetailKey, id)
+	nullKey := fmt.Sprintf(BrandNullCacheKey, id)
 	sfResult, err, _ := r.sf.Do(sfKey, func() (interface{}, error) { //防击穿
+		//先从缓存中获取
+		result, err := r.cacheRepo.Get(ctx, fmt.Sprintf(BrandDetailCacheKey, id))
+		if err == nil && result != "" {
+			var brand model.Brand
+			err = json.Unmarshal([]byte(result), &brand)
+			return &brand, nil
+		}
 		//检查空值缓存
 		nullResult, _ := r.cacheRepo.Get(ctx, nullKey)
 		if nullResult == "1" {
 			log.Printf("[BrandRepository] GetBrandByID null-cache hit inside singleflight, id=%s", id)
 			return nil, nil
 		}
+		//没有缓存，则从数据库中获取
 		var brand model.Brand
-		err := r.db.WithContext(ctx).Where("id = ?", id).First(&brand).Error
+		err = r.db.WithContext(ctx).Where("id = ?", id).First(&brand).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				log.Printf("[BrandRepository] GetBrandByID record not found in DB, id=%s", id)
-				go func() {
-					r.cacheRepo.Set(context.Background(), nullKey, "1", 5*time.Minute)
-				}()
+				r.cacheRepo.Set(context.Background(), nullKey, "1", 5*time.Minute) //如果数据库中没有，则设置空值缓存
 				return nil, nil
 			}
 			return nil, err
 		}
-		go func() {
-			data, _ := json.Marshal(brand)
-			if cacheErr := r.cacheRepo.Set(context.Background(), fmt.Sprintf(BrandDetailCacheKey, id), string(data), time.Minute*10); cacheErr != nil {
-				log.Printf("[BrandRepository] GetBrandByID set cache error: %v", cacheErr)
-			}
-		}()
+		//设置缓存
+		data, _ := json.Marshal(brand)
+		if cacheErr := r.cacheRepo.Set(context.Background(), fmt.Sprintf(BrandDetailCacheKey, id), string(data), time.Minute*10); cacheErr != nil {
+			log.Printf("[BrandRepository] GetBrandByID set cache error: %v", cacheErr)
+		}
+
 		return &brand, nil
 	})
 	if err != nil {
@@ -137,65 +133,83 @@ func (r *brandRepository) GetBrandByID(ctx context.Context, id string) (*model.B
 	return brands, nil
 }
 func (r *brandRepository) UpdateBrand(ctx context.Context, brand *model.Brand) error {
-	err := r.db.WithContext(ctx).Model(&model.Brand{}).Where("id = ?", brand.ID).Updates(brand).Error
+	//读取当前记录版本号
+	var current model.Brand
+	err := r.db.WithContext(ctx).Where("id = ?", brand.ID).First(&current).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("brand not found: %s", brand.ID)
+		}
 		return err
 	}
-	go func() {
-		// 删除详情缓存和空值缓存
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(BrandDetailCacheKey, brand.ID))
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(BrandNullCacheKey, brand.ID))
-		// 删除列表缓存（品牌信息可能影响排序或筛选）
-		r.cacheRepo.Delete(context.Background(), BrandListCacheKey)
-		// 删除按首字母分组缓存（如果first_letter或status变了，所有分组都需要更新）
-		r.cacheRepo.Delete(context.Background(), BrandGroupByLetterCacheKey)
-	}()
+	brand.Version = current.Version + 1
+	//更新时检查版本号
+	result := r.db.WithContext(ctx).Model(&model.Brand{}).Where("id = ? and version = ?", brand.ID, current.Version).Updates(brand)
+	if result.Error != nil {
+		return result.Error
+	}
+	//检查是否更新成功
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("version mismatch, current version: %d, new version: %d", current.Version, brand.Version)
+	}
+	newCtx := context.Background()
+	// 删除详情缓存和空值缓存
+	r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandDetailCacheKey, brand.ID))
+	r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandNullCacheKey, brand.ID))
+	// 删除列表缓存（品牌信息可能影响排序或筛选）
+	r.cacheRepo.Delete(newCtx, BrandListCacheKey)
+	// 删除按首字母分组缓存（如果first_letter或status变了，所有分组都需要更新）
+	r.cacheRepo.Delete(newCtx, BrandGroupByLetterCacheKey)
+
 	return nil
 }
 func (r *brandRepository) DeleteBrand(ctx context.Context, id string) error {
-	// 先查询品牌信息，用于删除相关缓存
-	var brand model.Brand
-	err := r.db.WithContext(ctx).Where("id = ?", id).First(&brand).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("brand not found: %s", id)
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 先查询品牌信息，用于删除相关缓存
+		var brand model.Brand
+		err := tx.WithContext(ctx).Where("id = ?", id).First(&brand).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("brand not found: %s", id)
+			}
+			return err
 		}
-		return err
-	}
 
-	// 执行软删除（注意：Where要在Delete之前）
-	err = r.db.WithContext(ctx).Where("id = ?", id).Delete(&model.Brand{}).Error
-	if err != nil {
-		return err
-	}
+		// 执行软删除（注意：Where要在Delete之前）
+		err = tx.WithContext(ctx).Where("id = ?", id).Delete(&model.Brand{}).Error
+		if err != nil {
+			return err
+		}
 
-	go func() {
+		newCtx := context.Background()
 		// 删除详情缓存和空值缓存
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(BrandDetailCacheKey, id))
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(BrandNullCacheKey, id))
+		r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandDetailCacheKey, id))
+		r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandNullCacheKey, id))
 		// 删除列表缓存（因为删除了品牌）
-		r.cacheRepo.Delete(context.Background(), BrandListCacheKey)
+		r.cacheRepo.Delete(newCtx, BrandListCacheKey)
 		// 删除按首字母分组缓存（因为删除了品牌，所有分组都需要更新）
-		r.cacheRepo.Delete(context.Background(), BrandGroupByLetterCacheKey)
-	}()
-	return nil
+		r.cacheRepo.Delete(newCtx, BrandGroupByLetterCacheKey)
+
+		return nil
+	})
+	return err
 }
 func (r *brandRepository) ListBrands(ctx context.Context, filter *BrandListFliter) ([]*model.Brand, error) {
-	// 先从缓存中获取全量列表（类似category的做法）
-	result, err := r.cacheRepo.Get(ctx, BrandListCacheKey)
-	if err == nil && result != "" {
-		var brands []*model.Brand
-		err = json.Unmarshal([]byte(result), &brands)
-		if err != nil {
-			return nil, err
-		}
-		// 在内存中过滤
-		filteredBrands := filterBrands(brands, filter)
-		return filteredBrands, nil
-	}
 
 	// 使用singleflight防击穿（key固定，因为缓存的是全量数据）
 	sfResult, err, _ := r.sf.Do(SingleFlightBrandListKey, func() (interface{}, error) {
+		// 先从缓存中获取全量列表（类似category的做法）
+		result, err := r.cacheRepo.Get(ctx, BrandListCacheKey)
+		if err == nil && result != "" {
+			var brands []*model.Brand
+			err = json.Unmarshal([]byte(result), &brands)
+			if err != nil {
+				return nil, err
+			}
+			// 在内存中过滤
+			filteredBrands := filterBrands(brands, filter)
+			return filteredBrands, nil
+		}
 		// 缓存中没有，则从数据库中获取全量数据
 		var brands []*model.Brand
 		err = r.db.WithContext(ctx).Order("sort_order DESC").Find(&brands).Error
@@ -204,12 +218,11 @@ func (r *brandRepository) ListBrands(ctx context.Context, filter *BrandListFlite
 		}
 
 		// 将全量数据缓存到redis（即使为空数组也缓存）
-		go func() {
-			data, _ := json.Marshal(brands)
-			if cacheErr := r.cacheRepo.Set(context.Background(), BrandListCacheKey, string(data), time.Hour*1); cacheErr != nil {
-				log.Printf("[BrandRepository] ListBrands set cache error: %v", cacheErr)
-			}
-		}()
+
+		data, _ := json.Marshal(brands)
+		if cacheErr := r.cacheRepo.Set(context.Background(), BrandListCacheKey, string(data), time.Hour*12); cacheErr != nil {
+			log.Printf("[BrandRepository] ListBrands set cache error: %v", cacheErr)
+		}
 		return brands, nil
 	})
 	if err != nil {
@@ -261,12 +274,11 @@ func (r *brandRepository) GetBrandsByFirstLetter(ctx context.Context, status int
 		groups := groupBrandsByLetter(brands)
 
 		// 将分组结果缓存到redis（即使为空数组也缓存）
-		go func() {
-			data, _ := json.Marshal(groups)
-			if cacheErr := r.cacheRepo.Set(context.Background(), BrandGroupByLetterCacheKey, string(data), time.Hour*1); cacheErr != nil {
-				log.Printf("[BrandRepository] GetBrandsByFirstLetter set cache error: %v", cacheErr)
-			}
-		}()
+
+		data, _ := json.Marshal(groups)
+		if cacheErr := r.cacheRepo.Set(context.Background(), BrandGroupByLetterCacheKey, string(data), time.Hour*1); cacheErr != nil {
+			log.Printf("[BrandRepository] GetBrandsByFirstLetter set cache error: %v", cacheErr)
+		}
 		return groups, nil
 	})
 	if err != nil {

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	productv1 "zjMall/gen/go/api/proto/product"
 	"zjMall/internal/product-service/model"
 	"zjMall/internal/product-service/repository"
@@ -52,7 +53,7 @@ func (s *ProductService) CreateCategory(ctx context.Context, req *productv1.Crea
 	if err != nil {
 		return &productv1.CreateCategoryResponse{
 			Code:    1,
-			Message: fmt.Sprintf("创建类目失败: %v", err),
+			Message: err.Error(),
 		}, nil
 	}
 	return &productv1.CreateCategoryResponse{
@@ -126,22 +127,6 @@ func (s *ProductService) UpdateCategory(ctx context.Context, req *productv1.Upda
 
 // DeleteCategory 删除类目
 func (s *ProductService) DeleteCategory(ctx context.Context, req *productv1.DeleteCategoryRequest) (*productv1.DeleteCategoryResponse, error) {
-	//先查找是否有子类目
-	children, err := s.categoryRepo.ListCategories(ctx, &repository.CategoryListFliter{
-		ParentID: req.CategoryId,
-	})
-	if err != nil {
-		return &productv1.DeleteCategoryResponse{
-			Code:    1,
-			Message: fmt.Sprintf("查询子类目列表失败: %v", err),
-		}, nil
-	}
-	if len(children) > 0 {
-		return &productv1.DeleteCategoryResponse{
-			Code:    1,
-			Message: "该类目有子类目，不能删除",
-		}, nil
-	}
 	if err := s.categoryRepo.DeleteCategory(ctx, req.CategoryId); err != nil {
 		return &productv1.DeleteCategoryResponse{
 			Code:    1,
@@ -310,7 +295,7 @@ func (s *ProductService) CreateBrand(ctx context.Context, req *productv1.CreateB
 	if err != nil {
 		return &productv1.CreateBrandResponse{
 			Code:    1,
-			Message: fmt.Sprintf("创建品牌失败: %v", err),
+			Message: err.Error(),
 		}, nil
 	}
 	return &productv1.CreateBrandResponse{
@@ -367,6 +352,14 @@ func (s *ProductService) UpdateBrand(ctx context.Context, req *productv1.UpdateB
 		Status:      int(req.Status),
 	})
 	if err != nil {
+		// 检查是否是版本冲突错误
+		if strings.Contains(err.Error(), "version mismatch") {
+			return &productv1.UpdateBrandResponse{
+				Code:    1,
+				Message: "数据已被其他请求修改，请刷新页面后重试",
+			}, nil
+		}
+
 		return &productv1.UpdateBrandResponse{
 			Code:    1,
 			Message: fmt.Sprintf("更新品牌失败: %v", err),

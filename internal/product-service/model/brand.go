@@ -8,6 +8,7 @@ import (
 
 type Brand struct {
 	pkg.BaseModel
+	Version     int            `gorm:"column:version" json:"version"`
 	Name        string         `gorm:"column:name" json:"name"`
 	LogoURL     string         `gorm:"column:logo_url" json:"logo_url"`
 	Country     string         `gorm:"column:country" json:"country"`

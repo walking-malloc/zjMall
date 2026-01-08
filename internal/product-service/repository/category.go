@@ -81,42 +81,41 @@ func NewCategoryRepository(db *gorm.DB, cacheRepo cache.CacheRepository, sf sing
 func (r *categoryRepository) CreateCategory(ctx context.Context, category *model.Category) error {
 	err := r.db.WithContext(ctx).Create(category).Error
 	if err != nil {
-		log.Printf("[CategoryRepository] CreateCategory DB error: %v", err)
+		// 检查是否是唯一性约束错误
+		if strings.Contains(err.Error(), "Duplicate entry") ||
+			strings.Contains(err.Error(), "UNIQUE constraint") {
+			return fmt.Errorf("类目名称已存在")
+		}
 		return err
 	}
 	log.Printf("[CategoryRepository] CreateCategory success, id=%s, name=%s, parent_id=%s", category.ID, category.Name, category.ParentID)
-	go func() {
-		// 删除所有相关缓存
-		log.Printf("[CategoryRepository] CreateCategory invalidate caches for id=%s", category.ID)
-		r.cacheRepo.Delete(context.Background(), CategoryAllListCacheKey)
-		r.cacheRepo.Delete(context.Background(), CategoryTreeCacheKey)
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryDetailCacheKey, category.ID))
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryNullCacheKey, category.ID))
-	}()
+
+	// 删除所有相关缓存
+	log.Printf("[CategoryRepository] CreateCategory invalidate caches for id=%s", category.ID)
+	ctx2 := context.Background()
+	r.cacheRepo.Delete(ctx2, CategoryAllListCacheKey)
+	r.cacheRepo.Delete(ctx2, CategoryTreeCacheKey)
+	r.cacheRepo.Delete(ctx2, fmt.Sprintf(CategoryDetailCacheKey, category.ID))
+	r.cacheRepo.Delete(ctx2, fmt.Sprintf(CategoryNullCacheKey, category.ID))
+
 	return nil
 }
 
 func (r *categoryRepository) GetCategoryByID(ctx context.Context, id string) (*model.Category, error) {
-	// 先查缓存
-	key := fmt.Sprintf(CategoryDetailCacheKey, id)
-	result, err := r.getFromCache(ctx, key)
-	if err == nil && result != nil {
-		log.Printf("[CategoryRepository] GetCategoryByID cache hit, id=%s", id)
-		return result, nil
-	} //如果缓存查到可以直接返回
 
-	//检查空值缓存
 	nullKey := fmt.Sprintf(CategoryNullCacheKey, id)
-	nullResult, _ := r.cacheRepo.Get(ctx, nullKey)
-	if nullResult == "1" {
-		log.Printf("[CategoryRepository] GetCategoryByID null-cache hit, id=%s", id)
-		return nil, nil
-	}
-
 	// 使用singleflight防止缓存击穿
 	sfKey := fmt.Sprintf(SingleFlightDetailKey, id)
 	log.Printf("[CategoryRepository] GetCategoryByID cache miss, enter singleflight, id=%s", id)
 	sfResult, err, _ := r.sf.Do(sfKey, func() (interface{}, error) {
+		// 先查缓存
+		key := fmt.Sprintf(CategoryDetailCacheKey, id)
+		result, err := r.getFromCache(ctx, key)
+		if err == nil && result != nil {
+			log.Printf("[CategoryRepository] GetCategoryByID cache hit, id=%s", id)
+			return result, nil
+		} //如果缓存查到可以直接返回
+
 		//检查空值缓存
 		nullResult, _ := r.cacheRepo.Get(ctx, nullKey)
 		if nullResult == "1" {
@@ -138,12 +137,9 @@ func (r *categoryRepository) GetCategoryByID(ctx context.Context, id string) (*m
 			return nil, err
 		}
 
-		//异步写缓存
-		go func() {
-			if err := r.setToCache(context.Background(), key, &category, 5*time.Minute); err != nil {
-				log.Printf("[CategoryRepository] GetCategoryByID setToCache failed, id=%s, err=%v", id, err)
-			}
-		}()
+		if err := r.setToCache(context.Background(), key, &category, 5*time.Minute); err != nil {
+			log.Printf("[CategoryRepository] GetCategoryByID setToCache failed, id=%s, err=%v", id, err)
+		}
 		return &category, nil
 	})
 
@@ -165,6 +161,13 @@ func (r *categoryRepository) GetCategoryByID(ctx context.Context, id string) (*m
 }
 
 func (r *categoryRepository) UpdateCategory(ctx context.Context, category *model.Category) error {
+	//读取当前记录版本号
+	var current model.Category
+	err := r.db.WithContext(ctx).Where("id = ?", category.ID).First(&current).Error
+	if err != nil {
+		return err
+	}
+	category.Version = current.Version + 1
 	updates := map[string]interface{}{
 		"name":       category.Name,
 		"is_leaf":    category.IsLeaf,    // false 也会更新
@@ -172,103 +175,112 @@ func (r *categoryRepository) UpdateCategory(ctx context.Context, category *model
 		"sort_order": category.SortOrder, // 0 也会更新
 		"icon":       category.Icon,
 		"status":     category.Status,
+		"version":    category.Version,
 	}
-	err := r.db.WithContext(ctx).Model(&model.Category{}).Where("id = ?", category.ID).Updates(updates).Error
-	if err != nil {
+	result := r.db.WithContext(ctx).Model(&model.Category{}).Where("id = ? and version = ?", category.ID, current.Version).Updates(updates)
+	if result.Error != nil {
 		log.Printf("[CategoryRepository] UpdateCategory DB error, id=%s, err=%v", category.ID, err)
 		return err
 	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("version mismatch, current version: %d, new version: %d", current.Version, category.Version)
+	}
 	log.Printf("[CategoryRepository] UpdateCategory success, id=%s", category.ID)
-	go func() {
-		log.Printf("[CategoryRepository] UpdateCategory invalidate caches for id=%s", category.ID)
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryDetailCacheKey, category.ID)) //删除单个类目详情缓存
-		r.cacheRepo.Delete(context.Background(), CategoryAllListCacheKey)                          //删除所有类目扁平列表缓存
-		r.cacheRepo.Delete(context.Background(), CategoryTreeCacheKey)                             //删除完整树形结构缓存
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryNullCacheKey, category.ID))   //删除空值缓存
-	}()
+	ctx2 := context.Background()
+	log.Printf("[CategoryRepository] UpdateCategory invalidate caches for id=%s", category.ID)
+	r.cacheRepo.Delete(ctx2, fmt.Sprintf(CategoryDetailCacheKey, category.ID)) //删除单个类目详情缓存
+	r.cacheRepo.Delete(ctx2, CategoryAllListCacheKey)                          //删除所有类目扁平列表缓存
+	r.cacheRepo.Delete(ctx2, CategoryTreeCacheKey)                             //删除完整树形结构缓存
+	r.cacheRepo.Delete(ctx2, fmt.Sprintf(CategoryNullCacheKey, category.ID))   //删除空值缓存
+
 	return nil
 }
 
 func (r *categoryRepository) DeleteCategory(ctx context.Context, id string) error {
-	var category model.Category
-	err := r.db.WithContext(ctx).Where("id = ?", id).First(&category).Error
-	if err != nil {
-		log.Printf("[CategoryRepository] DeleteCategory find DB error, id=%s, err=%v", id, err)
-		return err
-	}
-	err = r.db.WithContext(ctx).Delete(&category).Error //软删除
-	if err != nil {
-		log.Printf("[CategoryRepository] DeleteCategory DB delete error, id=%s, err=%v", id, err)
-		return err
-	}
-	log.Printf("[CategoryRepository] DeleteCategory success (soft delete), id=%s", id)
-	go func() {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		//先锁定该类目，避免子类目会创建
+		var category model.Category
+		err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("id = ?", id).
+			First(&category).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("category not found: %s", id)
+			}
+			return err
+		}
+		//先检查该类目下是否有子类目
+		var count int64
+		err = tx.Where("parent_id = ?", id).Count(&count).Error
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return errors.New("该类目下有子类目，不能删除")
+		}
+		//没有子类目，则删除该类目
+		err = tx.Delete(&category).Error //软删除
+		if err != nil {
+			log.Printf("[CategoryRepository] DeleteCategory DB delete error, id=%s, err=%v", id, err)
+			return err
+		}
+		log.Printf("[CategoryRepository] DeleteCategory success (soft delete), id=%s", id)
+
+		ctx2 := context.Background()
 		log.Printf("[CategoryRepository] DeleteCategory invalidate caches for id=%s", category.ID)
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryDetailCacheKey, category.ID)) //删除单个类目详情缓存
-		r.cacheRepo.Delete(context.Background(), CategoryAllListCacheKey)                          //删除所有类目扁平列表缓存
-		r.cacheRepo.Delete(context.Background(), CategoryTreeCacheKey)                             //删除完整树形结构缓存
-		r.cacheRepo.Delete(context.Background(), fmt.Sprintf(CategoryNullCacheKey, category.ID))   //删除空值缓存
-	}()
+		r.cacheRepo.Delete(ctx2, fmt.Sprintf(CategoryDetailCacheKey, category.ID)) //删除单个类目详情缓存
+		r.cacheRepo.Delete(ctx2, CategoryAllListCacheKey)                          //删除所有类目扁平列表缓存
+		r.cacheRepo.Delete(ctx2, CategoryTreeCacheKey)                             //删除完整树形结构缓存
+		r.cacheRepo.Delete(ctx2, fmt.Sprintf(CategoryNullCacheKey, category.ID))   //删除空值缓存
+
+		return nil
+	})
 	return err
 }
 
 func (r *categoryRepository) ListCategories(ctx context.Context, filter *CategoryListFliter) ([]*model.Category, error) {
-	log.Printf("[CategoryRepository] ListCategories called, filter=%+v", filter)
-	//先获取所有类目扁平列表
-	result, err := r.cacheRepo.Get(ctx, CategoryAllListCacheKey)
-	if err == nil && result != "" {
-		log.Printf("[CategoryRepository] ListCategories cache hit for all list")
-		var categories []*model.Category
-		err = json.Unmarshal([]byte(result), &categories)
-		if err != nil {
-			log.Printf("[CategoryRepository] ListCategories unmarshal cache error: %v", err)
-			return nil, err
-		}
-		log.Printf("[CategoryRepository] ListCategories categories=%+v", categories)
-		filteredCategories := filterCategories(categories, filter)
-		log.Printf("[CategoryRepository] ListCategories filteredCategories=%+v", filteredCategories)
-		return filteredCategories, nil
-	}
-	if err != nil {
-		log.Printf("[CategoryRepository] ListCategories cache Get error (will fallback to DB): %v", err)
-	} else {
-		log.Printf("[CategoryRepository] ListCategories cache miss for all list")
-	}
-	//如果缓存没有，则从数据库查询
-	log.Printf("[CategoryRepository] ListCategories enter singleflight for all list")
+
 	sfResult, err, _ := r.sf.Do(SingleFlightListKey, func() (interface{}, error) {
+		//先获取所有类目扁平列表
+		result, err := r.cacheRepo.Get(ctx, CategoryAllListCacheKey)
+		if err == nil && result != "" {
+			var categories []*model.Category
+			err = json.Unmarshal([]byte(result), &categories)
+			if err != nil {
+				log.Printf("[CategoryRepository] ListCategories unmarshal cache error: %v", err)
+				return nil, err
+			}
+			filteredCategories := filterCategories(categories, filter)
+			return filteredCategories, nil
+		}
+
 		var categories []*model.Category
 		err = r.db.WithContext(ctx).Order("sort_order Desc").Find(&categories).Error
 		if err != nil {
 			log.Printf("[CategoryRepository] ListCategories DB error: %v", err)
 			return nil, err
 		}
-		go func() {
-			data, _ := json.Marshal(categories)
-			if cacheErr := r.cacheRepo.Set(context.Background(), CategoryAllListCacheKey, string(data), time.Hour*24); cacheErr != nil {
-				log.Printf("[CategoryRepository] ListCategories set all-list cache error: %v", cacheErr)
-			}
-		}()
+
+		data, _ := json.Marshal(categories)
+		if cacheErr := r.cacheRepo.Set(context.Background(), CategoryAllListCacheKey, string(data), time.Hour*24); cacheErr != nil {
+			log.Printf("[CategoryRepository] ListCategories set all-list cache error: %v", cacheErr)
+		}
 
 		filteredCategories := filterCategories(categories, filter)
 		log.Printf("[CategoryRepository] ListCategories DB query done, total=%d, filtered=%d", len(categories), len(filteredCategories))
 		return filteredCategories, nil
 	})
 	if err != nil {
-		log.Printf("[CategoryRepository] ListCategories singleflight error: %v", err)
 		return nil, err
 	}
 	if sfResult == nil {
-		log.Printf("[CategoryRepository] ListCategories singleflight result nil")
 		return nil, nil
 	}
 	categories := sfResult.([]*model.Category)
-	log.Printf("[CategoryRepository] ListCategories return from DB/singleflight, count=%d", len(categories))
 	return categories, nil
 }
 
 func (r *categoryRepository) GetCategoryTree(ctx context.Context, maxlevel int32, isvisible bool, status int32) ([]*CategoryTreeNode, error) {
-	log.Printf("[CategoryRepository] GetCategoryTree called, maxlevel=%d, isvisible=%v, status=%d", maxlevel, isvisible, status)
 	result, err := r.cacheRepo.Get(ctx, CategoryTreeCacheKey)
 	if err == nil && result != "" {
 		log.Printf("[CategoryRepository] GetCategoryTree cache hit")
@@ -286,42 +298,34 @@ func (r *categoryRepository) GetCategoryTree(ctx context.Context, maxlevel int32
 		log.Printf("[CategoryRepository] GetCategoryTree ListCategories error: %v", err)
 		return nil, err
 	}
-	log.Printf("[CategoryRepository] GetCategoryTree fetched flat list, count=%d", len(allcategories))
 	tree := buildTreeFromFlatList(allcategories)
-	go func() {
-		data, _ := json.Marshal(tree)
-		if cacheErr := r.cacheRepo.Set(context.Background(), CategoryTreeCacheKey, string(data), time.Hour*24); cacheErr != nil {
-			log.Printf("[CategoryRepository] GetCategoryTree set tree cache error: %v", cacheErr)
-		}
-	}()
-	log.Printf("[CategoryRepository] GetCategoryTree built tree, root_count=%d", len(tree))
+
+	data, _ := json.Marshal(tree)
+	if cacheErr := r.cacheRepo.Set(context.Background(), CategoryTreeCacheKey, string(data), time.Hour*24); cacheErr != nil {
+		log.Printf("[CategoryRepository] GetCategoryTree set tree cache error: %v", cacheErr)
+	}
+
 	return tree, nil
 }
 func filterCategories(allcategories []*model.Category, filter *CategoryListFliter) []*model.Category {
-	log.Printf("[CategoryRepository] filterCategories called, allcategories=%d, filter=%+v", len(allcategories), filter)
 	if len(allcategories) == 0 || filter == nil {
 		return allcategories
 	}
 	var result []*model.Category = make([]*model.Category, 0, len(allcategories))
 	for _, category := range allcategories {
 		if filter.ParentID != "" && category.ParentID != filter.ParentID {
-			log.Printf("[CategoryRepository] filterCategories skip, category.ParentID=%s, filter.ParentID=%s", category.ParentID, filter.ParentID)
 			continue
 		}
 		if filter.Level > 0 && category.Level > (int8)(filter.Level) {
-			log.Printf("[CategoryRepository] filterCategories skip, category.Level=%d, filter.Level=%d", category.Level, filter.Level)
 			continue
 		}
 		if filter.Status > 0 && category.Status != (int8)(filter.Status) {
-			log.Printf("[CategoryRepository] filterCategories skip, category.Status=%d, filter.Status=%d", category.Status, filter.Status)
 			continue
 		}
 		if category.IsVisible != filter.IsVisible {
-			log.Printf("[CategoryRepository] filterCategories skip, category.IsVisible=%v, filter.IsVisible=%v", category.IsVisible, filter.IsVisible)
 			continue
 		}
 		if filter.Keyword != "" && !strings.Contains(category.Name, filter.Keyword) {
-			log.Printf("[CategoryRepository] filterCategories skip, category.Name=%s, filter.Keyword=%s", category.Name, filter.Keyword)
 			continue
 		}
 		result = append(result, category)

@@ -10,7 +10,7 @@ import (
 // 对应数据库表：categories
 type Category struct {
 	pkg.BaseModel
-
+	Version int `gorm:"column:version" json:"version"`
 	// 树形结构
 	ParentID string `gorm:"type:varchar(26);index:idx_parent_visible_status;comment:父类目ID，顶级类目为NULL" json:"parent_id,omitempty"`
 

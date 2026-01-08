@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS categories (
     sort_order INT DEFAULT 0 COMMENT '排序权重，数字越大越靠前',
     icon VARCHAR(255) COMMENT '类目图标URL',
     status TINYINT DEFAULT 1 COMMENT '状态：1-启用，2-停用',
+    version INT DEFAULT 0 COMMENT '版本号',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL COMMENT '软删除时间',
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS brands (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL COMMENT '软删除时间',
+    version INT DEFAULT 0 COMMENT '版本号',
     INDEX idx_first_letter (first_letter),
     INDEX idx_status_sort (status, sort_order),
     UNIQUE KEY uk_name_deleted (name, deleted_at)
