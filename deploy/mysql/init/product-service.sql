@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS brands (
     deleted_at TIMESTAMP NULL COMMENT '软删除时间',
     INDEX idx_first_letter (first_letter),
     INDEX idx_status_sort (status, sort_order),
-    INDEX idx_name_status (name, status)
+    UNIQUE KEY uk_name_deleted (name, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='品牌表';
 
 -- ============================================

@@ -548,7 +548,7 @@ message GetBrandRequest {
 message GetBrandResponse {
   int32 code = 1;
   string message = 2;
-  BrandInfo brand = 3;           // 品牌信息
+  BrandInfo data = 3;           // 品牌信息
 }
 
 // 更新品牌请求
@@ -597,7 +597,7 @@ message ListBrandsResponse {
   int32 code = 1;
   string message = 2;
   int64 total = 3;              // 总记录数
-  repeated BrandInfo brands = 4; // 品牌列表
+  repeated BrandInfo data = 4; // 品牌列表
 }
 
 // 按首字母分组查询品牌请求
@@ -609,7 +609,8 @@ message GetBrandsByFirstLetterRequest {
 message GetBrandsByFirstLetterResponse {
   int32 code = 1;
   string message = 2;
-  repeated BrandGroupByLetter groups = 3; // 按首字母分组的品牌列表
+  repeated BrandGroupByLetter data = 3; // 按首字母分组的品牌列表
+  int64 total = 4;
 }
 
 // ============================================

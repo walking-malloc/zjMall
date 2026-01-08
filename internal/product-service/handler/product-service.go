@@ -100,22 +100,55 @@ func (h *ProductServiceHandler) GetCategoryChildren(ctx context.Context, req *pr
 // ============================================
 
 func (h *ProductServiceHandler) CreateBrand(ctx context.Context, req *productv1.CreateBrandRequest) (*productv1.CreateBrandResponse, error) {
+	validator := service.NewCreateBrandRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.CreateBrandResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.CreateBrand(ctx, req)
 }
 
 func (h *ProductServiceHandler) GetBrand(ctx context.Context, req *productv1.GetBrandRequest) (*productv1.GetBrandResponse, error) {
+	if req.BrandId == "" {
+		return &productv1.GetBrandResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
 	return h.productService.GetBrand(ctx, req)
 }
 
 func (h *ProductServiceHandler) UpdateBrand(ctx context.Context, req *productv1.UpdateBrandRequest) (*productv1.UpdateBrandResponse, error) {
+	validator := service.NewUpdateBrandRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.UpdateBrandResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.UpdateBrand(ctx, req)
 }
 
 func (h *ProductServiceHandler) DeleteBrand(ctx context.Context, req *productv1.DeleteBrandRequest) (*productv1.DeleteBrandResponse, error) {
+	if req.BrandId == "" {
+		return &productv1.DeleteBrandResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
 	return h.productService.DeleteBrand(ctx, req)
 }
 
 func (h *ProductServiceHandler) ListBrands(ctx context.Context, req *productv1.ListBrandsRequest) (*productv1.ListBrandsResponse, error) {
+	validator := service.NewListBrandsRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.ListBrandsResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.ListBrands(ctx, req)
 }
 

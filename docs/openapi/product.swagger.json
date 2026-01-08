@@ -2627,7 +2627,7 @@
         "message": {
           "type": "string"
         },
-        "brand": {
+        "data": {
           "$ref": "#/definitions/product.v1.BrandInfo",
           "title": "品牌信息"
         }
@@ -2644,13 +2644,17 @@
         "message": {
           "type": "string"
         },
-        "groups": {
+        "data": {
           "type": "array",
           "items": {
             "type": "object",
             "$ref": "#/definitions/product.v1.BrandGroupByLetter"
           },
           "title": "按首字母分组的品牌列表"
+        },
+        "total": {
+          "type": "string",
+          "format": "int64"
         }
       },
       "title": "按首字母分组查询品牌响应"
@@ -2846,7 +2850,7 @@
           "format": "int64",
           "title": "总记录数"
         },
-        "brands": {
+        "data": {
           "type": "array",
           "items": {
             "type": "object",

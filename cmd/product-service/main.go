@@ -65,11 +65,12 @@ func main() {
 	log.Println("🔧 创建 Repository...")
 	cacheRepo := cache.NewCacheRepository(redisClient)
 	categoryRepo := repository.NewCategoryRepository(db, cacheRepo, singleflight.Group{})
+	brandRepo := repository.NewBrandRepository(db, cacheRepo, singleflight.Group{})
 	log.Println("✅ Repository 创建成功")
 
 	// 10. 创建Service
 	log.Println("🔧 创建 Service...")
-	productService := service.NewProductService(categoryRepo)
+	productService := service.NewProductService(categoryRepo, brandRepo)
 	log.Println("✅ Service 创建成功")
 
 	//7.创建Handler

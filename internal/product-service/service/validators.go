@@ -6,6 +6,7 @@ import (
 	"zjMall/pkg/validator"
 )
 
+// ==============类目管理验证器==============
 type CreateCategoryRequestValidator struct {
 	ParentID  string `validate:"omitempty" label:"父类目ID"`
 	Name      string `validate:"required,min=2,max=100" label:"类目名称"`
@@ -111,6 +112,91 @@ func NewGetCategoryChildrenRequestValidator(req *productv1.GetCategoryChildrenRe
 	}
 }
 func (v *GetCategoryChildrenRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+// ==============品牌管理验证器==============
+type CreateBrandRequestValidator struct {
+	Name        string `validate:"required,min=2,max=100" label:"品牌名称"`
+	LogoURL     string `validate:"omitempty,url" label:"品牌LogoURL"`
+	Country     string `validate:"omitempty,min=2,max=100" label:"国家"`
+	Description string `validate:"omitempty,min=2,max=1000" label:"品牌描述"`
+	FirstLetter string `validate:"required,min=1,max=1" label:"首字母"`
+	SortOrder   int32  `validate:"required" label:"排序权重"`
+	Status      int32  `validate:"required,oneof=1 2" label:"状态"`
+}
+
+func NewCreateBrandRequestValidator(req *productv1.CreateBrandRequest) *CreateBrandRequestValidator {
+	return &CreateBrandRequestValidator{
+		Name:        req.Name,
+		LogoURL:     req.LogoUrl,
+		Country:     req.Country,
+		Description: req.Description,
+		FirstLetter: req.FirstLetter,
+		SortOrder:   req.SortOrder,
+		Status:      req.Status,
+	}
+}
+func (v *CreateBrandRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type UpdateBrandRequestValidator struct {
+	BrandID     string `validate:"required" label:"品牌ID"`
+	Name        string `validate:"omitempty,min=2,max=100" label:"品牌名称"`
+	LogoURL     string `validate:"omitempty,url" label:"品牌LogoURL"`
+	Country     string `validate:"omitempty,min=2,max=100" label:"国家"`
+	Description string `validate:"omitempty,min=2,max=1000" label:"品牌描述"`
+	FirstLetter string `validate:"omitempty,min=1,max=1" label:"首字母"`
+	SortOrder   int32  `validate:"-" label:"排序权重"`
+	Status      int32  `validate:"omitempty,oneof=1 2" label:"状态"`
+}
+
+func NewUpdateBrandRequestValidator(req *productv1.UpdateBrandRequest) *UpdateBrandRequestValidator {
+	return &UpdateBrandRequestValidator{
+		BrandID:     req.BrandId,
+		Name:        req.Name,
+		LogoURL:     req.LogoUrl,
+		Country:     req.Country,
+		Description: req.Description,
+		FirstLetter: req.FirstLetter,
+		SortOrder:   req.SortOrder,
+		Status:      req.Status,
+	}
+}
+func (v *UpdateBrandRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type ListBrandsRequestValidator struct {
+	Page        int32  `validate:"omitempty,min=1" label:"页码"`
+	PageSize    int32  `validate:"omitempty,min=1" label:"每页条数"`
+	Status      int32  `validate:"required,oneof=1 2" label:"状态"`
+	Keyword     string `validate:"omitempty,min=2,max=100" label:"关键词"`
+	FirstLetter string `validate:"omitempty,min=1,max=1" label:"首字母"`
+	Country     string `validate:"omitempty,min=2,max=100" label:"国家"`
+}
+
+func NewListBrandsRequestValidator(req *productv1.ListBrandsRequest) *ListBrandsRequestValidator {
+	return &ListBrandsRequestValidator{
+		Page:        req.Page,
+		PageSize:    req.PageSize,
+		Status:      req.Status,
+		Keyword:     req.Keyword,
+		FirstLetter: req.FirstLetter,
+		Country:     req.Country,
+	}
+}
+func (v *ListBrandsRequestValidator) Validate() error {
 	if err := validator.ValidateStruct(v); err != nil {
 		return errors.New(validator.FormatError(err))
 	}

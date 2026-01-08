@@ -15,7 +15,7 @@ import (
 type ProductService struct {
 	// TODO: 添加需要的依赖，例如：
 	categoryRepo repository.CategoryRepository
-	// brandRepo    repository.BrandRepository
+	brandRepo    repository.BrandRepository
 	// productRepo  repository.ProductRepository
 	// skuRepo      repository.SkuRepository
 	// tagRepo      repository.TagRepository
@@ -24,10 +24,11 @@ type ProductService struct {
 // NewProductService 创建商品服务实例
 func NewProductService(
 	categoryRepo repository.CategoryRepository,
-
+	brandRepo repository.BrandRepository,
 ) *ProductService {
 	return &ProductService{
 		categoryRepo: categoryRepo,
+		brandRepo:    brandRepo,
 	}
 }
 
@@ -297,55 +298,193 @@ func (s *ProductService) GetCategoryChildren(ctx context.Context, req *productv1
 
 // CreateBrand 创建品牌
 func (s *ProductService) CreateBrand(ctx context.Context, req *productv1.CreateBrandRequest) (*productv1.CreateBrandResponse, error) {
-	// TODO: 实现创建品牌的业务逻辑
+	err := s.brandRepo.CreateBrand(ctx, &model.Brand{
+		Name:        req.Name,
+		LogoURL:     req.LogoUrl,
+		Country:     req.Country,
+		Description: req.Description,
+		FirstLetter: req.FirstLetter,
+		SortOrder:   int(req.SortOrder),
+		Status:      int(req.Status),
+	})
+	if err != nil {
+		return &productv1.CreateBrandResponse{
+			Code:    1,
+			Message: fmt.Sprintf("创建品牌失败: %v", err),
+		}, nil
+	}
 	return &productv1.CreateBrandResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "创建品牌成功",
 	}, nil
 }
 
 // GetBrand 查询品牌详情
 func (s *ProductService) GetBrand(ctx context.Context, req *productv1.GetBrandRequest) (*productv1.GetBrandResponse, error) {
-	// TODO: 实现查询品牌详情的业务逻辑
+	brand, err := s.brandRepo.GetBrandByID(ctx, req.BrandId)
+	if err != nil {
+		return &productv1.GetBrandResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询品牌详情失败: %v", err),
+		}, nil
+	}
+	if brand == nil {
+		return &productv1.GetBrandResponse{
+			Code:    1,
+			Message: "品牌不存在",
+		}, nil
+	}
 	return &productv1.GetBrandResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询品牌详情成功",
+		Data: &productv1.BrandInfo{
+			Id:          brand.ID,
+			Name:        brand.Name,
+			LogoUrl:     brand.LogoURL,
+			Country:     brand.Country,
+			Description: brand.Description,
+			FirstLetter: brand.FirstLetter,
+			SortOrder:   int32(brand.SortOrder),
+			Status:      int32(brand.Status),
+			CreatedAt:   timestamppb.New(brand.CreatedAt),
+			UpdatedAt:   timestamppb.New(brand.UpdatedAt),
+		},
 	}, nil
 }
 
 // UpdateBrand 更新品牌
 func (s *ProductService) UpdateBrand(ctx context.Context, req *productv1.UpdateBrandRequest) (*productv1.UpdateBrandResponse, error) {
-	// TODO: 实现更新品牌的业务逻辑
+	err := s.brandRepo.UpdateBrand(ctx, &model.Brand{
+		BaseModel: pkg.BaseModel{
+			ID: req.BrandId,
+		},
+		Name:        req.Name,
+		LogoURL:     req.LogoUrl,
+		Country:     req.Country,
+		Description: req.Description,
+		FirstLetter: req.FirstLetter,
+		SortOrder:   int(req.SortOrder),
+		Status:      int(req.Status),
+	})
+	if err != nil {
+		return &productv1.UpdateBrandResponse{
+			Code:    1,
+			Message: fmt.Sprintf("更新品牌失败: %v", err),
+		}, nil
+	}
 	return &productv1.UpdateBrandResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "更新品牌成功",
 	}, nil
 }
 
 // DeleteBrand 删除品牌
 func (s *ProductService) DeleteBrand(ctx context.Context, req *productv1.DeleteBrandRequest) (*productv1.DeleteBrandResponse, error) {
-	// TODO: 实现删除品牌的业务逻辑
+	err := s.brandRepo.DeleteBrand(ctx, req.BrandId)
+	if err != nil {
+		return &productv1.DeleteBrandResponse{
+			Code:    1,
+			Message: fmt.Sprintf("删除品牌失败: %v", err),
+		}, nil
+	}
 	return &productv1.DeleteBrandResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "删除品牌成功",
 	}, nil
 }
 
 // ListBrands 查询品牌列表
 func (s *ProductService) ListBrands(ctx context.Context, req *productv1.ListBrandsRequest) (*productv1.ListBrandsResponse, error) {
-	// TODO: 实现查询品牌列表的业务逻辑
+	brands, err := s.brandRepo.ListBrands(ctx, &repository.BrandListFliter{
+		Limit:       int(req.PageSize),
+		Offset:      int(req.Page-1) * int(req.PageSize),
+		Status:      int(req.Status),
+		Keyword:     req.Keyword,
+		FirstLetter: req.FirstLetter,
+		Country:     req.Country,
+	})
+	if err != nil {
+		return &productv1.ListBrandsResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询品牌列表失败: %v", err),
+		}, nil
+	}
+	if len(brands) == 0 {
+		return &productv1.ListBrandsResponse{
+			Code:    0,
+			Message: "查询品牌列表成功",
+			Data:    nil,
+		}, nil
+	}
+	brandList := make([]*productv1.BrandInfo, 0, len(brands))
+	for _, brand := range brands {
+		brandList = append(brandList, &productv1.BrandInfo{
+			Id:          brand.ID,
+			Name:        brand.Name,
+			LogoUrl:     brand.LogoURL,
+			Country:     brand.Country,
+			Description: brand.Description,
+			FirstLetter: brand.FirstLetter,
+			SortOrder:   int32(brand.SortOrder),
+			Status:      int32(brand.Status),
+			CreatedAt:   timestamppb.New(brand.CreatedAt),
+			UpdatedAt:   timestamppb.New(brand.UpdatedAt),
+		})
+	}
 	return &productv1.ListBrandsResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询品牌列表成功",
+		Data:    brandList,
+		Total:   int64(len(brands)),
 	}, nil
 }
 
 // GetBrandsByFirstLetter 按首字母分组查询品牌列表
 func (s *ProductService) GetBrandsByFirstLetter(ctx context.Context, req *productv1.GetBrandsByFirstLetterRequest) (*productv1.GetBrandsByFirstLetterResponse, error) {
-	// TODO: 实现按首字母分组查询品牌的业务逻辑
+	groups, err := s.brandRepo.GetBrandsByFirstLetter(ctx, req.Status)
+	if err != nil {
+		return &productv1.GetBrandsByFirstLetterResponse{
+			Code:    1,
+			Message: fmt.Sprintf("按首字母分组查询品牌列表失败: %v", err),
+		}, nil
+	}
+	if len(groups) == 0 {
+		return &productv1.GetBrandsByFirstLetterResponse{
+			Code:    0,
+			Message: "查询品牌列表成功",
+			Data:    []*productv1.BrandGroupByLetter{},
+		}, nil
+	}
+
+	// 转换为proto格式
+	groupList := make([]*productv1.BrandGroupByLetter, 0, len(groups))
+	for _, group := range groups {
+		brandList := make([]*productv1.BrandInfo, 0, len(group.Brands))
+		for _, brand := range group.Brands {
+			brandList = append(brandList, &productv1.BrandInfo{
+				Id:          brand.ID,
+				Name:        brand.Name,
+				LogoUrl:     brand.LogoURL,
+				Country:     brand.Country,
+				Description: brand.Description,
+				FirstLetter: brand.FirstLetter,
+				SortOrder:   int32(brand.SortOrder),
+				Status:      int32(brand.Status),
+				CreatedAt:   timestamppb.New(brand.CreatedAt),
+				UpdatedAt:   timestamppb.New(brand.UpdatedAt),
+			})
+		}
+		groupList = append(groupList, &productv1.BrandGroupByLetter{
+			FirstLetter: group.FirstLetter,
+			Brands:      brandList,
+		})
+	}
+
 	return &productv1.GetBrandsByFirstLetterResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询品牌列表成功",
+		Data:    groupList,
+		Total:   int64(len(groupList)),
 	}, nil
 }
 
