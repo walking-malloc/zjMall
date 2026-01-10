@@ -2,22 +2,25 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 	productv1 "zjMall/gen/go/api/proto/product"
 	"zjMall/internal/product-service/model"
 	"zjMall/internal/product-service/repository"
 	"zjMall/pkg"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 // ProductService 商品服务（业务逻辑层）
 type ProductService struct {
-	// TODO: 添加需要的依赖，例如：
 	categoryRepo repository.CategoryRepository
 	brandRepo    repository.BrandRepository
-	// productRepo  repository.ProductRepository
+	productRepo  repository.ProductRepository
 	// skuRepo      repository.SkuRepository
 	// tagRepo      repository.TagRepository
 }
@@ -26,10 +29,12 @@ type ProductService struct {
 func NewProductService(
 	categoryRepo repository.CategoryRepository,
 	brandRepo repository.BrandRepository,
+	productRepo repository.ProductRepository,
 ) *ProductService {
 	return &ProductService{
 		categoryRepo: categoryRepo,
 		brandRepo:    brandRepo,
+		productRepo:  productRepo,
 	}
 }
 
@@ -57,7 +62,7 @@ func (s *ProductService) CreateCategory(ctx context.Context, req *productv1.Crea
 		}, nil
 	}
 	return &productv1.CreateCategoryResponse{
-		Code:    1,
+		Code:    0,
 		Message: "创建成功",
 		Data:    category.ID,
 	}, nil
@@ -487,21 +492,7 @@ func (s *ProductService) GetBrandsByFirstLetter(ctx context.Context, req *produc
 
 // AddBrandCategory 添加品牌类目关联
 func (s *ProductService) AddBrandCategory(ctx context.Context, req *productv1.AddBrandCategoryRequest) (*productv1.AddBrandCategoryResponse, error) {
-	// 参数校验
-	if req.BrandId == "" {
-		return &productv1.AddBrandCategoryResponse{
-			Code:    1,
-			Message: "品牌ID不能为空",
-		}, nil
-	}
-	if req.CategoryId == "" {
-		return &productv1.AddBrandCategoryResponse{
-			Code:    1,
-			Message: "类目ID不能为空",
-		}, nil
-	}
-
-	// 调用repository添加关联
+	// Repository 层已做完善的校验（品牌存在、类目存在、唯一性检查）
 	err := s.brandRepo.AddBrandCategory(ctx, req.BrandId, req.CategoryId)
 	if err != nil {
 		return &productv1.AddBrandCategoryResponse{
@@ -518,21 +509,7 @@ func (s *ProductService) AddBrandCategory(ctx context.Context, req *productv1.Ad
 
 // RemoveBrandCategory 删除品牌类目关联
 func (s *ProductService) RemoveBrandCategory(ctx context.Context, req *productv1.RemoveBrandCategoryRequest) (*productv1.RemoveBrandCategoryResponse, error) {
-	// 参数校验
-	if req.BrandId == "" {
-		return &productv1.RemoveBrandCategoryResponse{
-			Code:    1,
-			Message: "品牌ID不能为空",
-		}, nil
-	}
-	if req.CategoryId == "" {
-		return &productv1.RemoveBrandCategoryResponse{
-			Code:    1,
-			Message: "类目ID不能为空",
-		}, nil
-	}
-
-	// 调用repository删除关联
+	// Repository 层已做完善的校验（关联是否存在）
 	err := s.brandRepo.RemoveBrandCategory(ctx, req.BrandId, req.CategoryId)
 	if err != nil {
 		return &productv1.RemoveBrandCategoryResponse{
@@ -549,15 +526,7 @@ func (s *ProductService) RemoveBrandCategory(ctx context.Context, req *productv1
 
 // GetBrandCategories 查询品牌的类目列表
 func (s *ProductService) GetBrandCategories(ctx context.Context, req *productv1.GetBrandCategoriesRequest) (*productv1.GetBrandCategoriesResponse, error) {
-	// 参数校验
-	if req.BrandId == "" {
-		return &productv1.GetBrandCategoriesResponse{
-			Code:    1,
-			Message: "品牌ID不能为空",
-		}, nil
-	}
-
-	// 调用repository查询类目列表
+	// Repository 层直接查询，无需额外校验
 	categories, err := s.brandRepo.GetBrandCategories(ctx, req.BrandId)
 	if err != nil {
 		return &productv1.GetBrandCategoriesResponse{
@@ -593,17 +562,9 @@ func (s *ProductService) GetBrandCategories(ctx context.Context, req *productv1.
 
 // BatchSetBrandCategories 批量设置品牌类目关联
 func (s *ProductService) BatchSetBrandCategories(ctx context.Context, req *productv1.BatchSetBrandCategoriesRequest) (*productv1.BatchSetBrandCategoriesResponse, error) {
-	// 参数校验
-	if req.BrandId == "" {
-		return &productv1.BatchSetBrandCategoriesResponse{
-			Code:    1,
-			Message: "品牌ID不能为空",
-		}, nil
-	}
-
-	// 去重category_ids
+	// 去重 category_ids（业务逻辑，保留在 service 层）
 	categoryIDMap := make(map[string]bool)
-	uniqueCategoryIDs := make([]string, 0)
+	uniqueCategoryIDs := make([]string, 0, len(req.CategoryIds))
 	for _, categoryID := range req.CategoryIds {
 		if categoryID != "" && !categoryIDMap[categoryID] {
 			categoryIDMap[categoryID] = true
@@ -611,7 +572,7 @@ func (s *ProductService) BatchSetBrandCategories(ctx context.Context, req *produ
 		}
 	}
 
-	// 调用repository批量设置关联
+	// Repository 层已做完善的校验（品牌存在、所有类目存在）
 	err := s.brandRepo.BatchSetBrandCategories(ctx, req.BrandId, uniqueCategoryIDs)
 	if err != nil {
 		return &productv1.BatchSetBrandCategoriesResponse{
@@ -630,84 +591,401 @@ func (s *ProductService) BatchSetBrandCategories(ctx context.Context, req *produ
 // 商品（SPU）管理接口
 // ============================================
 
+// convertProductToProto 将 model.Product 转换为 productv1.ProductInfo
+func convertProductToProto(product *model.Product) *productv1.ProductInfo {
+	var images []string
+	if product.Images != "" {
+		_ = json.Unmarshal([]byte(product.Images), &images)
+	}
+
+	productInfo := &productv1.ProductInfo{
+		Id:          product.ID,
+		CategoryId:  product.CategoryID,
+		BrandId:     product.BrandID,
+		Title:       product.Title,
+		Subtitle:    product.Subtitle,
+		MainImage:   product.MainImage,
+		Images:      images,
+		Description: product.Description,
+		Status:      int32(product.Status),
+		CreatedAt:   timestamppb.New(product.CreatedAt),
+		UpdatedAt:   timestamppb.New(product.UpdatedAt),
+	}
+
+	if product.OnShelfTime != nil {
+		productInfo.OnShelfTime = timestamppb.New(*product.OnShelfTime)
+	}
+	if product.OffShelfTime != nil {
+		productInfo.OffShelfTime = timestamppb.New(*product.OffShelfTime)
+	}
+
+	return productInfo
+}
+
 // CreateProduct 创建商品
 func (s *ProductService) CreateProduct(ctx context.Context, req *productv1.CreateProductRequest) (*productv1.CreateProductResponse, error) {
-	// TODO: 实现创建商品的业务逻辑
+	// 处理图片列表
+	var imagesJSON string
+	if len(req.Images) > 0 {
+		imagesBytes, err := json.Marshal(req.Images)
+		if err != nil {
+			return &productv1.CreateProductResponse{
+				Code:    1,
+				Message: fmt.Sprintf("图片列表格式错误: %v", err),
+			}, nil
+		}
+		imagesJSON = string(imagesBytes)
+	}
+
+	// 设置默认状态
+	status := int8(1) // 默认草稿
+	if req.Status > 0 {
+		status = int8(req.Status)
+	}
+
+	// 处理上架时间
+	var onShelfTime *time.Time
+	if req.OnShelfTime != nil {
+		t := req.OnShelfTime.AsTime()
+		onShelfTime = &t
+	}
+
+	product := &model.Product{
+		CategoryID:  req.CategoryId,
+		BrandID:     req.BrandId,
+		Title:       req.Title,
+		Subtitle:    req.Subtitle,
+		MainImage:   req.MainImage,
+		Images:      imagesJSON,
+		Description: req.Description,
+		Status:      status,
+		OnShelfTime: onShelfTime, //TODO:定期上线
+	}
+
+	err := s.productRepo.CreateProduct(ctx, product)
+	if err != nil {
+		return &productv1.CreateProductResponse{
+			Code:    1,
+			Message: fmt.Sprintf("创建商品失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.CreateProductResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "创建成功",
+		Data:    product.ID,
 	}, nil
 }
 
 // GetProduct 查询商品详情
 func (s *ProductService) GetProduct(ctx context.Context, req *productv1.GetProductRequest) (*productv1.GetProductResponse, error) {
-	// TODO: 实现查询商品详情的业务逻辑
-	return &productv1.GetProductResponse{
-		Code:    1,
-		Message: "未实现",
-	}, nil
+	product, err := s.productRepo.GetProduct(ctx, req.ProductId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &productv1.GetProductResponse{
+				Code:    1,
+				Message: "商品不存在",
+			}, nil
+		}
+		return &productv1.GetProductResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询商品详情失败: %v", err),
+		}, nil
+	}
+
+	if product == nil {
+		return &productv1.GetProductResponse{
+			Code:    1,
+			Message: "商品不存在",
+		}, nil
+	}
+
+	productInfo := convertProductToProto(product)
+
+	response := &productv1.GetProductResponse{
+		Code:    0,
+		Message: "查询成功",
+		Product: productInfo,
+	}
+
+	// TODO: 如果需要包含SKU列表和标签列表，需要调用相应的repository方法
+	// if req.IncludeSkus {
+	//     skus, err := s.skuRepo.ListSkusByProductID(ctx, req.ProductId)
+	//     ...
+	// }
+	// if req.IncludeTags {
+	//     tags, err := s.tagRepo.GetProductTags(ctx, req.ProductId)
+	//     ...
+	// }
+
+	return response, nil
 }
 
 // UpdateProduct 更新商品
 func (s *ProductService) UpdateProduct(ctx context.Context, req *productv1.UpdateProductRequest) (*productv1.UpdateProductResponse, error) {
-	// TODO: 实现更新商品的业务逻辑
+	// 先查询现有商品
+	existingProduct, err := s.productRepo.GetProduct(ctx, req.ProductId)
+	if err != nil {
+		return &productv1.UpdateProductResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询商品失败: %v", err),
+		}, nil
+	}
+
+	if existingProduct == nil {
+		return &productv1.UpdateProductResponse{
+			Code:    1,
+			Message: "商品不存在",
+		}, nil
+	}
+
+	// 构建更新数据 - 只更新提供的字段
+	product := &model.Product{
+		BaseModel: pkg.BaseModel{
+			ID: req.ProductId,
+		},
+	}
+
+	// 使用现有值作为默认值，只有当请求中提供了新值时才更新
+	product.CategoryID = existingProduct.CategoryID
+	product.BrandID = existingProduct.BrandID
+	product.Title = existingProduct.Title
+	product.Subtitle = existingProduct.Subtitle
+	product.MainImage = existingProduct.MainImage
+	product.Description = existingProduct.Description
+	product.Status = existingProduct.Status
+	product.Images = existingProduct.Images
+
+	// 只更新提供的字段
+	if req.CategoryId != "" {
+		product.CategoryID = req.CategoryId
+	}
+	if req.BrandId != "" {
+		product.BrandID = req.BrandId
+	}
+	if req.Title != "" {
+		product.Title = req.Title
+	}
+	if req.Subtitle != "" {
+		product.Subtitle = req.Subtitle
+	}
+	if req.MainImage != "" {
+		product.MainImage = req.MainImage
+	}
+	if req.Description != "" {
+		product.Description = req.Description
+	}
+	if req.Status > 0 {
+		product.Status = int8(req.Status)
+	}
+	if len(req.Images) > 0 {
+		imagesBytes, err := json.Marshal(req.Images)
+		if err != nil {
+			return &productv1.UpdateProductResponse{
+				Code:    1,
+				Message: fmt.Sprintf("图片列表格式错误: %v", err),
+			}, nil
+		}
+		product.Images = string(imagesBytes)
+	}
+
+	err = s.productRepo.UpdateProduct(ctx, product)
+	if err != nil {
+		return &productv1.UpdateProductResponse{
+			Code:    1,
+			Message: fmt.Sprintf("更新商品失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.UpdateProductResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "更新成功",
+		Data:    req.ProductId,
 	}, nil
 }
 
 // DeleteProduct 删除商品
 func (s *ProductService) DeleteProduct(ctx context.Context, req *productv1.DeleteProductRequest) (*productv1.DeleteProductResponse, error) {
-	// TODO: 实现删除商品的业务逻辑
+	err := s.productRepo.DeleteProduct(ctx, req.ProductId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &productv1.DeleteProductResponse{
+				Code:    1,
+				Message: "商品不存在",
+			}, nil
+		}
+		return &productv1.DeleteProductResponse{
+			Code:    1,
+			Message: fmt.Sprintf("删除商品失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.DeleteProductResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "删除成功",
+		Data:    req.ProductId,
 	}, nil
 }
 
 // ListProducts 查询商品列表
 func (s *ProductService) ListProducts(ctx context.Context, req *productv1.ListProductsRequest) (*productv1.ListProductsResponse, error) {
-	// TODO: 实现查询商品列表的业务逻辑
+	// 处理时间范围
+	var startTime, endTime *time.Time
+	if req.StartTime != nil {
+		t := req.StartTime.AsTime()
+		startTime = &t
+	}
+	if req.EndTime != nil {
+		t := req.EndTime.AsTime()
+		endTime = &t
+	}
+
+	filter := &repository.ProductListFliter{
+		Page:       req.Page,
+		PageSize:   req.PageSize,
+		CategoryId: req.CategoryId,
+		BrandId:    req.BrandId,
+		Status:     req.Status,
+		Keyword:    req.Keyword,
+		StartTime:  startTime,
+		EndTime:    endTime,
+		SortBy:     req.SortBy,
+		SortOrder:  req.SortOrder,
+	}
+	result, err := s.productRepo.ListProducts(ctx, filter)
+	if err != nil {
+		return &productv1.ListProductsResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询商品列表失败: %v", err),
+		}, nil
+	}
+
+	productList := make([]*productv1.ProductInfo, 0, len(result.Products))
+	for _, product := range result.Products {
+		productList = append(productList, convertProductToProto(product))
+	}
 	return &productv1.ListProductsResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:     0,
+		Message:  "查询成功",
+		Total:    result.Total,
+		Products: productList,
 	}, nil
 }
 
 // OnShelfProduct 上架商品
 func (s *ProductService) OnShelfProduct(ctx context.Context, req *productv1.OnShelfProductRequest) (*productv1.OnShelfProductResponse, error) {
-	// TODO: 实现上架商品的业务逻辑
+
+	err := s.productRepo.OnShelfProduct(ctx, req.ProductId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &productv1.OnShelfProductResponse{
+				Code:    1,
+				Message: "商品不存在",
+			}, nil
+		}
+		return &productv1.OnShelfProductResponse{
+			Code:    1,
+			Message: fmt.Sprintf("上架商品失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.OnShelfProductResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "上架成功",
+		Data:    req.ProductId,
 	}, nil
 }
 
 // OffShelfProduct 下架商品
 func (s *ProductService) OffShelfProduct(ctx context.Context, req *productv1.OffShelfProductRequest) (*productv1.OffShelfProductResponse, error) {
-	// TODO: 实现下架商品的业务逻辑
+	err := s.productRepo.OffShelfProduct(ctx, req.ProductId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &productv1.OffShelfProductResponse{
+				Code:    1,
+				Message: "商品不存在",
+			}, nil
+		}
+		return &productv1.OffShelfProductResponse{
+			Code:    1,
+			Message: fmt.Sprintf("下架商品失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.OffShelfProductResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "下架成功",
+		Data:    req.ProductId,
 	}, nil
 }
 
 // SubmitProductAudit 提交审核
 func (s *ProductService) SubmitProductAudit(ctx context.Context, req *productv1.SubmitProductAuditRequest) (*productv1.SubmitProductAuditResponse, error) {
-	// TODO: 实现提交审核的业务逻辑
+
+	err := s.productRepo.SubmitProductAudit(ctx, req.ProductId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &productv1.SubmitProductAuditResponse{
+				Code:    1,
+				Message: "商品不存在",
+			}, nil
+		}
+		return &productv1.SubmitProductAuditResponse{
+			Code:    1,
+			Message: fmt.Sprintf("提交审核失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.SubmitProductAuditResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "提交审核成功",
+		Data:    req.ProductId,
 	}, nil
 }
 
 // AuditProduct 审核商品
 func (s *ProductService) AuditProduct(ctx context.Context, req *productv1.AuditProductRequest) (*productv1.AuditProductResponse, error) {
-	// TODO: 实现审核商品的业务逻辑
+	// 检查商品是否存在
+	product, err := s.productRepo.GetProduct(ctx, req.ProductId)
+	if err != nil {
+		return &productv1.AuditProductResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询商品失败: %v", err),
+		}, nil
+	}
+
+	if product == nil {
+		return &productv1.AuditProductResponse{
+			Code:    1,
+			Message: "商品不存在",
+		}, nil
+	}
+
+	// 验证审核结果
+	if req.Result != 1 && req.Result != 2 {
+		return &productv1.AuditProductResponse{
+			Code:    1,
+			Message: "审核结果无效，必须为1（通过）或2（驳回）",
+		}, nil
+	}
+
+	err = s.productRepo.AuditProduct(ctx, req.ProductId, req.Result)
+	if err != nil {
+		return &productv1.AuditProductResponse{
+			Code:    1,
+			Message: fmt.Sprintf("审核商品失败: %v", err),
+		}, nil
+	}
+
+	message := "审核通过"
+	if req.Result == 2 {
+		message = "审核驳回"
+	}
+
 	return &productv1.AuditProductResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: message,
+		Data:    req.ProductId,
 	}, nil
 }
 

@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -14,16 +13,11 @@ import (
 
 	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
-	BrandDetailCacheKey               = "product:brand:detail:%s"
-	BrandListCacheKey                 = "product:brand:list"              // 全量列表缓存
-	BrandGroupByLetterCacheKey        = "product:brand:groupbyletter:all" // 所有首字母分组缓存
-	BrandNullCacheKey                 = "product:brand:null:%s"
-	SingleFlightBrandDetailKey        = "product:brand:sf:detail:%s"
-	SingleFlightBrandListKey          = "product:brand:sf:list"              // 固定key，因为缓存全量数据
-	SingleFlightBrandGroupByLetterKey = "product:brand:sf:groupbyletter:all" // 固定key，因为缓存所有分组
+	BrandNullCacheKey = "product:brand:null:%s"
 )
 
 type BrandListFliter struct {
@@ -77,66 +71,30 @@ func (r *brandRepository) CreateBrand(ctx context.Context, brand *model.Brand) e
 		}
 		return err
 	}
-	newCtx := context.Background()
-	// 删除详情缓存和空值缓存
-	r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandDetailCacheKey, brand.ID))
-	r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandNullCacheKey, brand.ID))
-	// 删除列表缓存（因为新增了品牌）
-	r.cacheRepo.Delete(newCtx, BrandListCacheKey)
-	// 删除按首字母分组缓存（因为新增了品牌，所有分组都需要更新）
-	r.cacheRepo.Delete(newCtx, BrandGroupByLetterCacheKey)
-
 	return nil
 }
 func (r *brandRepository) GetBrandByID(ctx context.Context, id string) (*model.Brand, error) {
-
-	//缓存中没有，则从数据库中获取
-	sfKey := fmt.Sprintf(SingleFlightBrandDetailKey, id)
+	var brand model.Brand
 	nullKey := fmt.Sprintf(BrandNullCacheKey, id)
-	sfResult, err, _ := r.sf.Do(sfKey, func() (interface{}, error) { //防击穿
-		//先从缓存中获取
-		result, err := r.cacheRepo.Get(ctx, fmt.Sprintf(BrandDetailCacheKey, id))
-		if err == nil && result != "" {
-			var brand model.Brand
-			err = json.Unmarshal([]byte(result), &brand)
-			return &brand, nil
-		}
-		//检查空值缓存
-		nullResult, _ := r.cacheRepo.Get(ctx, nullKey)
-		if nullResult == "1" {
-			log.Printf("[BrandRepository] GetBrandByID null-cache hit inside singleflight, id=%s", id)
-			return nil, nil
-		}
-		//没有缓存，则从数据库中获取
-		var brand model.Brand
-		err = r.db.WithContext(ctx).Where("id = ?", id).First(&brand).Error
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Printf("[BrandRepository] GetBrandByID record not found in DB, id=%s", id)
-				r.cacheRepo.Set(context.Background(), nullKey, "1", 5*time.Minute) //如果数据库中没有，则设置空值缓存
-				return nil, nil
-			}
-			return nil, err
-		}
-		//设置缓存
-		data, _ := json.Marshal(brand)
-		if cacheErr := r.cacheRepo.Set(context.Background(), fmt.Sprintf(BrandDetailCacheKey, id), string(data), time.Minute*10); cacheErr != nil {
-			log.Printf("[BrandRepository] GetBrandByID set cache error: %v", cacheErr)
-		}
 
-		return &brand, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	if sfResult == nil {
+	//检查空值缓存
+	nullResult, _ := r.cacheRepo.Get(ctx, nullKey)
+	if nullResult == "1" {
+		log.Printf("[BrandRepository] GetBrandByID null-cache hit inside singleflight, id=%s", id)
 		return nil, nil
 	}
-	brands, ok := sfResult.(*model.Brand)
-	if !ok {
-		return nil, fmt.Errorf("type assertion to *model.Brand failed or brand is nil")
+
+	err := r.db.WithContext(ctx).Where("id = ?", id).First(&brand).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[BrandRepository] GetBrandByID record not found in DB, id=%s", id)
+			r.cacheRepo.Set(context.Background(), nullKey, "1", 5*time.Minute) //如果数据库中没有，则设置空值缓存
+			return nil, nil
+		}
+		return nil, err
 	}
-	return brands, nil
+	return &brand, nil
+
 }
 func (r *brandRepository) UpdateBrand(ctx context.Context, brand *model.Brand) error {
 	//读取当前记录版本号
@@ -158,15 +116,6 @@ func (r *brandRepository) UpdateBrand(ctx context.Context, brand *model.Brand) e
 	if result.RowsAffected == 0 {
 		return fmt.Errorf("version mismatch, current version: %d, new version: %d", current.Version, brand.Version)
 	}
-	newCtx := context.Background()
-	// 删除详情缓存和空值缓存
-	r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandDetailCacheKey, brand.ID))
-	r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandNullCacheKey, brand.ID))
-	// 删除列表缓存（品牌信息可能影响排序或筛选）
-	r.cacheRepo.Delete(newCtx, BrandListCacheKey)
-	// 删除按首字母分组缓存（如果first_letter或status变了，所有分组都需要更新）
-	r.cacheRepo.Delete(newCtx, BrandGroupByLetterCacheKey)
-
 	return nil
 }
 func (r *brandRepository) DeleteBrand(ctx context.Context, id string) error {
@@ -187,116 +136,38 @@ func (r *brandRepository) DeleteBrand(ctx context.Context, id string) error {
 			return err
 		}
 
-		newCtx := context.Background()
-		// 删除详情缓存和空值缓存
-		r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandDetailCacheKey, id))
-		r.cacheRepo.Delete(newCtx, fmt.Sprintf(BrandNullCacheKey, id))
-		// 删除列表缓存（因为删除了品牌）
-		r.cacheRepo.Delete(newCtx, BrandListCacheKey)
-		// 删除按首字母分组缓存（因为删除了品牌，所有分组都需要更新）
-		r.cacheRepo.Delete(newCtx, BrandGroupByLetterCacheKey)
-
 		return nil
 	})
+
 	return err
 }
 func (r *brandRepository) ListBrands(ctx context.Context, filter *BrandListFliter) ([]*model.Brand, error) {
 
-	// 使用singleflight防击穿（key固定，因为缓存的是全量数据）
-	sfResult, err, _ := r.sf.Do(SingleFlightBrandListKey, func() (interface{}, error) {
-		// 先从缓存中获取全量列表（类似category的做法）
-		result, err := r.cacheRepo.Get(ctx, BrandListCacheKey)
-		if err == nil && result != "" {
-			var brands []*model.Brand
-			err = json.Unmarshal([]byte(result), &brands)
-			if err != nil {
-				return nil, err
-			}
-			// 在内存中过滤
-			filteredBrands := filterBrands(brands, filter)
-			return filteredBrands, nil
-		}
-		// 缓存中没有，则从数据库中获取全量数据
-		var brands []*model.Brand
-		err = r.db.WithContext(ctx).Order("sort_order DESC").Find(&brands).Error
-		if err != nil {
-			return nil, err
-		}
-
-		// 将全量数据缓存到redis（即使为空数组也缓存）
-
-		data, _ := json.Marshal(brands)
-		if cacheErr := r.cacheRepo.Set(context.Background(), BrandListCacheKey, string(data), time.Hour*12); cacheErr != nil {
-			log.Printf("[BrandRepository] ListBrands set cache error: %v", cacheErr)
-		}
-		return brands, nil
-	})
+	var brands []*model.Brand
+	err := r.db.WithContext(ctx).Order("sort_order DESC").Find(&brands).Error
 	if err != nil {
 		return nil, err
 	}
-	if sfResult == nil {
-		return []*model.Brand{}, nil
-	}
-	brands, ok := sfResult.([]*model.Brand)
-	if !ok {
-		return nil, fmt.Errorf("type assertion to []*model.Brand failed")
-	}
-
 	// 在内存中过滤
 	filteredBrands := filterBrands(brands, filter)
+
 	return filteredBrands, nil
 }
 
 func (r *brandRepository) GetBrandsByFirstLetter(ctx context.Context, status int32) ([]*BrandGroupByLetter, error) {
-	// 先从缓存中获取所有首字母分组
-	result, err := r.cacheRepo.Get(ctx, BrandGroupByLetterCacheKey)
-	if err == nil && result != "" {
-		var groups []*BrandGroupByLetter
-		err = json.Unmarshal([]byte(result), &groups)
-		if err != nil {
-			return nil, err
-		}
-		// 如果传入了status参数，需要过滤
-		if status > 0 {
-			groups = filterBrandGroupsByStatus(groups, status)
-		}
-		return groups, nil
+
+	var brands []*model.Brand
+	query := r.db.WithContext(ctx)
+	if status > 0 {
+		query = query.Where("status = ?", status)
 	}
-
-	// 使用singleflight防击穿（固定key，因为缓存所有分组）
-	sfResult, err, _ := r.sf.Do(SingleFlightBrandGroupByLetterKey, func() (interface{}, error) {
-		// 缓存中没有，则从数据库中获取所有品牌
-		var brands []*model.Brand
-		query := r.db.WithContext(ctx)
-		if status > 0 {
-			query = query.Where("status = ?", status)
-		}
-		err = query.Order("first_letter ASC, sort_order DESC").Find(&brands).Error
-		if err != nil {
-			return nil, err
-		}
-
-		// 按首字母分组
-		groups := groupBrandsByLetter(brands)
-
-		// 将分组结果缓存到redis（即使为空数组也缓存）
-
-		data, _ := json.Marshal(groups)
-		if cacheErr := r.cacheRepo.Set(context.Background(), BrandGroupByLetterCacheKey, string(data), time.Hour*1); cacheErr != nil {
-			log.Printf("[BrandRepository] GetBrandsByFirstLetter set cache error: %v", cacheErr)
-		}
-		return groups, nil
-	})
+	err := query.Order("first_letter ASC, sort_order DESC").Find(&brands).Error
 	if err != nil {
 		return nil, err
 	}
-	if sfResult == nil {
-		return []*BrandGroupByLetter{}, nil
-	}
-	groups, ok := sfResult.([]*BrandGroupByLetter)
-	if !ok {
-		return nil, fmt.Errorf("type assertion to []*BrandGroupByLetter failed")
-	}
+
+	// 按首字母分组
+	groups := groupBrandsByLetter(brands)
 	return groups, nil
 }
 
@@ -396,12 +267,12 @@ func filterBrandGroupsByStatus(groups []*BrandGroupByLetter, status int32) []*Br
 // 2. 即使两个请求同时插入相同的关联，唯一索引会保证只有一个成功
 // 3. 错误处理已经捕获了唯一约束冲突，返回友好的错误信息
 func (r *brandRepository) AddBrandCategory(ctx context.Context, brandID, categoryID string) error {
-	// 使用事务 + FOR UPDATE 锁定记录，防止在检查后被删除
+	// 使用事务 + Clauses(clause.Locking{Strength: "SHARE"}) 锁定记录，防止在检查后被删除
 	// 这样可以避免"检查时存在，插入时已被删除"的并发问题
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 检查品牌是否存在，并锁定记录（FOR UPDATE）
 		var brand model.Brand
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
 			Where("id = ?", brandID).
 			First(&brand).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -412,7 +283,7 @@ func (r *brandRepository) AddBrandCategory(ctx context.Context, brandID, categor
 
 		// 检查类目是否存在，并锁定记录（FOR UPDATE）
 		var category model.Category
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
 			Where("id = ?", categoryID).
 			First(&category).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {

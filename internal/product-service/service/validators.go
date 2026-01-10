@@ -202,3 +202,121 @@ func (v *ListBrandsRequestValidator) Validate() error {
 	}
 	return nil
 }
+
+// ==============商品管理验证器==============
+type CreateProductRequestValidator struct {
+	CategoryID  string `validate:"required" label:"所属类目ID"`
+	BrandID     string `validate:"omitempty" label:"品牌ID"`
+	Title       string `validate:"required,min=1,max=200" label:"商品标题"`
+	Subtitle    string `validate:"omitempty,max=200" label:"商品副标题"`
+	MainImage   string `validate:"required,url" label:"主图URL"`
+	Description string `validate:"omitempty" label:"商品详情"`
+	Status      int32  `validate:"omitempty,oneof=1 2" label:"状态"`
+	// OnShelfTime 在 proto 中是可选字段，不需要在 validator 中校验
+}
+
+func NewCreateProductRequestValidator(req *productv1.CreateProductRequest) *CreateProductRequestValidator {
+	return &CreateProductRequestValidator{
+		CategoryID:  req.CategoryId,
+		BrandID:     req.BrandId,
+		Title:       req.Title,
+		Subtitle:    req.Subtitle,
+		MainImage:   req.MainImage,
+		Description: req.Description,
+		Status:      req.Status,
+	}
+}
+
+func (v *CreateProductRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type UpdateProductRequestValidator struct {
+	ProductID   string `validate:"required" label:"商品ID"`
+	CategoryID  string `validate:"omitempty" label:"所属类目ID"`
+	BrandID     string `validate:"omitempty" label:"品牌ID"`
+	Title       string `validate:"omitempty,min=1,max=200" label:"商品标题"`
+	Subtitle    string `validate:"omitempty,max=200" label:"商品副标题"`
+	MainImage   string `validate:"omitempty,url" label:"主图URL"`
+	Description string `validate:"omitempty" label:"商品详情"`
+	Status      int32  `validate:"omitempty,oneof=1 2 3 4 5" label:"状态"`
+}
+
+func NewUpdateProductRequestValidator(req *productv1.UpdateProductRequest) *UpdateProductRequestValidator {
+	return &UpdateProductRequestValidator{
+		ProductID:   req.ProductId,
+		CategoryID:  req.CategoryId,
+		BrandID:     req.BrandId,
+		Title:       req.Title,
+		Subtitle:    req.Subtitle,
+		MainImage:   req.MainImage,
+		Description: req.Description,
+		Status:      req.Status,
+	}
+}
+
+func (v *UpdateProductRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type ListProductsRequestValidator struct {
+	Page       int32  `validate:"omitempty,min=1" label:"页码"`
+	PageSize   int32  `validate:"omitempty,min=1,max=100" label:"每页数量"`
+	CategoryID string `validate:"omitempty" label:"类目ID"`
+	BrandID    string `validate:"omitempty" label:"品牌ID"`
+	Status     int32  `validate:"omitempty,oneof=1 2 3 4 5" label:"状态"`
+	Keyword    string `validate:"omitempty,min=1,max=200" label:"关键词"`
+	SortBy     string `validate:"omitempty,oneof=created_at on_shelf_time" label:"排序字段"`
+	SortOrder  string `validate:"omitempty,oneof=asc desc" label:"排序方向"`
+}
+
+func NewListProductsRequestValidator(req *productv1.ListProductsRequest) *ListProductsRequestValidator {
+	return &ListProductsRequestValidator{
+		Page:       req.Page,
+		PageSize:   req.PageSize,
+		CategoryID: req.CategoryId,
+		BrandID:    req.BrandId,
+		Status:     req.Status,
+		Keyword:    req.Keyword,
+		SortBy:     req.SortBy,
+		SortOrder:  req.SortOrder,
+	}
+}
+
+func (v *ListProductsRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type AuditProductRequestValidator struct {
+	ProductID    string `validate:"required" label:"商品ID"`
+	Result       int32  `validate:"required,oneof=1 2" label:"审核结果"`
+	Reason       string `validate:"omitempty,max=500" label:"审核原因"`
+	OperatorID   string `validate:"omitempty" label:"操作人ID"`
+	OperatorName string `validate:"omitempty,max=50" label:"操作人姓名"`
+}
+
+func NewAuditProductRequestValidator(req *productv1.AuditProductRequest) *AuditProductRequestValidator {
+	return &AuditProductRequestValidator{
+		ProductID:    req.ProductId,
+		Result:       req.Result,
+		Reason:       req.Reason,
+		OperatorID:   req.OperatorId,
+		OperatorName: req.OperatorName,
+	}
+}
+
+func (v *AuditProductRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}

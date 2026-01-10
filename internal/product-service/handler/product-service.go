@@ -161,18 +161,60 @@ func (h *ProductServiceHandler) GetBrandsByFirstLetter(ctx context.Context, req 
 // ============================================
 
 func (h *ProductServiceHandler) AddBrandCategory(ctx context.Context, req *productv1.AddBrandCategoryRequest) (*productv1.AddBrandCategoryResponse, error) {
+	if req.BrandId == "" {
+		return &productv1.AddBrandCategoryResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
+	if req.CategoryId == "" {
+		return &productv1.AddBrandCategoryResponse{
+			Code:    1,
+			Message: "类目ID不能为空",
+		}, nil
+	}
 	return h.productService.AddBrandCategory(ctx, req)
 }
 
 func (h *ProductServiceHandler) RemoveBrandCategory(ctx context.Context, req *productv1.RemoveBrandCategoryRequest) (*productv1.RemoveBrandCategoryResponse, error) {
+	if req.BrandId == "" {
+		return &productv1.RemoveBrandCategoryResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
+	if req.CategoryId == "" {
+		return &productv1.RemoveBrandCategoryResponse{
+			Code:    1,
+			Message: "类目ID不能为空",
+		}, nil
+	}
 	return h.productService.RemoveBrandCategory(ctx, req)
 }
 
 func (h *ProductServiceHandler) GetBrandCategories(ctx context.Context, req *productv1.GetBrandCategoriesRequest) (*productv1.GetBrandCategoriesResponse, error) {
+	if req.BrandId == "" {
+		return &productv1.GetBrandCategoriesResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
 	return h.productService.GetBrandCategories(ctx, req)
 }
 
 func (h *ProductServiceHandler) BatchSetBrandCategories(ctx context.Context, req *productv1.BatchSetBrandCategoriesRequest) (*productv1.BatchSetBrandCategoriesResponse, error) {
+	if req.BrandId == "" {
+		return &productv1.BatchSetBrandCategoriesResponse{
+			Code:    1,
+			Message: "品牌ID不能为空",
+		}, nil
+	}
+	if len(req.CategoryIds) == 0 {
+		return &productv1.BatchSetBrandCategoriesResponse{
+			Code:    1,
+			Message: "类目ID不能为空",
+		}, nil
+	}
 	return h.productService.BatchSetBrandCategories(ctx, req)
 }
 
@@ -181,38 +223,100 @@ func (h *ProductServiceHandler) BatchSetBrandCategories(ctx context.Context, req
 // ============================================
 
 func (h *ProductServiceHandler) CreateProduct(ctx context.Context, req *productv1.CreateProductRequest) (*productv1.CreateProductResponse, error) {
+	// 参数校验
+	validator := service.NewCreateProductRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.CreateProductResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.CreateProduct(ctx, req)
 }
 
 func (h *ProductServiceHandler) GetProduct(ctx context.Context, req *productv1.GetProductRequest) (*productv1.GetProductResponse, error) {
+	if req.ProductId == "" {
+		return &productv1.GetProductResponse{
+			Code:    1,
+			Message: "商品ID不能为空",
+		}, nil
+	}
 	return h.productService.GetProduct(ctx, req)
 }
 
 func (h *ProductServiceHandler) UpdateProduct(ctx context.Context, req *productv1.UpdateProductRequest) (*productv1.UpdateProductResponse, error) {
+	// 参数校验
+	validator := service.NewUpdateProductRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.UpdateProductResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.UpdateProduct(ctx, req)
 }
 
 func (h *ProductServiceHandler) DeleteProduct(ctx context.Context, req *productv1.DeleteProductRequest) (*productv1.DeleteProductResponse, error) {
+	if req.ProductId == "" {
+		return &productv1.DeleteProductResponse{
+			Code:    1,
+			Message: "商品ID不能为空",
+		}, nil
+	}
 	return h.productService.DeleteProduct(ctx, req)
 }
 
 func (h *ProductServiceHandler) ListProducts(ctx context.Context, req *productv1.ListProductsRequest) (*productv1.ListProductsResponse, error) {
+	// 参数校验
+	validator := service.NewListProductsRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.ListProductsResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.ListProducts(ctx, req)
 }
 
 func (h *ProductServiceHandler) OnShelfProduct(ctx context.Context, req *productv1.OnShelfProductRequest) (*productv1.OnShelfProductResponse, error) {
+	if req.ProductId == "" {
+		return &productv1.OnShelfProductResponse{
+			Code:    1,
+			Message: "商品ID不能为空",
+		}, nil
+	}
 	return h.productService.OnShelfProduct(ctx, req)
 }
 
 func (h *ProductServiceHandler) OffShelfProduct(ctx context.Context, req *productv1.OffShelfProductRequest) (*productv1.OffShelfProductResponse, error) {
+	if req.ProductId == "" {
+		return &productv1.OffShelfProductResponse{
+			Code:    1,
+			Message: "商品ID不能为空",
+		}, nil
+	}
 	return h.productService.OffShelfProduct(ctx, req)
 }
 
 func (h *ProductServiceHandler) SubmitProductAudit(ctx context.Context, req *productv1.SubmitProductAuditRequest) (*productv1.SubmitProductAuditResponse, error) {
+	if req.ProductId == "" {
+		return &productv1.SubmitProductAuditResponse{
+			Code:    1,
+			Message: "商品ID不能为空",
+		}, nil
+	}
 	return h.productService.SubmitProductAudit(ctx, req)
 }
 
 func (h *ProductServiceHandler) AuditProduct(ctx context.Context, req *productv1.AuditProductRequest) (*productv1.AuditProductResponse, error) {
+	// 参数校验
+	validator := service.NewAuditProductRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.AuditProductResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.AuditProduct(ctx, req)
 }
 
