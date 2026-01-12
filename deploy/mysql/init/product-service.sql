@@ -139,9 +139,9 @@ CREATE TABLE IF NOT EXISTS skus (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL COMMENT '软删除时间',
-    INDEX idx_product_status (product_id, status),
-    INDEX idx_product_created  (product_id, created_at),
-    INDEX idx_price_status (price, status)
+    INDEX idx_product_status (product_id, status, deleted_at),
+    INDEX idx_product_created  (product_id, created_at, deleted_at),
+    INDEX idx_price_status (price, status, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SKU表（库存单元）';
 
 -- ============================================
@@ -169,7 +169,9 @@ CREATE TABLE IF NOT EXISTS tags (
     status TINYINT DEFAULT 1 COMMENT '状态：1-启用，2-停用',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_status_sort(status,sort_order)
+    deleted_at TIMESTAMP NULL COMMENT '软删除时间',
+    INDEX idx_status_sort(status,sort_order,deleted_at)
+    INDEX idx_name_deleted(name,deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='标签表';
 
 -- ============================================
@@ -180,9 +182,11 @@ CREATE TABLE IF NOT EXISTS product_tags (
     product_id VARCHAR(26) NOT NULL COMMENT '商品ID',
     tag_id VARCHAR(26) NOT NULL COMMENT '标签ID',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_product_tag (product_id, tag_id),
-    INDEX idx_product_id (product_id),
-    INDEX idx_tag_id (tag_id)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL COMMENT '软删除时间',
+    UNIQUE KEY uk_product_tag_deleted (product_id, tag_id,deleted_at),
+    INDEX idx_product_id_deleted (product_id,deleted_at),
+    INDEX idx_tag_id_deleted (tag_id,deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品标签关联表';
 
 -- ============================================

@@ -147,7 +147,6 @@ func (r *categoryRepository) DeleteCategory(ctx context.Context, id string) erro
 	var category model.Category
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		//先锁定该类目，避免子类目会创建
-
 		err := tx.Set("gorm:query_option", "FOR UPDATE").
 			Where("id = ?", id).
 			First(&category).Error
@@ -158,18 +157,20 @@ func (r *categoryRepository) DeleteCategory(ctx context.Context, id string) erro
 			return err
 		}
 		//先检查该类目下是否有子类目
-		var count int64
-		err = tx.Where("parent_id = ?", id).Count(&count).Error
-		if err != nil {
-			return err
-		}
-		if count > 0 {
-			return errors.New("该类目下有子类目，不能删除")
-		}
+		tx.Exec("SELECT 1 FROM categories WHERE parent_id = ? For Update", id)
+		//再检查该类目下是否有商品和品牌，有就无法删除
+		tx.Exec("SELECT 1 FROM products WHERE category_id = ? For update", id)
+		tx.Exec("SELECT 1 FROM brands WHERE category_id = ? For update", id)
+
 		//没有子类目，则删除该类目
 		err = tx.Delete(&category).Error //软删除
 		if err != nil {
 			log.Printf("[CategoryRepository] DeleteCategory DB delete error, id=%s, err=%v", id, err)
+			return err
+		}
+		//删除类目品牌关联
+		err = tx.Where("category_id = ?", id).Delete(&model.BrandCategory{}).Error
+		if err != nil {
 			return err
 		}
 		log.Printf("[CategoryRepository] DeleteCategory success (soft delete), id=%s", id)

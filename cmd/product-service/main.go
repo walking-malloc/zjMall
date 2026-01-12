@@ -67,11 +67,13 @@ func main() {
 	categoryRepo := repository.NewCategoryRepository(db, cacheRepo, singleflight.Group{})
 	brandRepo := repository.NewBrandRepository(db, cacheRepo, singleflight.Group{})
 	productRepo := repository.NewProductRepository(db, cacheRepo)
+	tagRepo := repository.NewTagRepository(db, cacheRepo, singleflight.Group{})
+	skuRepo := repository.NewSkuRepository(db)
 	log.Println("✅ Repository 创建成功")
 
 	// 10. 创建Service
 	log.Println("🔧 创建 Service...")
-	productService := service.NewProductService(categoryRepo, brandRepo, productRepo)
+	productService := service.NewProductService(categoryRepo, brandRepo, productRepo, tagRepo, skuRepo)
 	log.Println("✅ Service 创建成功")
 
 	//7.创建Handler

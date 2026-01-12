@@ -325,18 +325,60 @@ func (h *ProductServiceHandler) AuditProduct(ctx context.Context, req *productv1
 // ============================================
 
 func (h *ProductServiceHandler) AddProductTag(ctx context.Context, req *productv1.AddProductTagRequest) (*productv1.AddProductTagResponse, error) {
+	if req.ProductId == "" {
+		return &productv1.AddProductTagResponse{
+			Code:    1,
+			Message: "商品ID不能为空",
+		}, nil
+	}
+	if req.TagId == "" {
+		return &productv1.AddProductTagResponse{
+			Code:    1,
+			Message: "标签ID不能为空",
+		}, nil
+	}
 	return h.productService.AddProductTag(ctx, req)
 }
 
 func (h *ProductServiceHandler) RemoveProductTag(ctx context.Context, req *productv1.RemoveProductTagRequest) (*productv1.RemoveProductTagResponse, error) {
+	if req.ProductId == "" {
+		return &productv1.RemoveProductTagResponse{
+			Code:    1,
+			Message: "商品ID不能为空",
+		}, nil
+	}
+	if req.TagId == "" {
+		return &productv1.RemoveProductTagResponse{
+			Code:    1,
+			Message: "标签ID不能为空",
+		}, nil
+	}
 	return h.productService.RemoveProductTag(ctx, req)
 }
 
 func (h *ProductServiceHandler) GetProductTags(ctx context.Context, req *productv1.GetProductTagsRequest) (*productv1.GetProductTagsResponse, error) {
+	if req.ProductId == "" {
+		return &productv1.GetProductTagsResponse{
+			Code:    1,
+			Message: "商品ID不能为空",
+		}, nil
+	}
 	return h.productService.GetProductTags(ctx, req)
 }
 
 func (h *ProductServiceHandler) BatchSetProductTags(ctx context.Context, req *productv1.BatchSetProductTagsRequest) (*productv1.BatchSetProductTagsResponse, error) {
+	if req.ProductId == "" {
+		return &productv1.BatchSetProductTagsResponse{
+			Code:    1,
+			Message: "商品ID不能为空",
+		}, nil
+	}
+	if len(req.TagIds) == 0 {
+		return &productv1.BatchSetProductTagsResponse{
+			Code:    1,
+			Message: "标签ID不能为空",
+		}, nil
+	}
 	return h.productService.BatchSetProductTags(ctx, req)
 }
 
@@ -345,26 +387,66 @@ func (h *ProductServiceHandler) BatchSetProductTags(ctx context.Context, req *pr
 // ============================================
 
 func (h *ProductServiceHandler) CreateSku(ctx context.Context, req *productv1.CreateSkuRequest) (*productv1.CreateSkuResponse, error) {
+	validator := service.NewCreateSkuRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.CreateSkuResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.CreateSku(ctx, req)
 }
 
 func (h *ProductServiceHandler) GetSku(ctx context.Context, req *productv1.GetSkuRequest) (*productv1.GetSkuResponse, error) {
+	if req.SkuId == "" {
+		return &productv1.GetSkuResponse{
+			Code:    1,
+			Message: "SKU ID不能为空",
+		}, nil
+	}
 	return h.productService.GetSku(ctx, req)
 }
 
 func (h *ProductServiceHandler) UpdateSku(ctx context.Context, req *productv1.UpdateSkuRequest) (*productv1.UpdateSkuResponse, error) {
+	validator := service.NewUpdateSkuRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.UpdateSkuResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.UpdateSku(ctx, req)
 }
 
 func (h *ProductServiceHandler) DeleteSku(ctx context.Context, req *productv1.DeleteSkuRequest) (*productv1.DeleteSkuResponse, error) {
+	if req.SkuId == "" {
+		return &productv1.DeleteSkuResponse{
+			Code:    1,
+			Message: "SKU ID不能为空",
+		}, nil
+	}
 	return h.productService.DeleteSku(ctx, req)
 }
 
 func (h *ProductServiceHandler) ListSkus(ctx context.Context, req *productv1.ListSkusRequest) (*productv1.ListSkusResponse, error) {
+	validator := service.NewListSkusRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.ListSkusResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.ListSkus(ctx, req)
 }
 
 func (h *ProductServiceHandler) BatchCreateSkus(ctx context.Context, req *productv1.BatchCreateSkusRequest) (*productv1.BatchCreateSkusResponse, error) {
+	validator := service.NewBatchCreateSkusRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.BatchCreateSkusResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.BatchCreateSkus(ctx, req)
 }
 
@@ -393,21 +475,54 @@ func (h *ProductServiceHandler) BatchSetSkuAttributes(ctx context.Context, req *
 // ============================================
 
 func (h *ProductServiceHandler) CreateTag(ctx context.Context, req *productv1.CreateTagRequest) (*productv1.CreateTagResponse, error) {
+	validator := service.NewCreateTagRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.CreateTagResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.CreateTag(ctx, req)
 }
 
 func (h *ProductServiceHandler) GetTag(ctx context.Context, req *productv1.GetTagRequest) (*productv1.GetTagResponse, error) {
+	if req.TagId == "" {
+		return &productv1.GetTagResponse{
+			Code:    1,
+			Message: "标签ID不能为空",
+		}, nil
+	}
 	return h.productService.GetTag(ctx, req)
 }
 
 func (h *ProductServiceHandler) UpdateTag(ctx context.Context, req *productv1.UpdateTagRequest) (*productv1.UpdateTagResponse, error) {
+	validator := service.NewUpdateTagRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.UpdateTagResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.UpdateTag(ctx, req)
 }
 
 func (h *ProductServiceHandler) DeleteTag(ctx context.Context, req *productv1.DeleteTagRequest) (*productv1.DeleteTagResponse, error) {
+	if req.TagId == "" {
+		return &productv1.DeleteTagResponse{
+			Code:    1,
+			Message: "标签ID不能为空",
+		}, nil
+	}
 	return h.productService.DeleteTag(ctx, req)
 }
 
 func (h *ProductServiceHandler) ListTags(ctx context.Context, req *productv1.ListTagsRequest) (*productv1.ListTagsResponse, error) {
+	validator := service.NewListTagsRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.ListTagsResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.ListTags(ctx, req)
 }

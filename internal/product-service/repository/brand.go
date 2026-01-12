@@ -120,18 +120,16 @@ func (r *brandRepository) UpdateBrand(ctx context.Context, brand *model.Brand) e
 }
 func (r *brandRepository) DeleteBrand(ctx context.Context, id string) error {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 先查询品牌信息，用于删除相关缓存
-		var brand model.Brand
-		err := tx.WithContext(ctx).Where("id = ?", id).First(&brand).Error
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return fmt.Errorf("brand not found: %s", id)
-			}
-			return err
-		}
+		//先检查该品牌下是否有商品，有就无法删除
+		tx.Exec("SELECT 1 FROM products WHERE brand_id = ? For update", id)
 
 		// 执行软删除（注意：Where要在Delete之前）
-		err = tx.WithContext(ctx).Where("id = ?", id).Delete(&model.Brand{}).Error
+		err := tx.WithContext(ctx).Where("id = ?", id).Delete(&model.Brand{}).Error
+		if err != nil {
+			return err
+		}
+		//删除品牌类目关联
+		err = tx.Where("brand_id = ?", id).Delete(&model.BrandCategory{}).Error
 		if err != nil {
 			return err
 		}

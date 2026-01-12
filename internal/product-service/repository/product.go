@@ -55,6 +55,12 @@ type ProductRepository interface {
 	OffShelfProduct(ctx context.Context, id string) error
 	SubmitProductAudit(ctx context.Context, id string) error
 	AuditProduct(ctx context.Context, id string, result int32) error
+
+	// 商品标签关联方法
+	AddProductTag(ctx context.Context, productID, tagID string) error
+	RemoveProductTag(ctx context.Context, productID, tagID string) error
+	GetProductTags(ctx context.Context, productID string) ([]*model.Tag, error)
+	BatchSetProductTags(ctx context.Context, productID string, tagIDs []string) error
 }
 
 type productRepository struct {
@@ -181,13 +187,27 @@ func (r *productRepository) UpdateProduct(ctx context.Context, product *model.Pr
 }
 
 func (r *productRepository) DeleteProduct(ctx context.Context, id string) error {
-	err := r.db.Where("id = ?", id).Delete(&model.Product{}).Error
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		//先删除商品和tag关联的数据
+		err := tx.Where("product_id = ?", id).Delete(&model.ProductTag{}).Error
+		if err != nil {
+			return err
+		}
+		//再删除商品数据
+		err = tx.Where("id = ?", id).Delete(&model.Product{}).Error
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
 	if err != nil {
 		return err
 	}
 	go func() {
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
+		ctx2 := context.Background()
+		r.cacheRepo.Delete(ctx2, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
+		r.cacheRepo.Delete(ctx2, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
 	}()
 	return nil
 }
@@ -390,4 +410,149 @@ func (r *productRepository) AuditProduct(ctx context.Context, id string, result 
 		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
 	}()
 	return nil
+}
+
+// AddProductTag 添加商品标签关联
+func (r *productRepository) AddProductTag(ctx context.Context, productID, tagID string) error {
+	// 使用事务 + Clauses(clause.Locking{Strength: "SHARE"}) 锁定记录，防止在检查后被删除
+	// 这样可以避免"检查时存在，插入时已被删除"的并发问题
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 检查商品是否存在，并锁定记录（FOR SHARE）
+		var product model.Product
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+			Where("id = ?", productID).
+			First(&product).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("商品不存在: %s", productID)
+			}
+			return err
+		}
+
+		// 检查标签是否存在且启用，并锁定记录（FOR SHARE）
+		var tag model.Tag
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+			Where("id = ? AND status = ?", tagID, 1).
+			First(&tag).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("标签不存在或已停用: %s", tagID)
+			}
+			return err
+		}
+
+		// 创建关联（唯一索引会自动防止重复）
+		productTag := &model.ProductTag{
+			ProductID: productID,
+			TagID:     tagID,
+		}
+		if err := tx.Create(productTag).Error; err != nil {
+			if strings.Contains(err.Error(), "Duplicate entry") ||
+				strings.Contains(err.Error(), "UNIQUE constraint") {
+				return fmt.Errorf("该商品已关联该标签")
+			}
+			return err
+		}
+
+		return nil
+	})
+
+	return err
+}
+
+// RemoveProductTag 删除商品标签关联
+func (r *productRepository) RemoveProductTag(ctx context.Context, productID, tagID string) error {
+	result := r.db.WithContext(ctx).
+		Where("product_id = ? AND tag_id = ?", productID, tagID).
+		Delete(&model.ProductTag{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("商品标签关联不存在")
+	}
+	return nil
+}
+
+// GetProductTags 查询商品的标签列表
+func (r *productRepository) GetProductTags(ctx context.Context, productID string) ([]*model.Tag, error) {
+	var tags []*model.Tag
+
+	// 通过关联表查询标签
+	err := r.db.WithContext(ctx).
+		Table("tags").
+		Joins("INNER JOIN product_tags ON tags.id = product_tags.tag_id").
+		Where("product_tags.product_id = ? AND product_tags.deleted_at IS NULL", productID).
+		Where("tags.deleted_at IS NULL").
+		Order("tags.sort_order DESC, tags.created_at ASC").
+		Find(&tags).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tags, nil
+}
+
+// BatchSetProductTags 批量设置商品标签关联（先删除旧的，再插入新的）
+func (r *productRepository) BatchSetProductTags(ctx context.Context, productID string, tagIDs []string) error {
+	// 使用事务批量替换，并在事务中检查商品和标签是否存在
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 检查商品是否存在，并锁定记录（FOR SHARE）
+		var product model.Product
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+			Where("id = ?", productID).
+			First(&product).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("商品不存在: %s", productID)
+			}
+			return err
+		}
+
+		// 检查所有标签是否存在且启用
+		if len(tagIDs) > 0 {
+			// 去重
+			tagIDMap := make(map[string]struct{}, len(tagIDs))
+			uniqueTagIDs := make([]string, 0, len(tagIDs))
+			for _, id := range tagIDs {
+				if _, exists := tagIDMap[id]; !exists {
+					tagIDMap[id] = struct{}{}
+					uniqueTagIDs = append(uniqueTagIDs, id)
+				}
+			}
+			tagIDs = uniqueTagIDs
+
+			var count int64
+			err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Model(&model.Tag{}).
+				Where("id IN ? AND status = ?", tagIDs, 1).
+				Count(&count).Error
+			if err != nil {
+				return err
+			}
+			if int(count) != len(tagIDs) {
+				return fmt.Errorf("部分标签不存在或已停用")
+			}
+		}
+
+		// 1. 删除该商品的所有旧关联
+		if err := tx.Where("product_id = ?", productID).Delete(&model.ProductTag{}).Error; err != nil {
+			return err
+		}
+
+		// 2. 如果有关联要添加，批量插入新关联
+		if len(tagIDs) > 0 {
+			productTags := make([]*model.ProductTag, 0, len(tagIDs))
+			for _, tagID := range tagIDs {
+				productTags = append(productTags, &model.ProductTag{
+					ProductID: productID,
+					TagID:     tagID,
+				})
+			}
+			if err := tx.CreateInBatches(productTags, 50).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return err
 }

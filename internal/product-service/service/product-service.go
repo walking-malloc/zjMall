@@ -21,8 +21,8 @@ type ProductService struct {
 	categoryRepo repository.CategoryRepository
 	brandRepo    repository.BrandRepository
 	productRepo  repository.ProductRepository
-	// skuRepo      repository.SkuRepository
-	// tagRepo      repository.TagRepository
+	tagRepo      repository.TagRepository
+	skuRepo      repository.SkuRepository
 }
 
 // NewProductService 创建商品服务实例
@@ -30,11 +30,15 @@ func NewProductService(
 	categoryRepo repository.CategoryRepository,
 	brandRepo repository.BrandRepository,
 	productRepo repository.ProductRepository,
+	tagRepo repository.TagRepository,
+	skuRepo repository.SkuRepository,
 ) *ProductService {
 	return &ProductService{
 		categoryRepo: categoryRepo,
 		brandRepo:    brandRepo,
 		productRepo:  productRepo,
+		tagRepo:      tagRepo,
+		skuRepo:      skuRepo,
 	}
 }
 
@@ -995,37 +999,94 @@ func (s *ProductService) AuditProduct(ctx context.Context, req *productv1.AuditP
 
 // AddProductTag 添加商品标签关联
 func (s *ProductService) AddProductTag(ctx context.Context, req *productv1.AddProductTagRequest) (*productv1.AddProductTagResponse, error) {
-	// TODO: 实现添加商品标签关联的业务逻辑
+	err := s.productRepo.AddProductTag(ctx, req.ProductId, req.TagId)
+	if err != nil {
+		return &productv1.AddProductTagResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.AddProductTagResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "添加成功",
+		Data:    req.ProductId,
 	}, nil
 }
 
 // RemoveProductTag 删除商品标签关联
 func (s *ProductService) RemoveProductTag(ctx context.Context, req *productv1.RemoveProductTagRequest) (*productv1.RemoveProductTagResponse, error) {
-	// TODO: 实现删除商品标签关联的业务逻辑
+	err := s.productRepo.RemoveProductTag(ctx, req.ProductId, req.TagId)
+	if err != nil {
+		return &productv1.RemoveProductTagResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.RemoveProductTagResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "删除成功",
+		Data:    req.ProductId,
 	}, nil
 }
 
 // GetProductTags 查询商品的标签列表
 func (s *ProductService) GetProductTags(ctx context.Context, req *productv1.GetProductTagsRequest) (*productv1.GetProductTagsResponse, error) {
-	// TODO: 实现查询商品标签列表的业务逻辑
+	tags, err := s.productRepo.GetProductTags(ctx, req.ProductId)
+	if err != nil {
+		return &productv1.GetProductTagsResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询商品标签列表失败: %v", err),
+		}, nil
+	}
+
+	// 转换为响应格式
+	tagList := make([]*productv1.TagInfo, 0, len(tags))
+	for _, tag := range tags {
+		tagList = append(tagList, &productv1.TagInfo{
+			Id:        tag.ID,
+			Name:      tag.Name,
+			Type:      int32(tag.Type),
+			Color:     tag.Color,
+			SortOrder: tag.SortOrder,
+			Status:    int32(tag.Status),
+			CreatedAt: timestamppb.New(tag.CreatedAt),
+			UpdatedAt: timestamppb.New(tag.UpdatedAt),
+		})
+	}
+
 	return &productv1.GetProductTagsResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询成功",
+		Tags:    tagList,
 	}, nil
 }
 
 // BatchSetProductTags 批量设置商品标签关联
 func (s *ProductService) BatchSetProductTags(ctx context.Context, req *productv1.BatchSetProductTagsRequest) (*productv1.BatchSetProductTagsResponse, error) {
-	// TODO: 实现批量设置商品标签关联的业务逻辑
+	// 去重 tag_ids（业务逻辑，保留在 service 层）
+	tagIDMap := make(map[string]bool)
+	uniqueTagIDs := make([]string, 0, len(req.TagIds))
+	for _, tagID := range req.TagIds {
+		if tagID != "" && !tagIDMap[tagID] {
+			tagIDMap[tagID] = true
+			uniqueTagIDs = append(uniqueTagIDs, tagID)
+		}
+	}
+
+	err := s.productRepo.BatchSetProductTags(ctx, req.ProductId, uniqueTagIDs)
+	if err != nil {
+		return &productv1.BatchSetProductTagsResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.BatchSetProductTagsResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "批量设置成功",
+		Data:    req.ProductId,
 	}, nil
 }
 
@@ -1033,57 +1094,325 @@ func (s *ProductService) BatchSetProductTags(ctx context.Context, req *productv1
 // SKU管理接口
 // ============================================
 
+// convertSkuToProto 将 model.Sku 转换为 productv1.SkuInfo
+func convertSkuToProto(sku *model.Sku) *productv1.SkuInfo {
+	return &productv1.SkuInfo{
+		Id:            sku.ID,
+		ProductId:     sku.ProductID,
+		SkuCode:       sku.SkuCode,
+		Barcode:       sku.Barcode,
+		Name:          sku.Name,
+		Price:         sku.Price,
+		OriginalPrice: sku.OriginalPrice,
+		CostPrice:     sku.CostPrice,
+		Weight:        sku.Weight,
+		Volume:        sku.Volume,
+		Image:         sku.Image,
+		Status:        int32(sku.Status),
+		CreatedAt:     timestamppb.New(sku.CreatedAt),
+		UpdatedAt:     timestamppb.New(sku.UpdatedAt),
+	}
+}
+
 // CreateSku 创建SKU
 func (s *ProductService) CreateSku(ctx context.Context, req *productv1.CreateSkuRequest) (*productv1.CreateSkuResponse, error) {
-	// TODO: 实现创建SKU的业务逻辑
+	// 检查商品是否存在
+	product, err := s.productRepo.GetProduct(ctx, req.ProductId)
+	if err != nil {
+		return &productv1.CreateSkuResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询商品失败: %v", err),
+		}, nil
+	}
+	if product == nil {
+		return &productv1.CreateSkuResponse{
+			Code:    1,
+			Message: "商品不存在",
+		}, nil
+	}
+
+	// 设置默认状态
+	status := int8(1) // 默认上架
+	if req.Status > 0 {
+		status = int8(req.Status)
+	}
+
+	sku := &model.Sku{
+		ProductID:     req.ProductId,
+		SkuCode:       req.SkuCode,
+		Barcode:       req.Barcode,
+		Name:          req.Name,
+		Price:         req.Price,
+		OriginalPrice: req.OriginalPrice,
+		CostPrice:     req.CostPrice,
+		Weight:        req.Weight,
+		Volume:        req.Volume,
+		Image:         req.Image,
+		Status:        status,
+	}
+
+	err = s.skuRepo.CreateSku(ctx, sku)
+	if err != nil {
+		return &productv1.CreateSkuResponse{
+			Code:    1,
+			Message: fmt.Sprintf("创建SKU失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.CreateSkuResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "创建成功",
+		Data:    sku.ID,
 	}, nil
 }
 
 // GetSku 查询SKU详情
 func (s *ProductService) GetSku(ctx context.Context, req *productv1.GetSkuRequest) (*productv1.GetSkuResponse, error) {
-	// TODO: 实现查询SKU详情的业务逻辑
-	return &productv1.GetSkuResponse{
-		Code:    1,
-		Message: "未实现",
-	}, nil
+	sku, err := s.skuRepo.GetSkuByID(ctx, req.SkuId)
+	if err != nil {
+		return &productv1.GetSkuResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询SKU详情失败: %v", err),
+		}, nil
+	}
+
+	if sku == nil {
+		return &productv1.GetSkuResponse{
+			Code:    1,
+			Message: "SKU不存在",
+		}, nil
+	}
+
+	response := &productv1.GetSkuResponse{
+		Code:    0,
+		Message: "查询成功",
+		Sku:     convertSkuToProto(sku),
+	}
+
+	// TODO: 如果需要包含属性列表，在这里查询并填充 attributes 字段
+	// if req.IncludeAttributes {
+	//     attributes, err := s.skuRepo.GetSkuAttributes(ctx, req.SkuId)
+	//     if err == nil {
+	//         response.Attributes = convertAttributesToProto(attributes)
+	//     }
+	// }
+
+	return response, nil
 }
 
 // UpdateSku 更新SKU
 func (s *ProductService) UpdateSku(ctx context.Context, req *productv1.UpdateSkuRequest) (*productv1.UpdateSkuResponse, error) {
-	// TODO: 实现更新SKU的业务逻辑
+	// 先查询现有SKU
+	existingSku, err := s.skuRepo.GetSkuByID(ctx, req.SkuId)
+	if err != nil {
+		return &productv1.UpdateSkuResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询SKU失败: %v", err),
+		}, nil
+	}
+
+	if existingSku == nil {
+		return &productv1.UpdateSkuResponse{
+			Code:    1,
+			Message: "SKU不存在",
+		}, nil
+	}
+
+	// 构建更新数据 - 只更新提供的字段
+	sku := &model.Sku{
+		BaseModel: pkg.BaseModel{
+			ID: req.SkuId,
+		},
+		SkuCode:       existingSku.SkuCode,
+		Barcode:       existingSku.Barcode,
+		Name:          existingSku.Name,
+		Price:         existingSku.Price,
+		OriginalPrice: existingSku.OriginalPrice,
+		CostPrice:     existingSku.CostPrice,
+		Weight:        existingSku.Weight,
+		Volume:        existingSku.Volume,
+		Image:         existingSku.Image,
+		Status:        existingSku.Status,
+	}
+
+	// 只更新提供的字段
+	if req.SkuCode != "" {
+		sku.SkuCode = req.SkuCode
+	}
+	if req.Barcode != "" {
+		sku.Barcode = req.Barcode
+	}
+	if req.Name != "" {
+		sku.Name = req.Name
+	}
+	if req.Price > 0 {
+		sku.Price = req.Price
+	}
+	if req.OriginalPrice > 0 {
+		sku.OriginalPrice = req.OriginalPrice
+	}
+	if req.CostPrice > 0 {
+		sku.CostPrice = req.CostPrice
+	}
+	if req.Weight > 0 {
+		sku.Weight = req.Weight
+	}
+	if req.Volume > 0 {
+		sku.Volume = req.Volume
+	}
+	if req.Image != "" {
+		sku.Image = req.Image
+	}
+	if req.Status > 0 {
+		sku.Status = int8(req.Status)
+	}
+
+	err = s.skuRepo.UpdateSku(ctx, sku)
+	if err != nil {
+		return &productv1.UpdateSkuResponse{
+			Code:    1,
+			Message: fmt.Sprintf("更新SKU失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.UpdateSkuResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "更新成功",
+		Data:    req.SkuId,
 	}, nil
 }
 
 // DeleteSku 删除SKU
 func (s *ProductService) DeleteSku(ctx context.Context, req *productv1.DeleteSkuRequest) (*productv1.DeleteSkuResponse, error) {
-	// TODO: 实现删除SKU的业务逻辑
+	err := s.skuRepo.DeleteSku(ctx, req.SkuId)
+	if err != nil {
+		return &productv1.DeleteSkuResponse{
+			Code:    1,
+			Message: fmt.Sprintf("删除SKU失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.DeleteSkuResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "删除成功",
+		Data:    req.SkuId,
 	}, nil
 }
 
 // ListSkus 查询SKU列表
 func (s *ProductService) ListSkus(ctx context.Context, req *productv1.ListSkusRequest) (*productv1.ListSkusResponse, error) {
-	// TODO: 实现查询SKU列表的业务逻辑
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	filter := &repository.SkuListFilter{
+		Page:      page,
+		PageSize:  pageSize,
+		ProductID: req.ProductId,
+		Status:    req.Status,
+		Keyword:   req.Keyword,
+		MinPrice:  req.MinPrice,
+		MaxPrice:  req.MaxPrice,
+		Offset:    int((page - 1) * pageSize),
+		Limit:     int(pageSize),
+	}
+
+	skus, total, err := s.skuRepo.ListSkus(ctx, filter)
+	if err != nil {
+		return &productv1.ListSkusResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询SKU列表失败: %v", err),
+		}, nil
+	}
+
+	// 转换为响应格式
+	skuList := make([]*productv1.SkuInfo, 0, len(skus))
+	for _, sku := range skus {
+		skuList = append(skuList, convertSkuToProto(sku))
+	}
+
 	return &productv1.ListSkusResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询成功",
+		Total:   total,
+		Skus:    skuList,
 	}, nil
 }
 
 // BatchCreateSkus 批量创建SKU
 func (s *ProductService) BatchCreateSkus(ctx context.Context, req *productv1.BatchCreateSkusRequest) (*productv1.BatchCreateSkusResponse, error) {
-	// TODO: 实现批量创建SKU的业务逻辑
+	// 检查商品是否存在
+	product, err := s.productRepo.GetProduct(ctx, req.ProductId)
+	if err != nil {
+		return &productv1.BatchCreateSkusResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询商品失败: %v", err),
+		}, nil
+	}
+	if product == nil {
+		return &productv1.BatchCreateSkusResponse{
+			Code:    1,
+			Message: "商品不存在",
+		}, nil
+	}
+
+	if len(req.Skus) == 0 {
+		return &productv1.BatchCreateSkusResponse{
+			Code:    1,
+			Message: "SKU列表不能为空",
+		}, nil
+	}
+
+	// 转换为 model.Sku 列表
+	skus := make([]*model.Sku, 0, len(req.Skus))
+	for _, reqSku := range req.Skus {
+		status := int8(1) // 默认上架
+		if reqSku.Status > 0 {
+			status = int8(reqSku.Status)
+		}
+
+		sku := &model.Sku{
+			ProductID:     req.ProductId,
+			SkuCode:       reqSku.SkuCode,
+			Barcode:       reqSku.Barcode,
+			Name:          reqSku.Name,
+			Price:         reqSku.Price,
+			OriginalPrice: reqSku.OriginalPrice,
+			CostPrice:     reqSku.CostPrice,
+			Weight:        reqSku.Weight,
+			Volume:        reqSku.Volume,
+			Image:         reqSku.Image,
+			Status:        status,
+		}
+		skus = append(skus, sku)
+	}
+
+	err = s.skuRepo.BatchCreateSkus(ctx, req.ProductId, skus)
+	if err != nil {
+		return &productv1.BatchCreateSkusResponse{
+			Code:    1,
+			Message: fmt.Sprintf("批量创建SKU失败: %v", err),
+		}, nil
+	}
+
+	// 返回创建的SKU ID列表
+	skuIDs := make([]string, 0, len(skus))
+	for _, sku := range skus {
+		skuIDs = append(skuIDs, sku.ID)
+	}
+
 	return &productv1.BatchCreateSkusResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "批量创建成功",
+		SkuIds:  skuIDs,
 	}, nil
 }
 
@@ -1131,47 +1460,201 @@ func (s *ProductService) BatchSetSkuAttributes(ctx context.Context, req *product
 // 标签管理接口
 // ============================================
 
+// convertTagToProto 将 model.Tag 转换为 productv1.TagInfo
+func convertTagToProto(tag *model.Tag) *productv1.TagInfo {
+	return &productv1.TagInfo{
+		Id:        tag.ID,
+		Name:      tag.Name,
+		Type:      int32(tag.Type),
+		Color:     tag.Color,
+		SortOrder: tag.SortOrder,
+		Status:    int32(tag.Status),
+		CreatedAt: timestamppb.New(tag.CreatedAt),
+		UpdatedAt: timestamppb.New(tag.UpdatedAt),
+	}
+}
+
 // CreateTag 创建标签
 func (s *ProductService) CreateTag(ctx context.Context, req *productv1.CreateTagRequest) (*productv1.CreateTagResponse, error) {
-	// TODO: 实现创建标签的业务逻辑
+	// 设置默认值
+	status := int8(1) // 默认启用
+	if req.Status > 0 {
+		status = int8(req.Status)
+	}
+
+	tagType := int8(2) // 默认运营标签
+	if req.Type > 0 {
+		tagType = int8(req.Type)
+	}
+
+	tag := &model.Tag{
+		Name:      req.Name,
+		Type:      tagType,
+		Color:     req.Color,
+		SortOrder: req.SortOrder,
+		Status:    status,
+	}
+
+	err := s.tagRepo.CreateTag(ctx, tag)
+	if err != nil {
+		return &productv1.CreateTagResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.CreateTagResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "创建成功",
+		Data:    tag.ID,
 	}, nil
 }
 
 // GetTag 查询标签详情
 func (s *ProductService) GetTag(ctx context.Context, req *productv1.GetTagRequest) (*productv1.GetTagResponse, error) {
-	// TODO: 实现查询标签详情的业务逻辑
+	tag, err := s.tagRepo.GetTagByID(ctx, req.TagId)
+	if err != nil {
+		return &productv1.GetTagResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询标签详情失败: %v", err),
+		}, nil
+	}
+
+	if tag == nil {
+		return &productv1.GetTagResponse{
+			Code:    1,
+			Message: "标签不存在",
+		}, nil
+	}
+
 	return &productv1.GetTagResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询成功",
+		Tag:     convertTagToProto(tag),
 	}, nil
 }
 
 // UpdateTag 更新标签
 func (s *ProductService) UpdateTag(ctx context.Context, req *productv1.UpdateTagRequest) (*productv1.UpdateTagResponse, error) {
-	// TODO: 实现更新标签的业务逻辑
+	// 先查询现有标签
+	existingTag, err := s.tagRepo.GetTagByID(ctx, req.TagId)
+	if err != nil {
+		return &productv1.UpdateTagResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询标签失败: %v", err),
+		}, nil
+	}
+
+	if existingTag == nil {
+		return &productv1.UpdateTagResponse{
+			Code:    1,
+			Message: "标签不存在",
+		}, nil
+	}
+
+	// 构建更新数据 - 只更新提供的字段
+	tag := &model.Tag{
+		BaseModel: pkg.BaseModel{
+			ID: req.TagId,
+		},
+		Name:      existingTag.Name,
+		Type:      existingTag.Type,
+		Color:     existingTag.Color,
+		SortOrder: existingTag.SortOrder,
+		Status:    existingTag.Status,
+	}
+
+	// 只更新提供的字段
+	if req.Name != "" {
+		tag.Name = req.Name
+	}
+	if req.Type > 0 {
+		tag.Type = int8(req.Type)
+	}
+	if req.Color != "" {
+		tag.Color = req.Color
+	}
+	if req.SortOrder > 0 {
+		tag.SortOrder = req.SortOrder
+	}
+	if req.Status > 0 {
+		tag.Status = int8(req.Status)
+	}
+
+	err = s.tagRepo.UpdateTag(ctx, tag)
+	if err != nil {
+		return &productv1.UpdateTagResponse{
+			Code:    1,
+			Message: fmt.Sprintf("更新标签失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.UpdateTagResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "更新成功",
+		Data:    req.TagId,
 	}, nil
 }
 
 // DeleteTag 删除标签
 func (s *ProductService) DeleteTag(ctx context.Context, req *productv1.DeleteTagRequest) (*productv1.DeleteTagResponse, error) {
-	// TODO: 实现删除标签的业务逻辑
+	err := s.tagRepo.DeleteTag(ctx, req.TagId)
+	if err != nil {
+		return &productv1.DeleteTagResponse{
+			Code:    1,
+			Message: fmt.Sprintf("删除标签失败: %v", err),
+		}, nil
+	}
+
 	return &productv1.DeleteTagResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "删除成功",
+		Data:    req.TagId,
 	}, nil
 }
 
 // ListTags 查询标签列表
 func (s *ProductService) ListTags(ctx context.Context, req *productv1.ListTagsRequest) (*productv1.ListTagsResponse, error) {
-	// TODO: 实现查询标签列表的业务逻辑
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	filter := &repository.TagListFilter{
+		Page:     page,
+		PageSize: pageSize,
+		Type:     req.Type,
+		Status:   req.Status,
+		Keyword:  req.Keyword,
+		Offset:   int((page - 1) * pageSize),
+		Limit:    int(pageSize),
+	}
+
+	tags, total, err := s.tagRepo.ListTags(ctx, filter)
+	if err != nil {
+		return &productv1.ListTagsResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询标签列表失败: %v", err),
+		}, nil
+	}
+
+	// 转换为响应格式
+	tagList := make([]*productv1.TagInfo, 0, len(tags))
+	for _, tag := range tags {
+		tagList = append(tagList, convertTagToProto(tag))
+	}
+
 	return &productv1.ListTagsResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "查询成功",
+		Total:   total,
+		Tags:    tagList,
 	}, nil
 }

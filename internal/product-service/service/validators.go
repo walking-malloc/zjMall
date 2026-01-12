@@ -320,3 +320,201 @@ func (v *AuditProductRequestValidator) Validate() error {
 	}
 	return nil
 }
+
+// ==============标签管理验证器==============
+
+type CreateTagRequestValidator struct {
+	Name      string `validate:"required,min=1,max=50" label:"标签名称"`
+	Type      int32  `validate:"omitempty,oneof=1 2" label:"标签类型"`
+	Color     string `validate:"omitempty" label:"标签颜色"`
+	SortOrder int32  `validate:"omitempty" label:"排序权重"`
+	Status    int32  `validate:"omitempty,oneof=1 2" label:"状态"`
+}
+
+func NewCreateTagRequestValidator(req *productv1.CreateTagRequest) *CreateTagRequestValidator {
+	return &CreateTagRequestValidator{
+		Name:      req.Name,
+		Type:      req.Type,
+		Color:     req.Color,
+		SortOrder: req.SortOrder,
+		Status:    req.Status,
+	}
+}
+
+func (v *CreateTagRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type UpdateTagRequestValidator struct {
+	TagID     string `validate:"required" label:"标签ID"`
+	Name      string `validate:"omitempty,min=1,max=50" label:"标签名称"`
+	Type      int32  `validate:"omitempty,oneof=1 2" label:"标签类型"`
+	Color     string `validate:"omitempty" label:"标签颜色"`
+	SortOrder int32  `validate:"omitempty" label:"排序权重"`
+	Status    int32  `validate:"omitempty,oneof=1 2" label:"状态"`
+}
+
+func NewUpdateTagRequestValidator(req *productv1.UpdateTagRequest) *UpdateTagRequestValidator {
+	return &UpdateTagRequestValidator{
+		TagID:     req.TagId,
+		Name:      req.Name,
+		Type:      req.Type,
+		Color:     req.Color,
+		SortOrder: req.SortOrder,
+		Status:    req.Status,
+	}
+}
+
+func (v *UpdateTagRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type ListTagsRequestValidator struct {
+	Page     int32  `validate:"omitempty,min=1" label:"页码"`
+	PageSize int32  `validate:"omitempty,min=1,max=100" label:"每页数量"`
+	Type     int32  `validate:"omitempty,oneof=1 2" label:"标签类型"`
+	Status   int32  `validate:"omitempty,oneof=1 2" label:"状态"`
+	Keyword  string `validate:"omitempty,min=1,max=50" label:"关键词"`
+}
+
+func NewListTagsRequestValidator(req *productv1.ListTagsRequest) *ListTagsRequestValidator {
+	return &ListTagsRequestValidator{
+		Page:     req.Page,
+		PageSize: req.PageSize,
+		Type:     req.Type,
+		Status:   req.Status,
+		Keyword:  req.Keyword,
+	}
+}
+
+func (v *ListTagsRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+// ==============SKU 管理验证器==============
+
+type CreateSkuRequestValidator struct {
+	ProductID     string  `validate:"required" label:"所属商品ID"`
+	SkuCode       string  `validate:"omitempty,min=1,max=50" label:"SKU编码"`
+	Barcode       string  `validate:"omitempty,min=1,max=50" label:"条形码"`
+	Name          string  `validate:"required,min=1,max=200" label:"SKU名称"`
+	Image         string  `validate:"omitempty,url" label:"SKU图片"`
+	Weight        float64 `validate:"omitempty,gt=0" label:"重量"`
+	Volume        float64 `validate:"omitempty,gt=0" label:"体积"`
+	Price         float64 `validate:"required,gt=0" label:"销售价格"`
+	CostPrice     float64 `validate:"omitempty,gt=0" label:"成本价格"`
+	OriginalPrice float64 `validate:"omitempty,gt=0" label:"原价"`
+	Status        int32   `validate:"omitempty,oneof=1 2 3" label:"状态"`
+}
+
+func NewCreateSkuRequestValidator(req *productv1.CreateSkuRequest) *CreateSkuRequestValidator {
+	return &CreateSkuRequestValidator{
+		ProductID:     req.ProductId,
+		Price:         req.Price,
+		Status:        req.Status,
+		SkuCode:       req.SkuCode,
+		Barcode:       req.Barcode,
+		Name:          req.Name,
+		Image:         req.Image,
+		Weight:        req.Weight,
+		Volume:        req.Volume,
+		CostPrice:     req.CostPrice,
+		OriginalPrice: req.OriginalPrice,
+	}
+}
+
+func (v *CreateSkuRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type UpdateSkuRequestValidator struct {
+	SkuID         string  `validate:"required" label:"SKU ID"`
+	SkuCode       string  `validate:"omitempty,min=1,max=50" label:"SKU编码"`
+	Barcode       string  `validate:"omitempty,min=1,max=50" label:"条形码"`
+	Name          string  `validate:"omitempty,min=1,max=200" label:"SKU名称"`
+	Image         string  `validate:"omitempty,url" label:"SKU图片"`
+	Weight        float64 `validate:"omitempty,gt=0" label:"重量"`
+	Volume        float64 `validate:"omitempty,gt=0" label:"体积"`
+	CostPrice     float64 `validate:"omitempty,gt=0" label:"成本价格"`
+	OriginalPrice float64 `validate:"omitempty,gt=0" label:"原价"`
+	Price         float64 `validate:"omitempty,gt=0" label:"销售价格"`
+	Status        int32   `validate:"omitempty,oneof=1 2 3" label:"状态"`
+}
+
+func NewUpdateSkuRequestValidator(req *productv1.UpdateSkuRequest) *UpdateSkuRequestValidator {
+	return &UpdateSkuRequestValidator{
+		SkuID:  req.SkuId,
+		Price:  req.Price,
+		Status: req.Status,
+	}
+}
+
+func (v *UpdateSkuRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type ListSkusRequestValidator struct {
+	Page      int32   `validate:"omitempty,min=1" label:"页码"`
+	PageSize  int32   `validate:"omitempty,min=1,max=100" label:"每页数量"`
+	Status    int32   `validate:"omitempty,oneof=1 2 3" label:"状态"`
+	MinPrice  float64 `validate:"omitempty,gte=0" label:"最低价格"`
+	MaxPrice  float64 `validate:"omitempty,gte=0" label:"最高价格"`
+	Keyword   string  `validate:"omitempty,min=1,max=200" label:"关键词"`
+	ProductID string  `validate:"omitempty" label:"商品ID"`
+}
+
+func NewListSkusRequestValidator(req *productv1.ListSkusRequest) *ListSkusRequestValidator {
+	return &ListSkusRequestValidator{
+		Page:      req.Page,
+		PageSize:  req.PageSize,
+		Status:    req.Status,
+		MinPrice:  req.MinPrice,
+		MaxPrice:  req.MaxPrice,
+		Keyword:   req.Keyword,
+		ProductID: req.ProductId,
+	}
+}
+
+func (v *ListSkusRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	// 额外检查：如果同时传了 min_price 和 max_price，要求 min <= max
+	if v.MinPrice > 0 && v.MaxPrice > 0 && v.MinPrice > v.MaxPrice {
+		return errors.New("最低价格不能大于最高价格")
+	}
+	return nil
+}
+
+type BatchCreateSkusRequestValidator struct {
+	ProductID string `validate:"required" label:"所属商品ID"`
+	// skus 数组本身在 service 中进一步校验（如长度、每个元素的必填字段）
+}
+
+func NewBatchCreateSkusRequestValidator(req *productv1.BatchCreateSkusRequest) *BatchCreateSkusRequestValidator {
+	return &BatchCreateSkusRequestValidator{
+		ProductID: req.ProductId,
+	}
+}
+
+func (v *BatchCreateSkusRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
