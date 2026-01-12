@@ -65,6 +65,7 @@ type productRepository struct {
 func NewProductRepository(db *gorm.DB, cache cache.CacheRepository) ProductRepository {
 	return &productRepository{db: db, cacheRepo: cache}
 }
+
 func (r *productRepository) CreateProduct(ctx context.Context, product *model.Product) error {
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		//先检查对应的brandId和categoryId是否存在
@@ -155,9 +156,7 @@ func (r *productRepository) UpdateProduct(ctx context.Context, product *model.Pr
 		if err != nil {
 			return err
 		}
-		if category.ID == "" {
-			return errors.New("category not found")
-		}
+
 		//再检查brandId是否存在
 		var brand model.Brand
 		err = tx.Model(&model.Brand{}).
@@ -166,9 +165,7 @@ func (r *productRepository) UpdateProduct(ctx context.Context, product *model.Pr
 		if err != nil {
 			return err
 		}
-		if brand.ID == "" {
-			return errors.New("brand not found")
-		}
+
 		//更新商品
 		err = tx.Model(&model.Product{}).Where("id = ?", product.ID).Updates(product).Error
 		if err != nil {
@@ -220,7 +217,8 @@ func (r *productRepository) ListProducts(ctx context.Context, filter *ProductLis
 	}
 	if filter.Keyword != "" {
 		// 安全处理LIKE查询
-		safeKeyword := strings.ReplaceAll(filter.Keyword, "%", "\\%")
+		safeKeyword := strings.ReplaceAll(filter.Keyword, `\`, `\\`)
+		safeKeyword = strings.ReplaceAll(filter.Keyword, "%", "\\%")
 		safeKeyword = strings.ReplaceAll(safeKeyword, "_", "\\_")
 		query = query.Where("(title LIKE ? OR subtitle LIKE ?)",
 			"%"+safeKeyword+"%", "%"+safeKeyword+"%")
@@ -276,22 +274,25 @@ func (r *productRepository) ListProducts(ctx context.Context, filter *ProductLis
 }
 
 func (r *productRepository) OnShelfProduct(ctx context.Context, id string) error {
-	//先检查当前商品状态是否为审核通过
-	var product model.Product
-	err := r.db.Model(&model.Product{}).Where("id = ?", id).First(&product).Error
-	if err != nil {
-		return err
+
+	// 在更新时同时检查状态，保证原子性
+	result := r.db.Model(&model.Product{}).
+		Where("id = ? AND status = ?", id, ProductStatusAuditPass).
+		Update("status", ProductStatusOnShelf)
+	if result.Error != nil {
+		return result.Error
 	}
-	if product.ID == "" {
-		return errors.New("商品不存在")
-	}
-	if product.Status != ProductStatusAuditPass {
+
+	// 如果更新失败，检查是商品不存在还是状态不正确
+	if result.RowsAffected == 0 {
+		var count int64
+		if err := r.db.Model(&model.Product{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return errors.New("商品不存在")
+		}
 		return errors.New("商品状态不正确")
-	}
-	product.Status = ProductStatusOnShelf
-	err = r.db.Model(&model.Product{}).Where("id = ?", id).Updates(&product).Error
-	if err != nil {
-		return err
 	}
 
 	go func() {
@@ -302,23 +303,24 @@ func (r *productRepository) OnShelfProduct(ctx context.Context, id string) error
 }
 
 func (r *productRepository) OffShelfProduct(ctx context.Context, id string) error {
-	//先检查当前商品状态是否为上架
-	var product model.Product
-	err := r.db.Model(&model.Product{}).Where("id = ?", id).First(&product).Error
-	if err != nil {
-		return err
-	}
-	if product.ID == "" {
-		return errors.New("商品不存在")
-	}
-	if product.Status != ProductStatusOnShelf {
-		return errors.New("商品状态不正确")
+	// 在更新时同时检查状态，保证原子性
+	result := r.db.Model(&model.Product{}).
+		Where("id = ? AND status = ?", id, ProductStatusOnShelf).
+		Update("status", ProductStatusOffShelf)
+	if result.Error != nil {
+		return result.Error
 	}
 
-	product.Status = ProductStatusOffShelf
-	err = r.db.Model(&model.Product{}).Where("id = ?", id).Updates(&product).Error
-	if err != nil {
-		return err
+	// 如果更新失败，检查是商品不存在还是状态不正确
+	if result.RowsAffected == 0 {
+		var count int64
+		if err := r.db.Model(&model.Product{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return errors.New("商品不存在")
+		}
+		return errors.New("商品状态不正确")
 	}
 	go func() {
 		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
@@ -328,22 +330,24 @@ func (r *productRepository) OffShelfProduct(ctx context.Context, id string) erro
 }
 
 func (r *productRepository) SubmitProductAudit(ctx context.Context, id string) error {
-	//先检查当前商品状态是否为草稿
-	var product model.Product
-	err := r.db.Model(&model.Product{}).Where("id = ?", id).First(&product).Error
-	if err != nil {
-		return err
+	// 在更新时同时检查状态，保证原子性
+	result := r.db.Model(&model.Product{}).
+		Where("id = ? AND status = ?", id, ProductStatusDraft).
+		Update("status", ProductStatusToAudit)
+	if result.Error != nil {
+		return result.Error
 	}
-	if product.ID == "" {
-		return errors.New("商品不存在")
-	}
-	if product.Status != ProductStatusDraft {
+
+	// 如果更新失败，检查是商品不存在还是状态不正确
+	if result.RowsAffected == 0 {
+		var count int64
+		if err := r.db.Model(&model.Product{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return errors.New("商品不存在")
+		}
 		return errors.New("商品状态不正确")
-	}
-	product.Status = ProductStatusToAudit
-	err = r.db.Model(&model.Product{}).Where("id = ?", id).Updates(&product).Error
-	if err != nil {
-		return err
 	}
 
 	go func() {
@@ -354,25 +358,32 @@ func (r *productRepository) SubmitProductAudit(ctx context.Context, id string) e
 }
 
 func (r *productRepository) AuditProduct(ctx context.Context, id string, result int32) error {
-	//先检查当前商品状态是否为待审核
-	var product model.Product
-	err := r.db.Model(&model.Product{}).Where("id = ?", id).First(&product).Error
-	if err != nil {
-		return err
-	}
-	if product.ID == "" {
-		return errors.New("商品不存在")
-	}
-	if product.Status != ProductStatusToAudit {
-		return errors.New("商品状态不正确")
+	// 在更新时同时检查状态，保证原子性
+	// result: 1-通过（上架），2-驳回（草稿）
+	var newStatus int8
+	if result == 1 {
+		newStatus = ProductStatusAuditPass
+	} else {
+		newStatus = ProductStatusDraft
 	}
 
-	if result == 1 {
-		product.Status = ProductStatusAuditPass
+	updateResult := r.db.Model(&model.Product{}).
+		Where("id = ? AND status = ?", id, ProductStatusToAudit).
+		Update("status", newStatus)
+	if updateResult.Error != nil {
+		return updateResult.Error
 	}
-	err = r.db.Model(&model.Product{}).Where("id = ?", id).Updates(product).Error
-	if err != nil {
-		return err
+
+	// 如果更新失败，检查是商品不存在还是状态不正确
+	if updateResult.RowsAffected == 0 {
+		var count int64
+		if err := r.db.Model(&model.Product{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return errors.New("商品不存在")
+		}
+		return errors.New("商品状态不正确")
 	}
 	go func() {
 		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
