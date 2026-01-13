@@ -8,7 +8,6 @@ import (
 	"zjMall/internal/common/cache"
 	"zjMall/internal/product-service/model"
 
-	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 )
 
@@ -33,14 +32,12 @@ type TagRepository interface {
 type tagRepository struct {
 	db        *gorm.DB
 	cacheRepo cache.CacheRepository
-	sf        singleflight.Group
 }
 
-func NewTagRepository(db *gorm.DB, cacheRepo cache.CacheRepository, sf singleflight.Group) TagRepository {
+func NewTagRepository(db *gorm.DB, cacheRepo cache.CacheRepository) TagRepository {
 	return &tagRepository{
 		db:        db,
 		cacheRepo: cacheRepo,
-		sf:        sf,
 	}
 }
 

@@ -16,7 +16,6 @@ import (
 	"zjMall/internal/product-service/service"
 	"zjMall/pkg/validator"
 
-	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc"
 )
 
@@ -64,16 +63,18 @@ func main() {
 	// 6. 创建仓库
 	log.Println("🔧 创建 Repository...")
 	cacheRepo := cache.NewCacheRepository(redisClient)
-	categoryRepo := repository.NewCategoryRepository(db, cacheRepo, singleflight.Group{})
-	brandRepo := repository.NewBrandRepository(db, cacheRepo, singleflight.Group{})
+	categoryRepo := repository.NewCategoryRepository(db, cacheRepo)
+	brandRepo := repository.NewBrandRepository(db, cacheRepo)
 	productRepo := repository.NewProductRepository(db, cacheRepo)
-	tagRepo := repository.NewTagRepository(db, cacheRepo, singleflight.Group{})
+	tagRepo := repository.NewTagRepository(db, cacheRepo)
 	skuRepo := repository.NewSkuRepository(db)
+	attributeRepo := repository.NewAttributeRepository(db)
+	attributeValueRepo := repository.NewAttributeValueRepository(db)
 	log.Println("✅ Repository 创建成功")
 
 	// 10. 创建Service
 	log.Println("🔧 创建 Service...")
-	productService := service.NewProductService(categoryRepo, brandRepo, productRepo, tagRepo, skuRepo)
+	productService := service.NewProductService(categoryRepo, brandRepo, productRepo, tagRepo, skuRepo, attributeRepo, attributeValueRepo)
 	log.Println("✅ Service 创建成功")
 
 	//7.创建Handler

@@ -12,7 +12,6 @@ import (
 	"zjMall/internal/common/cache"
 	"zjMall/internal/product-service/model"
 
-	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 )
 
@@ -60,14 +59,12 @@ type CategoryRepository interface {
 type categoryRepository struct {
 	db        *gorm.DB
 	cacheRepo cache.CacheRepository
-	sf        singleflight.Group //防止缓存击穿
 }
 
-func NewCategoryRepository(db *gorm.DB, cacheRepo cache.CacheRepository, sf singleflight.Group) CategoryRepository {
+func NewCategoryRepository(db *gorm.DB, cacheRepo cache.CacheRepository) CategoryRepository {
 	return &categoryRepository{
 		db:        db,
 		cacheRepo: cacheRepo,
-		sf:        sf,
 	}
 }
 

@@ -455,18 +455,45 @@ func (h *ProductServiceHandler) BatchCreateSkus(ctx context.Context, req *produc
 // ============================================
 
 func (h *ProductServiceHandler) AddSkuAttribute(ctx context.Context, req *productv1.AddSkuAttributeRequest) (*productv1.AddSkuAttributeResponse, error) {
+	validator := service.NewAddSkuAttributeRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.AddSkuAttributeResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.AddSkuAttribute(ctx, req)
 }
 
 func (h *ProductServiceHandler) RemoveSkuAttribute(ctx context.Context, req *productv1.RemoveSkuAttributeRequest) (*productv1.RemoveSkuAttributeResponse, error) {
+	validator := service.NewRemoveSkuAttributeRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.RemoveSkuAttributeResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.RemoveSkuAttribute(ctx, req)
 }
 
 func (h *ProductServiceHandler) GetSkuAttributes(ctx context.Context, req *productv1.GetSkuAttributesRequest) (*productv1.GetSkuAttributesResponse, error) {
+	if req.SkuId == "" {
+		return &productv1.GetSkuAttributesResponse{
+			Code:    1,
+			Message: "SKU ID不能为空",
+		}, nil
+	}
 	return h.productService.GetSkuAttributes(ctx, req)
 }
 
 func (h *ProductServiceHandler) BatchSetSkuAttributes(ctx context.Context, req *productv1.BatchSetSkuAttributesRequest) (*productv1.BatchSetSkuAttributesResponse, error) {
+	validator := service.NewBatchSetSkuAttributesRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.BatchSetSkuAttributesResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
 	return h.productService.BatchSetSkuAttributes(ctx, req)
 }
 
@@ -525,4 +552,118 @@ func (h *ProductServiceHandler) ListTags(ctx context.Context, req *productv1.Lis
 		}, nil
 	}
 	return h.productService.ListTags(ctx, req)
+}
+
+// ============================================
+// 属性管理接口
+// ============================================
+
+func (h *ProductServiceHandler) CreateAttribute(ctx context.Context, req *productv1.CreateAttributeRequest) (*productv1.CreateAttributeResponse, error) {
+	validator := service.NewCreateAttributeRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.CreateAttributeResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+	return h.productService.CreateAttribute(ctx, req)
+}
+
+func (h *ProductServiceHandler) GetAttribute(ctx context.Context, req *productv1.GetAttributeRequest) (*productv1.GetAttributeResponse, error) {
+	if req.AttributeId == "" {
+		return &productv1.GetAttributeResponse{
+			Code:    1,
+			Message: "属性ID不能为空",
+		}, nil
+	}
+	return h.productService.GetAttribute(ctx, req)
+}
+
+func (h *ProductServiceHandler) UpdateAttribute(ctx context.Context, req *productv1.UpdateAttributeRequest) (*productv1.UpdateAttributeResponse, error) {
+	validator := service.NewUpdateAttributeRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.UpdateAttributeResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+	return h.productService.UpdateAttribute(ctx, req)
+}
+
+func (h *ProductServiceHandler) DeleteAttribute(ctx context.Context, req *productv1.DeleteAttributeRequest) (*productv1.DeleteAttributeResponse, error) {
+	if req.AttributeId == "" {
+		return &productv1.DeleteAttributeResponse{
+			Code:    1,
+			Message: "属性ID不能为空",
+		}, nil
+	}
+	return h.productService.DeleteAttribute(ctx, req)
+}
+
+func (h *ProductServiceHandler) ListAttributes(ctx context.Context, req *productv1.ListAttributesRequest) (*productv1.ListAttributesResponse, error) {
+	validator := service.NewListAttributesRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.ListAttributesResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+	return h.productService.ListAttributes(ctx, req)
+}
+
+// ============================================
+// 属性值管理接口
+// ============================================
+
+func (h *ProductServiceHandler) CreateAttributeValue(ctx context.Context, req *productv1.CreateAttributeValueRequest) (*productv1.CreateAttributeValueResponse, error) {
+	validator := service.NewCreateAttributeValueRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.CreateAttributeValueResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+	return h.productService.CreateAttributeValue(ctx, req)
+}
+
+func (h *ProductServiceHandler) GetAttributeValue(ctx context.Context, req *productv1.GetAttributeValueRequest) (*productv1.GetAttributeValueResponse, error) {
+	if req.AttributeValueId == "" {
+		return &productv1.GetAttributeValueResponse{
+			Code:    1,
+			Message: "属性值ID不能为空",
+		}, nil
+	}
+	return h.productService.GetAttributeValue(ctx, req)
+}
+
+func (h *ProductServiceHandler) UpdateAttributeValue(ctx context.Context, req *productv1.UpdateAttributeValueRequest) (*productv1.UpdateAttributeValueResponse, error) {
+	validator := service.NewUpdateAttributeValueRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.UpdateAttributeValueResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+	return h.productService.UpdateAttributeValue(ctx, req)
+}
+
+func (h *ProductServiceHandler) DeleteAttributeValue(ctx context.Context, req *productv1.DeleteAttributeValueRequest) (*productv1.DeleteAttributeValueResponse, error) {
+	if req.AttributeValueId == "" {
+		return &productv1.DeleteAttributeValueResponse{
+			Code:    1,
+			Message: "属性值ID不能为空",
+		}, nil
+	}
+	return h.productService.DeleteAttributeValue(ctx, req)
+}
+
+func (h *ProductServiceHandler) ListAttributeValues(ctx context.Context, req *productv1.ListAttributeValuesRequest) (*productv1.ListAttributeValuesResponse, error) {
+	validator := service.NewListAttributeValuesRequestValidator(req)
+	if err := validator.Validate(); err != nil {
+		return &productv1.ListAttributeValuesResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+	return h.productService.ListAttributeValues(ctx, req)
 }

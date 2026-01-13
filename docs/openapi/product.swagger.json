@@ -16,6 +16,394 @@
     "application/json"
   ],
   "paths": {
+    "/api/v1/product/attribute-values": {
+      "get": {
+        "summary": "查询属性值列表（支持分页、按属性ID筛选）",
+        "operationId": "ProductService_ListAttributeValues",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.ListAttributeValuesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "description": "页码，从1开始",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "description": "每页数量",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "attributeId",
+            "description": "属性ID筛选（可选）",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "keyword",
+            "description": "关键词搜索（可选，搜索属性值名称）",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "属性值管理"
+        ]
+      },
+      "post": {
+        "summary": "创建属性值",
+        "operationId": "ProductService_CreateAttributeValue",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.CreateAttributeValueResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/product.v1.CreateAttributeValueRequest"
+            }
+          }
+        ],
+        "tags": [
+          "属性值管理"
+        ]
+      }
+    },
+    "/api/v1/product/attribute-values/{attributeValueId}": {
+      "get": {
+        "summary": "查询属性值详情",
+        "operationId": "ProductService_GetAttributeValue",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.GetAttributeValueResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "attributeValueId",
+            "description": "属性值ID",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "属性值管理"
+        ]
+      },
+      "delete": {
+        "summary": "删除属性值",
+        "operationId": "ProductService_DeleteAttributeValue",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.DeleteAttributeValueResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "attributeValueId",
+            "description": "属性值ID",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "属性值管理"
+        ]
+      },
+      "put": {
+        "summary": "更新属性值",
+        "operationId": "ProductService_UpdateAttributeValue",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.UpdateAttributeValueResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "attributeValueId",
+            "description": "属性值ID",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/product.v1.ProductService.UpdateAttributeValueBody"
+            }
+          }
+        ],
+        "tags": [
+          "属性值管理"
+        ]
+      }
+    },
+    "/api/v1/product/attributes": {
+      "get": {
+        "summary": "查询属性列表（支持分页、按类目、类型筛选）",
+        "operationId": "ProductService_ListAttributes",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.ListAttributesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "description": "页码，从1开始",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "description": "每页数量",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "categoryId",
+            "description": "类目ID筛选（可选）",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "type",
+            "description": "属性类型筛选（可选，1-销售属性，2-非销售属性）",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "isRequired",
+            "description": "是否必填筛选（可选，0-否，1-是）",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "keyword",
+            "description": "关键词搜索（可选，搜索属性名称）",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "属性管理"
+        ]
+      },
+      "post": {
+        "summary": "创建属性",
+        "operationId": "ProductService_CreateAttribute",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.CreateAttributeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/product.v1.CreateAttributeRequest"
+            }
+          }
+        ],
+        "tags": [
+          "属性管理"
+        ]
+      }
+    },
+    "/api/v1/product/attributes/{attributeId}": {
+      "get": {
+        "summary": "查询属性详情",
+        "operationId": "ProductService_GetAttribute",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.GetAttributeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "attributeId",
+            "description": "属性ID",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "属性管理"
+        ]
+      },
+      "delete": {
+        "summary": "删除属性",
+        "operationId": "ProductService_DeleteAttribute",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.DeleteAttributeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "attributeId",
+            "description": "属性ID",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "属性管理"
+        ]
+      },
+      "put": {
+        "summary": "更新属性",
+        "operationId": "ProductService_UpdateAttribute",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.UpdateAttributeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "attributeId",
+            "description": "属性ID",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/product.v1.ProductService.UpdateAttributeBody"
+            }
+          }
+        ],
+        "tags": [
+          "属性管理"
+        ]
+      }
+    },
     "/api/v1/product/brands": {
       "get": {
         "summary": "查询品牌列表（支持分页、按首字母、按状态筛选）",
@@ -82,7 +470,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       },
       "post": {
@@ -113,7 +501,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       }
     },
@@ -146,7 +534,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       }
     },
@@ -178,7 +566,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       },
       "delete": {
@@ -208,7 +596,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       },
       "put": {
@@ -246,7 +634,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       }
     },
@@ -278,7 +666,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       },
       "post": {
@@ -316,7 +704,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       }
     },
@@ -356,7 +744,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       }
     },
@@ -395,7 +783,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "品牌管理"
         ]
       }
     },
@@ -466,7 +854,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "类目管理"
         ]
       },
       "post": {
@@ -497,7 +885,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "类目管理"
         ]
       }
     },
@@ -545,7 +933,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "类目管理"
         ]
       }
     },
@@ -577,7 +965,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "类目管理"
         ]
       },
       "delete": {
@@ -607,7 +995,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "类目管理"
         ]
       },
       "put": {
@@ -645,7 +1033,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "类目管理"
         ]
       }
     },
@@ -706,7 +1094,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "类目管理"
         ]
       }
     },
@@ -806,7 +1194,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       },
       "post": {
@@ -837,7 +1225,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       }
     },
@@ -883,7 +1271,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       },
       "delete": {
@@ -913,7 +1301,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       },
       "put": {
@@ -951,7 +1339,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       }
     },
@@ -991,7 +1379,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       }
     },
@@ -1031,7 +1419,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       }
     },
@@ -1071,7 +1459,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       }
     },
@@ -1111,7 +1499,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       }
     },
@@ -1143,7 +1531,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       },
       "post": {
@@ -1181,7 +1569,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       }
     },
@@ -1221,7 +1609,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       }
     },
@@ -1260,7 +1648,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "商品管理"
         ]
       }
     },
@@ -1339,7 +1727,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       },
       "post": {
@@ -1370,7 +1758,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       }
     },
@@ -1403,7 +1791,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       }
     },
@@ -1442,7 +1830,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       },
       "delete": {
@@ -1472,7 +1860,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       },
       "put": {
@@ -1510,7 +1898,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       }
     },
@@ -1542,7 +1930,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       },
       "post": {
@@ -1580,7 +1968,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       }
     },
@@ -1620,7 +2008,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       }
     },
@@ -1659,7 +2047,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "SKU管理"
         ]
       }
     },
@@ -1723,7 +2111,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "标签管理"
         ]
       },
       "post": {
@@ -1754,7 +2142,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "标签管理"
         ]
       }
     },
@@ -1786,7 +2174,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "标签管理"
         ]
       },
       "delete": {
@@ -1816,7 +2204,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "标签管理"
         ]
       },
       "put": {
@@ -1854,7 +2242,7 @@
           }
         ],
         "tags": [
-          "ProductService"
+          "标签管理"
         ]
       }
     }
@@ -1935,6 +2323,54 @@
         }
       },
       "title": "添加SKU属性关联响应"
+    },
+    "product.v1.AttributeInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "title": "属性ID"
+        },
+        "categoryId": {
+          "type": "string",
+          "title": "所属类目ID"
+        },
+        "name": {
+          "type": "string",
+          "title": "属性名称（如：颜色、尺寸、存储容量）"
+        },
+        "type": {
+          "type": "integer",
+          "format": "int32",
+          "title": "属性类型：1-销售属性（用于生成SKU），2-非销售属性（仅展示）"
+        },
+        "inputType": {
+          "type": "integer",
+          "format": "int32",
+          "title": "录入方式：1-单选，2-多选，3-文本，4-数值"
+        },
+        "isRequired": {
+          "type": "integer",
+          "format": "int32",
+          "title": "是否必填：0-否，1-是"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32",
+          "title": "排序权重"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "title": "创建时间"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "title": "更新时间"
+        }
+      },
+      "title": "属性信息"
     },
     "product.v1.AttributeValueInfo": {
       "type": "object",
@@ -2215,6 +2651,93 @@
         }
       },
       "title": "类目树节点（支持嵌套子节点）"
+    },
+    "product.v1.CreateAttributeRequest": {
+      "type": "object",
+      "properties": {
+        "categoryId": {
+          "type": "string",
+          "title": "所属类目ID"
+        },
+        "name": {
+          "type": "string",
+          "title": "属性名称（如：颜色、尺寸、存储容量）"
+        },
+        "type": {
+          "type": "integer",
+          "format": "int32",
+          "title": "属性类型：1-销售属性（用于生成SKU），2-非销售属性（仅展示）"
+        },
+        "inputType": {
+          "type": "integer",
+          "format": "int32",
+          "title": "录入方式：1-单选，2-多选，3-文本，4-数值"
+        },
+        "isRequired": {
+          "type": "integer",
+          "format": "int32",
+          "title": "是否必填：0-否，1-是（可选，默认0）"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32",
+          "title": "排序权重（可选，默认0）"
+        }
+      },
+      "title": "创建属性请求"
+    },
+    "product.v1.CreateAttributeResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string",
+          "title": "属性ID"
+        }
+      },
+      "title": "创建属性响应"
+    },
+    "product.v1.CreateAttributeValueRequest": {
+      "type": "object",
+      "properties": {
+        "attributeId": {
+          "type": "string",
+          "title": "所属属性ID"
+        },
+        "value": {
+          "type": "string",
+          "title": "属性值名称（如：红色、XL、128G）"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32",
+          "title": "排序权重（可选，默认0）"
+        }
+      },
+      "title": "创建属性值请求"
+    },
+    "product.v1.CreateAttributeValueResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string",
+          "title": "属性值ID"
+        }
+      },
+      "title": "创建属性值响应"
     },
     "product.v1.CreateBrandRequest": {
       "type": "object",
@@ -2516,6 +3039,38 @@
       },
       "title": "创建标签响应"
     },
+    "product.v1.DeleteAttributeResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        }
+      },
+      "title": "删除属性响应"
+    },
+    "product.v1.DeleteAttributeValueResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        }
+      },
+      "title": "删除属性值响应"
+    },
     "product.v1.DeleteBrandResponse": {
       "type": "object",
       "properties": {
@@ -2595,6 +3150,40 @@
         }
       },
       "title": "删除标签响应"
+    },
+    "product.v1.GetAttributeResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "attribute": {
+          "$ref": "#/definitions/product.v1.AttributeInfo",
+          "title": "属性信息"
+        }
+      },
+      "title": "查询属性详情响应"
+    },
+    "product.v1.GetAttributeValueResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "attributeValue": {
+          "$ref": "#/definitions/product.v1.AttributeValueInfo",
+          "title": "属性值信息"
+        }
+      },
+      "title": "查询属性值详情响应"
     },
     "product.v1.GetBrandCategoriesResponse": {
       "type": "object",
@@ -2834,6 +3423,58 @@
         }
       },
       "title": "查询标签详情响应"
+    },
+    "product.v1.ListAttributeValuesResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "string",
+          "format": "int64",
+          "title": "总记录数"
+        },
+        "attributeValues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/product.v1.AttributeValueInfo"
+          },
+          "title": "属性值列表"
+        }
+      },
+      "title": "查询属性值列表响应"
+    },
+    "product.v1.ListAttributesResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "string",
+          "format": "int64",
+          "title": "总记录数"
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/product.v1.AttributeInfo"
+          },
+          "title": "属性列表"
+        }
+      },
+      "title": "查询属性列表响应"
     },
     "product.v1.ListBrandsResponse": {
       "type": "object",
@@ -3194,6 +3835,51 @@
         }
       },
       "title": "提交审核请求"
+    },
+    "product.v1.ProductService.UpdateAttributeBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "属性名称（可选）"
+        },
+        "type": {
+          "type": "integer",
+          "format": "int32",
+          "title": "属性类型（可选）"
+        },
+        "inputType": {
+          "type": "integer",
+          "format": "int32",
+          "title": "录入方式（可选）"
+        },
+        "isRequired": {
+          "type": "integer",
+          "format": "int32",
+          "title": "是否必填（可选）"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32",
+          "title": "排序权重（可选）"
+        }
+      },
+      "title": "更新属性请求"
+    },
+    "product.v1.ProductService.UpdateAttributeValueBody": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string",
+          "title": "属性值名称（可选）"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32",
+          "title": "排序权重（可选）"
+        }
+      },
+      "title": "更新属性值请求"
     },
     "product.v1.ProductService.UpdateBrandBody": {
       "type": "object",
@@ -3562,6 +4248,38 @@
         }
       },
       "title": "标签信息"
+    },
+    "product.v1.UpdateAttributeResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        }
+      },
+      "title": "更新属性响应"
+    },
+    "product.v1.UpdateAttributeValueResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        }
+      },
+      "title": "更新属性值响应"
     },
     "product.v1.UpdateBrandResponse": {
       "type": "object",

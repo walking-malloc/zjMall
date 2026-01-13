@@ -18,11 +18,13 @@ import (
 
 // ProductService 商品服务（业务逻辑层）
 type ProductService struct {
-	categoryRepo repository.CategoryRepository
-	brandRepo    repository.BrandRepository
-	productRepo  repository.ProductRepository
-	tagRepo      repository.TagRepository
-	skuRepo      repository.SkuRepository
+	categoryRepo       repository.CategoryRepository
+	brandRepo          repository.BrandRepository
+	productRepo        repository.ProductRepository
+	tagRepo            repository.TagRepository
+	skuRepo            repository.SkuRepository
+	attributeRepo      repository.AttributeRepository
+	attributeValueRepo repository.AttributeValueRepository
 }
 
 // NewProductService 创建商品服务实例
@@ -32,13 +34,17 @@ func NewProductService(
 	productRepo repository.ProductRepository,
 	tagRepo repository.TagRepository,
 	skuRepo repository.SkuRepository,
+	attributeRepo repository.AttributeRepository,
+	attributeValueRepo repository.AttributeValueRepository,
 ) *ProductService {
 	return &ProductService{
-		categoryRepo: categoryRepo,
-		brandRepo:    brandRepo,
-		productRepo:  productRepo,
-		tagRepo:      tagRepo,
-		skuRepo:      skuRepo,
+		categoryRepo:       categoryRepo,
+		brandRepo:          brandRepo,
+		productRepo:        productRepo,
+		tagRepo:            tagRepo,
+		skuRepo:            skuRepo,
+		attributeRepo:      attributeRepo,
+		attributeValueRepo: attributeValueRepo,
 	}
 }
 
@@ -1151,7 +1157,8 @@ func (s *ProductService) CreateSku(ctx context.Context, req *productv1.CreateSku
 		Status:        status,
 	}
 
-	err = s.skuRepo.CreateSku(ctx, sku)
+	// 使用事务同时创建SKU和设置属性关联
+	err = s.skuRepo.CreateSkuWithAttributes(ctx, sku, req.AttributeValueIds)
 	if err != nil {
 		return &productv1.CreateSkuResponse{
 			Code:    1,
@@ -1189,13 +1196,50 @@ func (s *ProductService) GetSku(ctx context.Context, req *productv1.GetSkuReques
 		Sku:     convertSkuToProto(sku),
 	}
 
-	// TODO: 如果需要包含属性列表，在这里查询并填充 attributes 字段
-	// if req.IncludeAttributes {
-	//     attributes, err := s.skuRepo.GetSkuAttributes(ctx, req.SkuId)
-	//     if err == nil {
-	//         response.Attributes = convertAttributesToProto(attributes)
-	//     }
-	// }
+	if req.IncludeAttributes {
+		// 获取 SKU 的属性值列表
+		attributeValues, err := s.skuRepo.GetSkuAttributes(ctx, req.SkuId)
+		if err == nil && len(attributeValues) > 0 {
+			// 批量获取属性信息（用于显示属性名称）
+			attributeMap := make(map[string]*model.Attribute)
+			attributeIDs := make([]string, 0, len(attributeValues))
+			seen := make(map[string]struct{})
+			for _, av := range attributeValues {
+				if _, exists := seen[av.AttributeID]; !exists {
+					attributeIDs = append(attributeIDs, av.AttributeID)
+					seen[av.AttributeID] = struct{}{}
+				}
+			}
+
+			// 批量查询属性
+			for _, attrID := range attributeIDs {
+				attr, err := s.attributeRepo.GetAttributeByID(ctx, attrID)
+				if err == nil && attr != nil {
+					attributeMap[attrID] = attr
+				}
+			}
+
+			// 转换为响应格式
+			for _, attributeValue := range attributeValues {
+				info := &productv1.AttributeValueInfo{
+					Id:          attributeValue.ID,
+					AttributeId: attributeValue.AttributeID,
+					Value:       attributeValue.Value,
+					SortOrder:   attributeValue.SortOrder,
+					CreatedAt:   timestamppb.New(attributeValue.CreatedAt),
+					UpdatedAt:   timestamppb.New(attributeValue.UpdatedAt),
+				}
+
+				// 填充属性名称
+				if attr, exists := attributeMap[attributeValue.AttributeID]; exists {
+					info.AttributeName = attr.Name
+				}
+
+				response.Attributes = append(response.Attributes, info)
+			}
+		}
+		// 如果查询属性失败或没有属性，不返回错误，只返回空的属性列表
+	}
 
 	return response, nil
 }
@@ -1416,43 +1460,106 @@ func (s *ProductService) BatchCreateSkus(ctx context.Context, req *productv1.Bat
 	}, nil
 }
 
+// convertAttributeValueToProto 将 model.AttributeValue 转换为 AttributeValueInfo
+func convertAttributeValueToProto(attr *model.AttributeValue) *productv1.AttributeValueInfo {
+	return &productv1.AttributeValueInfo{
+		Id:            attr.ID,
+		AttributeId:   attr.AttributeID,
+		AttributeName: "", // 属性名称暂未从 attributes 表加载，后续可扩展
+		Value:         attr.Value,
+		SortOrder:     attr.SortOrder,
+		CreatedAt:     timestamppb.New(attr.CreatedAt),
+		UpdatedAt:     timestamppb.New(attr.UpdatedAt),
+	}
+}
+
 // ============================================
 // SKU属性关联管理接口
 // ============================================
 
 // AddSkuAttribute 添加SKU属性关联
 func (s *ProductService) AddSkuAttribute(ctx context.Context, req *productv1.AddSkuAttributeRequest) (*productv1.AddSkuAttributeResponse, error) {
-	// TODO: 实现添加SKU属性关联的业务逻辑
+	err := s.skuRepo.AddSkuAttribute(ctx, req.SkuId, req.AttributeValueId)
+	if err != nil {
+		return &productv1.AddSkuAttributeResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.AddSkuAttributeResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "添加成功",
+		Data:    req.SkuId,
 	}, nil
 }
 
 // RemoveSkuAttribute 删除SKU属性关联
 func (s *ProductService) RemoveSkuAttribute(ctx context.Context, req *productv1.RemoveSkuAttributeRequest) (*productv1.RemoveSkuAttributeResponse, error) {
-	// TODO: 实现删除SKU属性关联的业务逻辑
+	err := s.skuRepo.RemoveSkuAttribute(ctx, req.SkuId, req.AttributeValueId)
+	if err != nil {
+		return &productv1.RemoveSkuAttributeResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.RemoveSkuAttributeResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "删除成功",
+		Data:    req.SkuId,
 	}, nil
 }
 
 // GetSkuAttributes 查询SKU的属性列表
 func (s *ProductService) GetSkuAttributes(ctx context.Context, req *productv1.GetSkuAttributesRequest) (*productv1.GetSkuAttributesResponse, error) {
-	// TODO: 实现查询SKU属性列表的业务逻辑
+	attrs, err := s.skuRepo.GetSkuAttributes(ctx, req.SkuId)
+	if err != nil {
+		return &productv1.GetSkuAttributesResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询SKU属性列表失败: %v", err),
+		}, nil
+	}
+
+	list := make([]*productv1.AttributeValueInfo, 0, len(attrs))
+	for _, a := range attrs {
+		list = append(list, convertAttributeValueToProto(a))
+	}
+
 	return &productv1.GetSkuAttributesResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:       0,
+		Message:    "查询成功",
+		Attributes: list,
 	}, nil
 }
 
 // BatchSetSkuAttributes 批量设置SKU属性关联
 func (s *ProductService) BatchSetSkuAttributes(ctx context.Context, req *productv1.BatchSetSkuAttributesRequest) (*productv1.BatchSetSkuAttributesResponse, error) {
-	// TODO: 实现批量设置SKU属性关联的业务逻辑
+	// 去重 attribute_value_ids
+	idMap := make(map[string]struct{}, len(req.AttributeValueIds))
+	uniqueIDs := make([]string, 0, len(req.AttributeValueIds))
+	for _, id := range req.AttributeValueIds {
+		if id == "" {
+			continue
+		}
+		if _, exists := idMap[id]; !exists {
+			idMap[id] = struct{}{}
+			uniqueIDs = append(uniqueIDs, id)
+		}
+	}
+
+	err := s.skuRepo.BatchSetSkuAttributes(ctx, req.SkuId, uniqueIDs)
+	if err != nil {
+		return &productv1.BatchSetSkuAttributesResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
 	return &productv1.BatchSetSkuAttributesResponse{
-		Code:    1,
-		Message: "未实现",
+		Code:    0,
+		Message: "批量设置成功",
+		Data:    req.SkuId,
 	}, nil
 }
 
@@ -1656,5 +1763,434 @@ func (s *ProductService) ListTags(ctx context.Context, req *productv1.ListTagsRe
 		Message: "查询成功",
 		Total:   total,
 		Tags:    tagList,
+	}, nil
+}
+
+// ============================================
+// 属性管理接口
+// ============================================
+
+// convertAttributeToProto 将 model.Attribute 转换为 productv1.AttributeInfo
+func convertAttributeToProto(attr *model.Attribute) *productv1.AttributeInfo {
+	return &productv1.AttributeInfo{
+		Id:         attr.ID,
+		CategoryId: attr.CategoryID,
+		Name:       attr.Name,
+		Type:       int32(attr.Type),
+		InputType:  int32(attr.InputType),
+		IsRequired: int32(attr.IsRequired),
+		SortOrder:  attr.SortOrder,
+		CreatedAt:  timestamppb.New(attr.CreatedAt),
+		UpdatedAt:  timestamppb.New(attr.UpdatedAt),
+	}
+}
+
+// CreateAttribute 创建属性
+func (s *ProductService) CreateAttribute(ctx context.Context, req *productv1.CreateAttributeRequest) (*productv1.CreateAttributeResponse, error) {
+	// 检查类目是否存在
+	category, err := s.categoryRepo.GetCategoryByID(ctx, req.CategoryId)
+	if err != nil {
+		return &productv1.CreateAttributeResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询类目失败: %v", err),
+		}, nil
+	}
+	if category == nil {
+		return &productv1.CreateAttributeResponse{
+			Code:    1,
+			Message: "类目不存在",
+		}, nil
+	}
+
+	attribute := &model.Attribute{
+		CategoryID: req.CategoryId,
+		Name:       req.Name,
+		Type:       int8(req.Type),
+		InputType:  int8(req.InputType),
+		IsRequired: int8(req.IsRequired),
+		SortOrder:  req.SortOrder,
+	}
+
+	err = s.attributeRepo.CreateAttribute(ctx, attribute)
+	if err != nil {
+		return &productv1.CreateAttributeResponse{
+			Code:    1,
+			Message: fmt.Sprintf("创建属性失败: %v", err),
+		}, nil
+	}
+
+	return &productv1.CreateAttributeResponse{
+		Code:    0,
+		Message: "创建成功",
+		Data:    attribute.ID,
+	}, nil
+}
+
+// GetAttribute 查询属性详情
+func (s *ProductService) GetAttribute(ctx context.Context, req *productv1.GetAttributeRequest) (*productv1.GetAttributeResponse, error) {
+	attribute, err := s.attributeRepo.GetAttributeByID(ctx, req.AttributeId)
+	if err != nil {
+		return &productv1.GetAttributeResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询属性详情失败: %v", err),
+		}, nil
+	}
+
+	if attribute == nil {
+		return &productv1.GetAttributeResponse{
+			Code:    1,
+			Message: "属性不存在",
+		}, nil
+	}
+
+	return &productv1.GetAttributeResponse{
+		Code:      0,
+		Message:   "查询成功",
+		Attribute: convertAttributeToProto(attribute),
+	}, nil
+}
+
+// UpdateAttribute 更新属性
+func (s *ProductService) UpdateAttribute(ctx context.Context, req *productv1.UpdateAttributeRequest) (*productv1.UpdateAttributeResponse, error) {
+	// 先查询现有属性
+	existingAttribute, err := s.attributeRepo.GetAttributeByID(ctx, req.AttributeId)
+	if err != nil {
+		return &productv1.UpdateAttributeResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询属性失败: %v", err),
+		}, nil
+	}
+
+	if existingAttribute == nil {
+		return &productv1.UpdateAttributeResponse{
+			Code:    1,
+			Message: "属性不存在",
+		}, nil
+	}
+
+	// 构建更新数据 - 只更新提供的字段
+	attribute := &model.Attribute{
+		BaseModel: pkg.BaseModel{
+			ID: req.AttributeId,
+		},
+		Name:       existingAttribute.Name,
+		Type:       existingAttribute.Type,
+		InputType:  existingAttribute.InputType,
+		IsRequired: existingAttribute.IsRequired,
+		SortOrder:  existingAttribute.SortOrder,
+	}
+
+	// 只更新提供的字段
+	if req.Name != "" {
+		attribute.Name = req.Name
+	}
+	if req.Type > 0 {
+		attribute.Type = int8(req.Type)
+	}
+	if req.InputType > 0 {
+		attribute.InputType = int8(req.InputType)
+	}
+	if req.IsRequired >= 0 {
+		attribute.IsRequired = int8(req.IsRequired)
+	}
+	if req.SortOrder > 0 {
+		attribute.SortOrder = req.SortOrder
+	}
+
+	err = s.attributeRepo.UpdateAttribute(ctx, attribute)
+	if err != nil {
+		return &productv1.UpdateAttributeResponse{
+			Code:    1,
+			Message: fmt.Sprintf("更新属性失败: %v", err),
+		}, nil
+	}
+
+	return &productv1.UpdateAttributeResponse{
+		Code:    0,
+		Message: "更新成功",
+		Data:    req.AttributeId,
+	}, nil
+}
+
+// DeleteAttribute 删除属性
+func (s *ProductService) DeleteAttribute(ctx context.Context, req *productv1.DeleteAttributeRequest) (*productv1.DeleteAttributeResponse, error) {
+	err := s.attributeRepo.DeleteAttribute(ctx, req.AttributeId)
+	if err != nil {
+		return &productv1.DeleteAttributeResponse{
+			Code:    1,
+			Message: fmt.Sprintf("删除属性失败: %v", err),
+		}, nil
+	}
+
+	return &productv1.DeleteAttributeResponse{
+		Code:    0,
+		Message: "删除成功",
+		Data:    req.AttributeId,
+	}, nil
+}
+
+// ListAttributes 查询属性列表
+func (s *ProductService) ListAttributes(ctx context.Context, req *productv1.ListAttributesRequest) (*productv1.ListAttributesResponse, error) {
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	filter := &repository.AttributeListFilter{
+		Page:       page,
+		PageSize:   pageSize,
+		CategoryID: req.CategoryId,
+		Type:       req.Type,
+		IsRequired: req.IsRequired,
+		Keyword:    req.Keyword,
+		Offset:     int((page - 1) * pageSize),
+		Limit:      int(pageSize),
+	}
+
+	attributes, total, err := s.attributeRepo.ListAttributes(ctx, filter)
+	if err != nil {
+		return &productv1.ListAttributesResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询属性列表失败: %v", err),
+		}, nil
+	}
+
+	// 转换为响应格式
+	attributeList := make([]*productv1.AttributeInfo, 0, len(attributes))
+	for _, attr := range attributes {
+		attributeList = append(attributeList, convertAttributeToProto(attr))
+	}
+
+	return &productv1.ListAttributesResponse{
+		Code:       0,
+		Message:    "查询成功",
+		Total:      total,
+		Attributes: attributeList,
+	}, nil
+}
+
+// ============================================
+// 属性值管理接口
+// ============================================
+
+// CreateAttributeValue 创建属性值
+func (s *ProductService) CreateAttributeValue(ctx context.Context, req *productv1.CreateAttributeValueRequest) (*productv1.CreateAttributeValueResponse, error) {
+
+	attributeValue := &model.AttributeValue{
+		AttributeID: req.AttributeId,
+		Value:       req.Value,
+		SortOrder:   req.SortOrder,
+	}
+
+	err := s.attributeValueRepo.CreateAttributeValue(ctx, attributeValue)
+	if err != nil {
+		return &productv1.CreateAttributeValueResponse{
+			Code:    1,
+			Message: fmt.Sprintf("创建属性值失败: %v", err),
+		}, nil
+	}
+
+	return &productv1.CreateAttributeValueResponse{
+		Code:    0,
+		Message: "创建成功",
+		Data:    attributeValue.ID,
+	}, nil
+}
+
+// GetAttributeValue 查询属性值详情
+func (s *ProductService) GetAttributeValue(ctx context.Context, req *productv1.GetAttributeValueRequest) (*productv1.GetAttributeValueResponse, error) {
+	attributeValue, err := s.attributeValueRepo.GetAttributeValueByID(ctx, req.AttributeValueId)
+	if err != nil {
+		return &productv1.GetAttributeValueResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询属性值详情失败: %v", err),
+		}, nil
+	}
+
+	if attributeValue == nil {
+		return &productv1.GetAttributeValueResponse{
+			Code:    1,
+			Message: "属性值不存在",
+		}, nil
+	}
+
+	// 获取属性信息（用于显示属性名称）
+	attribute, err := s.attributeRepo.GetAttributeByID(ctx, attributeValue.AttributeID)
+	if err != nil {
+		return &productv1.GetAttributeValueResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询属性失败: %v", err),
+		}, nil
+	}
+
+	attributeValueInfo := &productv1.AttributeValueInfo{
+		Id:          attributeValue.ID,
+		AttributeId: attributeValue.AttributeID,
+		Value:       attributeValue.Value,
+		SortOrder:   attributeValue.SortOrder,
+		CreatedAt:   timestamppb.New(attributeValue.CreatedAt),
+		UpdatedAt:   timestamppb.New(attributeValue.UpdatedAt),
+	}
+
+	if attribute != nil {
+		attributeValueInfo.AttributeName = attribute.Name
+	}
+
+	return &productv1.GetAttributeValueResponse{
+		Code:           0,
+		Message:        "查询成功",
+		AttributeValue: attributeValueInfo,
+	}, nil
+}
+
+// UpdateAttributeValue 更新属性值
+func (s *ProductService) UpdateAttributeValue(ctx context.Context, req *productv1.UpdateAttributeValueRequest) (*productv1.UpdateAttributeValueResponse, error) {
+	// 先查询现有属性值
+	existingAttributeValue, err := s.attributeValueRepo.GetAttributeValueByID(ctx, req.AttributeValueId)
+	if err != nil {
+		return &productv1.UpdateAttributeValueResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询属性值失败: %v", err),
+		}, nil
+	}
+
+	if existingAttributeValue == nil {
+		return &productv1.UpdateAttributeValueResponse{
+			Code:    1,
+			Message: "属性值不存在",
+		}, nil
+	}
+
+	// 构建更新数据 - 只更新提供的字段
+	attributeValue := &model.AttributeValue{
+		BaseModel: pkg.BaseModel{
+			ID: req.AttributeValueId,
+		},
+		Value:     existingAttributeValue.Value,
+		SortOrder: existingAttributeValue.SortOrder,
+	}
+
+	// 只更新提供的字段
+	if req.Value != "" {
+		attributeValue.Value = req.Value
+	}
+	if req.SortOrder > 0 {
+		attributeValue.SortOrder = req.SortOrder
+	}
+
+	err = s.attributeValueRepo.UpdateAttributeValue(ctx, attributeValue)
+	if err != nil {
+		return &productv1.UpdateAttributeValueResponse{
+			Code:    1,
+			Message: fmt.Sprintf("更新属性值失败: %v", err),
+		}, nil
+	}
+
+	return &productv1.UpdateAttributeValueResponse{
+		Code:    0,
+		Message: "更新成功",
+		Data:    req.AttributeValueId,
+	}, nil
+}
+
+// DeleteAttributeValue 删除属性值
+func (s *ProductService) DeleteAttributeValue(ctx context.Context, req *productv1.DeleteAttributeValueRequest) (*productv1.DeleteAttributeValueResponse, error) {
+	err := s.attributeValueRepo.DeleteAttributeValue(ctx, req.AttributeValueId)
+	if err != nil {
+		return &productv1.DeleteAttributeValueResponse{
+			Code:    1,
+			Message: fmt.Sprintf("删除属性值失败: %v", err),
+		}, nil
+	}
+
+	return &productv1.DeleteAttributeValueResponse{
+		Code:    0,
+		Message: "删除成功",
+		Data:    req.AttributeValueId,
+	}, nil
+}
+
+// ListAttributeValues 查询属性值列表
+func (s *ProductService) ListAttributeValues(ctx context.Context, req *productv1.ListAttributeValuesRequest) (*productv1.ListAttributeValuesResponse, error) {
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	filter := &repository.AttributeValueListFilter{
+		Page:        page,
+		PageSize:    pageSize,
+		AttributeID: req.AttributeId,
+		Keyword:     req.Keyword,
+		Offset:      int((page - 1) * pageSize),
+		Limit:       int(pageSize),
+	}
+
+	attributeValues, total, err := s.attributeValueRepo.ListAttributeValues(ctx, filter)
+	if err != nil {
+		return &productv1.ListAttributeValuesResponse{
+			Code:    1,
+			Message: fmt.Sprintf("查询属性值列表失败: %v", err),
+		}, nil
+	}
+
+	// 转换为响应格式
+	attributeValueList := make([]*productv1.AttributeValueInfo, 0, len(attributeValues))
+
+	// 批量获取属性信息（用于显示属性名称）
+	attributeMap := make(map[string]*model.Attribute)
+	if len(attributeValues) > 0 {
+		attributeIDs := make([]string, 0, len(attributeValues))
+		for _, av := range attributeValues {
+			if _, exists := attributeMap[av.AttributeID]; !exists {
+				attributeIDs = append(attributeIDs, av.AttributeID)
+			}
+		}
+
+		// 批量查询属性
+		for _, attrID := range attributeIDs {
+			attr, err := s.attributeRepo.GetAttributeByID(ctx, attrID)
+			if err == nil && attr != nil {
+				attributeMap[attrID] = attr
+			}
+		}
+	}
+
+	for _, av := range attributeValues {
+		info := &productv1.AttributeValueInfo{
+			Id:          av.ID,
+			AttributeId: av.AttributeID,
+			Value:       av.Value,
+			SortOrder:   av.SortOrder,
+			CreatedAt:   timestamppb.New(av.CreatedAt),
+			UpdatedAt:   timestamppb.New(av.UpdatedAt),
+		}
+
+		if attr, exists := attributeMap[av.AttributeID]; exists {
+			info.AttributeName = attr.Name
+		}
+
+		attributeValueList = append(attributeValueList, info)
+	}
+
+	return &productv1.ListAttributeValuesResponse{
+		Code:            0,
+		Message:         "查询成功",
+		Total:           total,
+		AttributeValues: attributeValueList,
 	}, nil
 }

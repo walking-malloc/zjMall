@@ -11,7 +11,6 @@ import (
 	"zjMall/internal/common/cache"
 	"zjMall/internal/product-service/model"
 
-	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -52,14 +51,12 @@ type BrandRepository interface {
 type brandRepository struct {
 	db        *gorm.DB
 	cacheRepo cache.CacheRepository
-	sf        singleflight.Group
 }
 
-func NewBrandRepository(db *gorm.DB, cacheRepo cache.CacheRepository, sf singleflight.Group) BrandRepository {
+func NewBrandRepository(db *gorm.DB, cacheRepo cache.CacheRepository) BrandRepository {
 	return &brandRepository{
 		db:        db,
 		cacheRepo: cacheRepo,
-		sf:        sf,
 	}
 }
 func (r *brandRepository) CreateBrand(ctx context.Context, brand *model.Brand) error {

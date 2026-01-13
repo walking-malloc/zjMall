@@ -518,3 +518,212 @@ func (v *BatchCreateSkusRequestValidator) Validate() error {
 	}
 	return nil
 }
+
+// ==============SKU 属性关联验证器==============
+
+type AddSkuAttributeRequestValidator struct {
+	SkuID            string `validate:"required" label:"SKU ID"`
+	AttributeValueID string `validate:"required" label:"属性值ID"`
+}
+
+func NewAddSkuAttributeRequestValidator(req *productv1.AddSkuAttributeRequest) *AddSkuAttributeRequestValidator {
+	return &AddSkuAttributeRequestValidator{
+		SkuID:            req.SkuId,
+		AttributeValueID: req.AttributeValueId,
+	}
+}
+
+func (v *AddSkuAttributeRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type RemoveSkuAttributeRequestValidator struct {
+	SkuID            string `validate:"required" label:"SKU ID"`
+	AttributeValueID string `validate:"required" label:"属性值ID"`
+}
+
+func NewRemoveSkuAttributeRequestValidator(req *productv1.RemoveSkuAttributeRequest) *RemoveSkuAttributeRequestValidator {
+	return &RemoveSkuAttributeRequestValidator{
+		SkuID:            req.SkuId,
+		AttributeValueID: req.AttributeValueId,
+	}
+}
+
+func (v *RemoveSkuAttributeRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type BatchSetSkuAttributesRequestValidator struct {
+	SkuID             string   `validate:"required" label:"SKU ID"`
+	AttributeValueIDs []string `validate:"required,min=1,dive,required" label:"属性值ID列表"`
+}
+
+func NewBatchSetSkuAttributesRequestValidator(req *productv1.BatchSetSkuAttributesRequest) *BatchSetSkuAttributesRequestValidator {
+	return &BatchSetSkuAttributesRequestValidator{
+		SkuID:             req.SkuId,
+		AttributeValueIDs: req.AttributeValueIds,
+	}
+}
+
+func (v *BatchSetSkuAttributesRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+// ==============属性管理验证器==============
+
+type CreateAttributeRequestValidator struct {
+	CategoryID string `validate:"required" label:"所属类目ID"`
+	Name       string `validate:"required,min=1,max=100" label:"属性名称"`
+	Type       int32  `validate:"required,oneof=1 2" label:"属性类型"`
+	InputType  int32  `validate:"required,oneof=1 2 3 4" label:"录入方式"`
+	IsRequired int32  `validate:"omitempty,oneof=0 1" label:"是否必填"`
+	SortOrder  int32  `validate:"omitempty" label:"排序权重"`
+}
+
+func NewCreateAttributeRequestValidator(req *productv1.CreateAttributeRequest) *CreateAttributeRequestValidator {
+	return &CreateAttributeRequestValidator{
+		CategoryID: req.CategoryId,
+		Name:       req.Name,
+		Type:       req.Type,
+		InputType:  req.InputType,
+		IsRequired: req.IsRequired,
+		SortOrder:  req.SortOrder,
+	}
+}
+
+func (v *CreateAttributeRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type UpdateAttributeRequestValidator struct {
+	AttributeID string `validate:"required" label:"属性ID"`
+	Name        string `validate:"omitempty,min=1,max=100" label:"属性名称"`
+	Type        int32  `validate:"omitempty,oneof=1 2" label:"属性类型"`
+	InputType   int32  `validate:"omitempty,oneof=1 2 3 4" label:"录入方式"`
+	IsRequired  int32  `validate:"omitempty,oneof=0 1" label:"是否必填"`
+	SortOrder   int32  `validate:"omitempty" label:"排序权重"`
+}
+
+func NewUpdateAttributeRequestValidator(req *productv1.UpdateAttributeRequest) *UpdateAttributeRequestValidator {
+	return &UpdateAttributeRequestValidator{
+		AttributeID: req.AttributeId,
+		Name:        req.Name,
+		Type:        req.Type,
+		InputType:   req.InputType,
+		IsRequired:  req.IsRequired,
+		SortOrder:   req.SortOrder,
+	}
+}
+
+func (v *UpdateAttributeRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type ListAttributesRequestValidator struct {
+	Page       int32  `validate:"omitempty,min=1" label:"页码"`
+	PageSize   int32  `validate:"omitempty,min=1,max=100" label:"每页数量"`
+	CategoryID string `validate:"omitempty" label:"类目ID"`
+	Type       int32  `validate:"omitempty,oneof=1 2" label:"属性类型"`
+	IsRequired int32  `validate:"omitempty,oneof=0 1" label:"是否必填"`
+	Keyword    string `validate:"omitempty,min=1,max=100" label:"关键词"`
+}
+
+func NewListAttributesRequestValidator(req *productv1.ListAttributesRequest) *ListAttributesRequestValidator {
+	return &ListAttributesRequestValidator{
+		Page:       req.Page,
+		PageSize:   req.PageSize,
+		CategoryID: req.CategoryId,
+		Type:       req.Type,
+		IsRequired: req.IsRequired,
+		Keyword:    req.Keyword,
+	}
+}
+
+func (v *ListAttributesRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+// ==============属性值管理验证器==============
+
+type CreateAttributeValueRequestValidator struct {
+	AttributeID string `validate:"required" label:"所属属性ID"`
+	Value       string `validate:"required,min=1,max=100" label:"属性值名称"`
+	SortOrder   int32  `validate:"omitempty" label:"排序权重"`
+}
+
+func NewCreateAttributeValueRequestValidator(req *productv1.CreateAttributeValueRequest) *CreateAttributeValueRequestValidator {
+	return &CreateAttributeValueRequestValidator{
+		AttributeID: req.AttributeId,
+		Value:       req.Value,
+		SortOrder:   req.SortOrder,
+	}
+}
+
+func (v *CreateAttributeValueRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type UpdateAttributeValueRequestValidator struct {
+	AttributeValueID string `validate:"required" label:"属性值ID"`
+	Value            string `validate:"omitempty,min=1,max=100" label:"属性值名称"`
+	SortOrder        int32  `validate:"omitempty" label:"排序权重"`
+}
+
+func NewUpdateAttributeValueRequestValidator(req *productv1.UpdateAttributeValueRequest) *UpdateAttributeValueRequestValidator {
+	return &UpdateAttributeValueRequestValidator{
+		AttributeValueID: req.AttributeValueId,
+		Value:            req.Value,
+		SortOrder:        req.SortOrder,
+	}
+}
+
+func (v *UpdateAttributeValueRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}
+
+type ListAttributeValuesRequestValidator struct {
+	Page        int32  `validate:"omitempty,min=1" label:"页码"`
+	PageSize    int32  `validate:"omitempty,min=1,max=100" label:"每页数量"`
+	AttributeID string `validate:"omitempty" label:"属性ID"`
+	Keyword     string `validate:"omitempty,min=1,max=100" label:"关键词"`
+}
+
+func NewListAttributeValuesRequestValidator(req *productv1.ListAttributeValuesRequest) *ListAttributeValuesRequestValidator {
+	return &ListAttributeValuesRequestValidator{
+		Page:        req.Page,
+		PageSize:    req.PageSize,
+		AttributeID: req.AttributeId,
+		Keyword:     req.Keyword,
+	}
+}
+
+func (v *ListAttributeValuesRequestValidator) Validate() error {
+	if err := validator.ValidateStruct(v); err != nil {
+		return errors.New(validator.FormatError(err))
+	}
+	return nil
+}

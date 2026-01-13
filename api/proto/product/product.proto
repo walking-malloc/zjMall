@@ -6,6 +6,7 @@ option go_package = "zjMall/api/proto/gen/go/product/v1;productv1";
 
 import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
 
 // 商品服务
 service ProductService {
@@ -19,12 +20,18 @@ service ProductService {
       post: "/api/v1/product/categories"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "类目管理"
+    };
   }
 
   // 查询类目详情
   rpc GetCategory(GetCategoryRequest) returns (GetCategoryResponse) {
     option (google.api.http) = {
       get: "/api/v1/product/categories/{category_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "类目管理"
     };
   }
 
@@ -34,12 +41,18 @@ service ProductService {
       put: "/api/v1/product/categories/{category_id}"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "类目管理"
+    };
   }
 
   // 删除类目
   rpc DeleteCategory(DeleteCategoryRequest) returns (DeleteCategoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/product/categories/{category_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "类目管理"
     };
   }
 
@@ -48,6 +61,9 @@ service ProductService {
     option (google.api.http) = {
       get: "/api/v1/product/categories"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "类目管理"
+    };
   }
 
   // 查询类目树（返回树形结构）
@@ -55,12 +71,18 @@ service ProductService {
     option (google.api.http) = {
       get: "/api/v1/product/categories/tree"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "类目管理"
+    };
   }
 
   // 查询子类目列表（根据父类目ID）
   rpc GetCategoryChildren(GetCategoryChildrenRequest) returns (GetCategoryChildrenResponse) {
     option (google.api.http) = {
       get: "/api/v1/product/categories/{parent_id}/children"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "类目管理"
     };
   }
 
@@ -74,12 +96,18 @@ service ProductService {
       post: "/api/v1/product/brands"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
+    };
   }
 
   // 查询品牌详情
   rpc GetBrand(GetBrandRequest) returns (GetBrandResponse) {
     option (google.api.http) = {
       get: "/api/v1/product/brands/{brand_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
     };
   }
 
@@ -89,12 +117,18 @@ service ProductService {
       put: "/api/v1/product/brands/{brand_id}"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
+    };
   }
 
   // 删除品牌
   rpc DeleteBrand(DeleteBrandRequest) returns (DeleteBrandResponse) {
     option (google.api.http) = {
       delete: "/api/v1/product/brands/{brand_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
     };
   }
 
@@ -103,12 +137,18 @@ service ProductService {
     option (google.api.http) = {
       get: "/api/v1/product/brands"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
+    };
   }
 
   // 按首字母分组查询品牌列表
   rpc GetBrandsByFirstLetter(GetBrandsByFirstLetterRequest) returns (GetBrandsByFirstLetterResponse) {
     option (google.api.http) = {
       get: "/api/v1/product/brands/by-letter"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
     };
   }
 
@@ -122,12 +162,18 @@ service ProductService {
       post: "/api/v1/product/brands/{brand_id}/categories"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
+    };
   }
 
   // 删除品牌类目关联
   rpc RemoveBrandCategory(RemoveBrandCategoryRequest) returns (RemoveBrandCategoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/product/brands/{brand_id}/categories/{category_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
     };
   }
 
@@ -136,6 +182,9 @@ service ProductService {
     option (google.api.http) = {
       get: "/api/v1/product/brands/{brand_id}/categories"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
+    };
   }
 
   // 批量设置品牌类目关联
@@ -143,6 +192,9 @@ service ProductService {
     option (google.api.http) = {
       put: "/api/v1/product/brands/{brand_id}/categories/batch"
       body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "品牌管理"
     };
   }
 
@@ -156,12 +208,18 @@ service ProductService {
       post: "/api/v1/product/products"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
+    };
   }
 
   // 查询商品详情
   rpc GetProduct(GetProductRequest) returns (GetProductResponse) {
     option (google.api.http) = {
       get: "/api/v1/product/products/{product_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
     };
   }
 
@@ -171,6 +229,9 @@ service ProductService {
       put: "/api/v1/product/products/{product_id}"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
+    };
   }
 
   // 删除商品
@@ -178,12 +239,18 @@ service ProductService {
     option (google.api.http) = {
       delete: "/api/v1/product/products/{product_id}"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
+    };
   }
 
   // 查询商品列表（支持分页、按类目、品牌、状态筛选）
   rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {
     option (google.api.http) = {
       get: "/api/v1/product/products"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
     };
   }
 
@@ -193,6 +260,9 @@ service ProductService {
       post: "/api/v1/product/products/{product_id}/on-shelf"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
+    };
   }
 
   // 下架商品
@@ -200,6 +270,9 @@ service ProductService {
     option (google.api.http) = {
       post: "/api/v1/product/products/{product_id}/off-shelf"
       body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
     };
   }
 
@@ -209,6 +282,9 @@ service ProductService {
       post: "/api/v1/product/products/{product_id}/submit-audit"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
+    };
   }
 
   // 审核商品（通过/驳回）
@@ -216,6 +292,9 @@ service ProductService {
     option (google.api.http) = {
       post: "/api/v1/product/products/{product_id}/audit"
       body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
     };
   }
 
@@ -229,12 +308,18 @@ service ProductService {
       post: "/api/v1/product/products/{product_id}/tags"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
+    };
   }
 
   // 删除商品标签关联
   rpc RemoveProductTag(RemoveProductTagRequest) returns (RemoveProductTagResponse) {
     option (google.api.http) = {
       delete: "/api/v1/product/products/{product_id}/tags/{tag_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
     };
   }
 
@@ -243,6 +328,9 @@ service ProductService {
     option (google.api.http) = {
       get: "/api/v1/product/products/{product_id}/tags"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
+    };
   }
 
   // 批量设置商品标签关联
@@ -250,6 +338,9 @@ service ProductService {
     option (google.api.http) = {
       put: "/api/v1/product/products/{product_id}/tags/batch"
       body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品管理"
     };
   }
 
@@ -263,12 +354,18 @@ service ProductService {
       post: "/api/v1/product/skus"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
+    };
   }
 
   // 查询SKU详情
   rpc GetSku(GetSkuRequest) returns (GetSkuResponse) {
     option (google.api.http) = {
       get: "/api/v1/product/skus/{sku_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
     };
   }
 
@@ -278,12 +375,18 @@ service ProductService {
       put: "/api/v1/product/skus/{sku_id}"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
+    };
   }
 
   // 删除SKU
   rpc DeleteSku(DeleteSkuRequest) returns (DeleteSkuResponse) {
     option (google.api.http) = {
       delete: "/api/v1/product/skus/{sku_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
     };
   }
 
@@ -292,6 +395,9 @@ service ProductService {
     option (google.api.http) = {
       get: "/api/v1/product/skus"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
+    };
   }
 
   // 批量创建SKU（用于商品创建时批量创建多个SKU）
@@ -299,6 +405,9 @@ service ProductService {
     option (google.api.http) = {
       post: "/api/v1/product/skus/batch"
       body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
     };
   }
 
@@ -312,12 +421,18 @@ service ProductService {
       post: "/api/v1/product/skus/{sku_id}/attributes"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
+    };
   }
 
   // 删除SKU属性关联
   rpc RemoveSkuAttribute(RemoveSkuAttributeRequest) returns (RemoveSkuAttributeResponse) {
     option (google.api.http) = {
       delete: "/api/v1/product/skus/{sku_id}/attributes/{attribute_value_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
     };
   }
 
@@ -326,6 +441,9 @@ service ProductService {
     option (google.api.http) = {
       get: "/api/v1/product/skus/{sku_id}/attributes"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
+    };
   }
 
   // 批量设置SKU属性关联
@@ -333,6 +451,9 @@ service ProductService {
     option (google.api.http) = {
       put: "/api/v1/product/skus/{sku_id}/attributes/batch"
       body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "SKU管理"
     };
   }
 
@@ -346,6 +467,9 @@ service ProductService {
       post: "/api/v1/product/tags"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "标签管理"
+    };
   }
 
   // 查询标签详情
@@ -353,20 +477,29 @@ service ProductService {
     option (google.api.http) = {
       get: "/api/v1/product/tags/{tag_id}"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "标签管理"
+    };
   }
 
   // 更新标签
   rpc UpdateTag(UpdateTagRequest) returns (UpdateTagResponse) {
     option (google.api.http) = {
       put: "/api/v1/product/tags/{tag_id}"
-            body: "*"
-        };
-    }
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "标签管理"
+    };
+  }
 
   // 删除标签
   rpc DeleteTag(DeleteTagRequest) returns (DeleteTagResponse) {
     option (google.api.http) = {
       delete: "/api/v1/product/tags/{tag_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "标签管理"
     };
   }
 
@@ -374,6 +507,121 @@ service ProductService {
   rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {
     option (google.api.http) = {
       get: "/api/v1/product/tags"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "标签管理"
+    };
+  }
+
+  // ============================================
+  // 属性管理接口
+  // ============================================
+
+  // 创建属性
+  rpc CreateAttribute(CreateAttributeRequest) returns (CreateAttributeResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/attributes"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性管理"
+    };
+  }
+
+  // 查询属性详情
+  rpc GetAttribute(GetAttributeRequest) returns (GetAttributeResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/attributes/{attribute_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性管理"
+    };
+  }
+
+  // 更新属性
+  rpc UpdateAttribute(UpdateAttributeRequest) returns (UpdateAttributeResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/attributes/{attribute_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性管理"
+    };
+  }
+
+  // 删除属性
+  rpc DeleteAttribute(DeleteAttributeRequest) returns (DeleteAttributeResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/attributes/{attribute_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性管理"
+    };
+  }
+
+  // 查询属性列表（支持分页、按类目、类型筛选）
+  rpc ListAttributes(ListAttributesRequest) returns (ListAttributesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/attributes"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性管理"
+    };
+  }
+
+  // ============================================
+  // 属性值管理接口
+  // ============================================
+
+  // 创建属性值
+  rpc CreateAttributeValue(CreateAttributeValueRequest) returns (CreateAttributeValueResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/product/attribute-values"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性值管理"
+    };
+  }
+
+  // 查询属性值详情
+  rpc GetAttributeValue(GetAttributeValueRequest) returns (GetAttributeValueResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/attribute-values/{attribute_value_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性值管理"
+    };
+  }
+
+  // 更新属性值
+  rpc UpdateAttributeValue(UpdateAttributeValueRequest) returns (UpdateAttributeValueResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/product/attribute-values/{attribute_value_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性值管理"
+    };
+  }
+
+  // 删除属性值
+  rpc DeleteAttributeValue(DeleteAttributeValueRequest) returns (DeleteAttributeValueResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/product/attribute-values/{attribute_value_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性值管理"
+    };
+  }
+
+  // 查询属性值列表（支持分页、按属性ID筛选）
+  rpc ListAttributeValues(ListAttributeValuesRequest) returns (ListAttributeValuesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/attribute-values"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "属性值管理"
     };
   }
 
@@ -1194,6 +1442,19 @@ message ListTagsResponse {
 // 属性值信息类型定义
 // ============================================
 
+// 属性信息
+message AttributeInfo {
+  string id = 1;                                // 属性ID
+  string category_id = 2;                       // 所属类目ID
+  string name = 3;                              // 属性名称（如：颜色、尺寸、存储容量）
+  int32 type = 4;                               // 属性类型：1-销售属性（用于生成SKU），2-非销售属性（仅展示）
+  int32 input_type = 5;                         // 录入方式：1-单选，2-多选，3-文本，4-数值
+  int32 is_required = 6;                        // 是否必填：0-否，1-是
+  int32 sort_order = 7;                        // 排序权重
+  google.protobuf.Timestamp created_at = 8;     // 创建时间
+  google.protobuf.Timestamp updated_at = 9;     // 更新时间
+}
+
 // 属性值信息
 message AttributeValueInfo {
   string id = 1;                                // 属性值ID
@@ -1203,5 +1464,157 @@ message AttributeValueInfo {
   int32 sort_order = 5;                        // 排序权重
   google.protobuf.Timestamp created_at = 6;     // 创建时间
   google.protobuf.Timestamp updated_at = 7;     // 更新时间
+}
+
+// ============================================
+// 属性管理请求和响应体
+// ============================================
+
+// 创建属性请求
+message CreateAttributeRequest {
+  string category_id = 1;        // 所属类目ID
+  string name = 2;               // 属性名称（如：颜色、尺寸、存储容量）
+  int32 type = 3;                // 属性类型：1-销售属性（用于生成SKU），2-非销售属性（仅展示）
+  int32 input_type = 4;          // 录入方式：1-单选，2-多选，3-文本，4-数值
+  int32 is_required = 5;         // 是否必填：0-否，1-是（可选，默认0）
+  int32 sort_order = 6;          // 排序权重（可选，默认0）
+}
+
+// 创建属性响应
+message CreateAttributeResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;              // 属性ID
+}
+
+// 查询属性详情请求
+message GetAttributeRequest {
+  string attribute_id = 1;      // 属性ID
+}
+
+// 查询属性详情响应
+message GetAttributeResponse {
+  int32 code = 1;
+  string message = 2;
+  AttributeInfo attribute = 3;  // 属性信息
+}
+
+// 更新属性请求
+message UpdateAttributeRequest {
+  string attribute_id = 1;      // 属性ID
+  string name = 2;               // 属性名称（可选）
+  int32 type = 3;                // 属性类型（可选）
+  int32 input_type = 4;          // 录入方式（可选）
+  int32 is_required = 5;         // 是否必填（可选）
+  int32 sort_order = 6;          // 排序权重（可选）
+}
+
+// 更新属性响应
+message UpdateAttributeResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除属性请求
+message DeleteAttributeRequest {
+  string attribute_id = 1;      // 属性ID
+}
+
+// 删除属性响应
+message DeleteAttributeResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询属性列表请求
+message ListAttributesRequest {
+  int32 page = 1;               // 页码，从1开始
+  int32 page_size = 2;           // 每页数量
+  string category_id = 3;        // 类目ID筛选（可选）
+  int32 type = 4;                // 属性类型筛选（可选，1-销售属性，2-非销售属性）
+  int32 is_required = 5;         // 是否必填筛选（可选，0-否，1-是）
+  string keyword = 6;           // 关键词搜索（可选，搜索属性名称）
+}
+
+// 查询属性列表响应
+message ListAttributesResponse {
+  int32 code = 1;
+  string message = 2;
+  int64 total = 3;              // 总记录数
+  repeated AttributeInfo attributes = 4; // 属性列表
+}
+
+// ============================================
+// 属性值管理请求和响应体
+// ============================================
+
+// 创建属性值请求
+message CreateAttributeValueRequest {
+  string attribute_id = 1;      // 所属属性ID
+  string value = 2;              // 属性值名称（如：红色、XL、128G）
+  int32 sort_order = 3;          // 排序权重（可选，默认0）
+}
+
+// 创建属性值响应
+message CreateAttributeValueResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;              // 属性值ID
+}
+
+// 查询属性值详情请求
+message GetAttributeValueRequest {
+  string attribute_value_id = 1; // 属性值ID
+}
+
+// 查询属性值详情响应
+message GetAttributeValueResponse {
+  int32 code = 1;
+  string message = 2;
+  AttributeValueInfo attribute_value = 3; // 属性值信息
+}
+
+// 更新属性值请求
+message UpdateAttributeValueRequest {
+  string attribute_value_id = 1; // 属性值ID
+  string value = 2;               // 属性值名称（可选）
+  int32 sort_order = 3;            // 排序权重（可选）
+}
+
+// 更新属性值响应
+message UpdateAttributeValueResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 删除属性值请求
+message DeleteAttributeValueRequest {
+  string attribute_value_id = 1; // 属性值ID
+}
+
+// 删除属性值响应
+message DeleteAttributeValueResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
+
+// 查询属性值列表请求
+message ListAttributeValuesRequest {
+  int32 page = 1;                // 页码，从1开始
+  int32 page_size = 2;           // 每页数量
+  string attribute_id = 3;        // 属性ID筛选（可选）
+  string keyword = 4;            // 关键词搜索（可选，搜索属性值名称）
+}
+
+// 查询属性值列表响应
+message ListAttributeValuesResponse {
+  int32 code = 1;
+  string message = 2;
+  int64 total = 3;              // 总记录数
+  repeated AttributeValueInfo attribute_values = 4; // 属性值列表
 }
 

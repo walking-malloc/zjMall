@@ -30,11 +30,18 @@ type SkuListFilter struct {
 
 type SkuRepository interface {
 	CreateSku(ctx context.Context, sku *model.Sku) error
+	CreateSkuWithAttributes(ctx context.Context, sku *model.Sku, attributeValueIDs []string) error
 	GetSkuByID(ctx context.Context, id string) (*model.Sku, error)
 	UpdateSku(ctx context.Context, sku *model.Sku) error
 	DeleteSku(ctx context.Context, id string) error
 	ListSkus(ctx context.Context, filter *SkuListFilter) ([]*model.Sku, int64, error)
 	BatchCreateSkus(ctx context.Context, productID string, skus []*model.Sku) error
+
+	// SKU 属性关联相关方法
+	AddSkuAttribute(ctx context.Context, skuID, attributeValueID string) error
+	RemoveSkuAttribute(ctx context.Context, skuID, attributeValueID string) error
+	GetSkuAttributes(ctx context.Context, skuID string) ([]*model.AttributeValue, error)
+	BatchSetSkuAttributes(ctx context.Context, skuID string, attributeValueIDs []string) error
 }
 
 type skuRepository struct {
@@ -49,6 +56,62 @@ func NewSkuRepository(db *gorm.DB) SkuRepository {
 
 func (r *skuRepository) CreateSku(ctx context.Context, sku *model.Sku) error {
 	return r.db.WithContext(ctx).Create(sku).Error
+}
+
+// CreateSkuWithAttributes 创建SKU并同时设置属性关联（事务）
+func (r *skuRepository) CreateSkuWithAttributes(ctx context.Context, sku *model.Sku, attributeValueIDs []string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. 创建SKU
+		if err := tx.Create(sku).Error; err != nil {
+			return err
+		}
+
+		// 2. 如果有属性值ID列表，批量设置属性关联
+		if len(attributeValueIDs) > 0 {
+			// 去重
+			attributeValueIDMap := make(map[string]struct{}, len(attributeValueIDs))
+			uniqueAttributeValueIDs := make([]string, 0, len(attributeValueIDs))
+			for _, id := range attributeValueIDs {
+				if id != "" {
+					if _, exists := attributeValueIDMap[id]; !exists {
+						attributeValueIDMap[id] = struct{}{}
+						uniqueAttributeValueIDs = append(uniqueAttributeValueIDs, id)
+					}
+				}
+			}
+
+			if len(uniqueAttributeValueIDs) > 0 {
+				// 检查所有属性值是否存在
+				var count int64
+				if err := tx.Model(&model.AttributeValue{}).
+					Where("id IN ?", uniqueAttributeValueIDs).
+					Count(&count).Error; err != nil {
+					return err
+				}
+				if int(count) != len(uniqueAttributeValueIDs) {
+					return fmt.Errorf("部分属性值不存在")
+				}
+
+				// 批量插入关联
+				skuAttributes := make([]*model.SkuAttribute, 0, len(uniqueAttributeValueIDs))
+				for _, attributeValueID := range uniqueAttributeValueIDs {
+					skuAttributes = append(skuAttributes, &model.SkuAttribute{
+						SkuID:            sku.ID,
+						AttributeValueID: attributeValueID,
+					})
+				}
+				if err := tx.CreateInBatches(skuAttributes, 50).Error; err != nil {
+					if strings.Contains(err.Error(), "Duplicate entry") ||
+						strings.Contains(err.Error(), "UNIQUE constraint") {
+						return fmt.Errorf("部分SKU属性关联已存在")
+					}
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
 }
 
 func (r *skuRepository) GetSkuByID(ctx context.Context, id string) (*model.Sku, error) {
@@ -157,6 +220,139 @@ func (r *skuRepository) BatchCreateSkus(ctx context.Context, productID string, s
 			}
 			return err
 		}
+		return nil
+	})
+}
+
+// AddSkuAttribute 添加 SKU 属性关联
+func (r *skuRepository) AddSkuAttribute(ctx context.Context, skuID, attributeValueID string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 检查 SKU 是否存在
+		var sku model.Sku
+		if err := tx.Where("id = ?", skuID).First(&sku).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("SKU 不存在: %s", skuID)
+			}
+			return err
+		}
+
+		// 检查属性值是否存在
+		var attrValue model.AttributeValue
+		if err := tx.Where("id = ?", attributeValueID).First(&attrValue).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("属性值不存在: %s", attributeValueID)
+			}
+			return err
+		}
+
+		// 创建关联（唯一索引会自动防止重复）
+		skuAttr := &model.SkuAttribute{
+			SkuID:            skuID,
+			AttributeValueID: attributeValueID,
+		}
+		if err := tx.Create(skuAttr).Error; err != nil {
+			if strings.Contains(err.Error(), "Duplicate entry") ||
+				strings.Contains(err.Error(), "UNIQUE constraint") {
+				return fmt.Errorf("该 SKU 已关联该属性值")
+			}
+			return err
+		}
+
+		return nil
+	})
+}
+
+// RemoveSkuAttribute 删除 SKU 属性关联
+func (r *skuRepository) RemoveSkuAttribute(ctx context.Context, skuID, attributeValueID string) error {
+	result := r.db.WithContext(ctx).
+		Where("sku_id = ? AND attribute_value_id = ?", skuID, attributeValueID).
+		Delete(&model.SkuAttribute{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("SKU 属性关联不存在")
+	}
+	return nil
+}
+
+// GetSkuAttributes 查询 SKU 的属性值列表
+func (r *skuRepository) GetSkuAttributes(ctx context.Context, skuID string) ([]*model.AttributeValue, error) {
+	var attrs []*model.AttributeValue
+
+	err := r.db.WithContext(ctx).
+		Table("attribute_values").
+		Joins("INNER JOIN sku_attributes ON sku_attributes.attribute_value_id = attribute_values.id").
+		Where("sku_attributes.sku_id = ?", skuID).
+		Order("attribute_values.sort_order ASC, attribute_values.created_at ASC").
+		Find(&attrs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return attrs, nil
+}
+
+// BatchSetSkuAttributes 批量设置 SKU 属性关联（先删除旧的，再插入新的）
+func (r *skuRepository) BatchSetSkuAttributes(ctx context.Context, skuID string, attributeValueIDs []string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 检查 SKU 是否存在
+		var sku model.Sku
+		if err := tx.Where("id = ?", skuID).First(&sku).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("SKU 不存在: %s", skuID)
+			}
+			return err
+		}
+
+		// 去重属性值 ID
+		if len(attributeValueIDs) > 0 {
+			seen := make(map[string]struct{}, len(attributeValueIDs))
+			unique := make([]string, 0, len(attributeValueIDs))
+			for _, id := range attributeValueIDs {
+				if id == "" {
+					continue
+				}
+				if _, ok := seen[id]; !ok {
+					seen[id] = struct{}{}
+					unique = append(unique, id)
+				}
+			}
+			attributeValueIDs = unique
+		}
+
+		// 检查属性值是否全部存在
+		if len(attributeValueIDs) > 0 {
+			var count int64
+			if err := tx.Model(&model.AttributeValue{}).
+				Where("id IN ?", attributeValueIDs).
+				Count(&count).Error; err != nil {
+				return err
+			}
+			if int(count) != len(attributeValueIDs) {
+				return fmt.Errorf("部分属性值不存在")
+			}
+		}
+
+		// 删除旧关联
+		if err := tx.Where("sku_id = ?", skuID).Delete(&model.SkuAttribute{}).Error; err != nil {
+			return err
+		}
+
+		// 插入新关联
+		if len(attributeValueIDs) > 0 {
+			records := make([]*model.SkuAttribute, 0, len(attributeValueIDs))
+			for _, id := range attributeValueIDs {
+				records = append(records, &model.SkuAttribute{
+					SkuID:            skuID,
+					AttributeValueID: id,
+				})
+			}
+			if err := tx.CreateInBatches(records, 50).Error; err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 }

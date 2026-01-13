@@ -74,7 +74,8 @@ CREATE TABLE IF NOT EXISTS attributes (
     sort_order INT DEFAULT 0 COMMENT '排序权重',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_category_type_required (category_id, type, is_required)
+    deleted_at TIMESTAMP NULL COMMENT '软删除时间',
+    INDEX idx_category_name_deleted (category_id, name,deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='属性表（属性模板）';
 
 -- ============================================
@@ -87,7 +88,8 @@ CREATE TABLE IF NOT EXISTS attribute_values (
     sort_order INT DEFAULT 0 COMMENT '排序权重',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_attribute_sort (attribute_id, sort_order)
+    deleted_at TIMESTAMP NULL COMMENT '软删除时间',
+    INDEX idx_attribute_sort_deleted (attribute_id, sort_order,deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='属性值表';
 
 -- ============================================
@@ -152,9 +154,11 @@ CREATE TABLE IF NOT EXISTS sku_attributes (
     sku_id VARCHAR(26) NOT NULL COMMENT 'SKU ID',
     attribute_value_id VARCHAR(26) NOT NULL COMMENT '属性值ID',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_sku_attribute_value (sku_id, attribute_value_id),
-    INDEX idx_sku_id (sku_id),
-    INDEX idx_attribute_value_id (attribute_value_id)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL COMMENT '软删除时间',
+    UNIQUE KEY uk_sku_attribute_value_deleted (sku_id, attribute_value_id,deleted_at),
+    INDEX idx_sku_id_deleted (sku_id,deleted_at),
+    INDEX idx_attribute_value_id_deleted (attribute_value_id,deleted_at),
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SKU属性关联表';
 
 -- ============================================
