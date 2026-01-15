@@ -893,10 +893,10 @@ func (s *ProductService) ListProducts(ctx context.Context, req *productv1.ListPr
 		productList = append(productList, convertProductToProto(product))
 	}
 	return &productv1.ListProductsResponse{
-		Code:     0,
-		Message:  "查询成功",
-		Total:    result.Total,
-		Products: productList,
+		Code:    0,
+		Message: "查询成功",
+		Total:   result.Total,
+		Data:    productList,
 	}, nil
 }
 

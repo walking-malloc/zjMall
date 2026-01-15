@@ -1,0 +1,1170 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "api/proto/promotion/promotion.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "PromotionService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v1/coupons/claim": {
+      "post": {
+        "summary": "领取优惠券",
+        "operationId": "PromotionService_ClaimCoupon",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.ClaimCouponResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.ClaimCouponRequest"
+            }
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      }
+    },
+    "/api/v1/coupons/templates": {
+      "post": {
+        "summary": "创建优惠券模板",
+        "operationId": "PromotionService_CreateCouponTemplate",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.CreateCouponTemplateResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.CreateCouponTemplateRequest"
+            }
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      }
+    },
+    "/api/v1/coupons/use": {
+      "post": {
+        "summary": "核销优惠券",
+        "operationId": "PromotionService_UseCoupon",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.UseCouponResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.UseCouponRequest"
+            }
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      }
+    },
+    "/api/v1/coupons/user/{userId}": {
+      "get": {
+        "summary": "查询用户优惠券列表",
+        "operationId": "PromotionService_ListUserCoupons",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.ListUserCouponsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "status",
+            "description": "筛选状态\n\n - COUPON_STATUS_UNUSED: 未使用\n - COUPON_STATUS_USED: 已使用\n - COUPON_STATUS_EXPIRED: 已过期",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "COUPON_STATUS_UNSPECIFIED",
+              "COUPON_STATUS_UNUSED",
+              "COUPON_STATUS_USED",
+              "COUPON_STATUS_EXPIRED"
+            ],
+            "default": "COUPON_STATUS_UNSPECIFIED"
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      }
+    },
+    "/api/v1/promotions": {
+      "get": {
+        "summary": "查询促销活动列表",
+        "operationId": "PromotionService_ListPromotions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.ListPromotionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "type",
+            "description": " - PROMOTION_TYPE_FULL_REDUCTION: 满减：满X减Y\n - PROMOTION_TYPE_FULL_DISCOUNT: 满折：满X打Y折\n - PROMOTION_TYPE_DIRECT_REDUCTION: 直降：商品直接降价\n - PROMOTION_TYPE_TIME_LIMITED: 限时折扣",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "PROMOTION_TYPE_UNSPECIFIED",
+              "PROMOTION_TYPE_FULL_REDUCTION",
+              "PROMOTION_TYPE_FULL_DISCOUNT",
+              "PROMOTION_TYPE_DIRECT_REDUCTION",
+              "PROMOTION_TYPE_TIME_LIMITED"
+            ],
+            "default": "PROMOTION_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "status",
+            "description": " - PROMOTION_STATUS_DRAFT: 草稿\n - PROMOTION_STATUS_ACTIVE: 进行中\n - PROMOTION_STATUS_PAUSED: 已暂停\n - PROMOTION_STATUS_ENDED: 已结束\n - PROMOTION_STATUS_DELETED: 已删除",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "PROMOTION_STATUS_UNSPECIFIED",
+              "PROMOTION_STATUS_DRAFT",
+              "PROMOTION_STATUS_ACTIVE",
+              "PROMOTION_STATUS_PAUSED",
+              "PROMOTION_STATUS_ENDED",
+              "PROMOTION_STATUS_DELETED"
+            ],
+            "default": "PROMOTION_STATUS_UNSPECIFIED"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      },
+      "post": {
+        "summary": "创建促销活动",
+        "operationId": "PromotionService_CreatePromotion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.CreatePromotionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.CreatePromotionRequest"
+            }
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      }
+    },
+    "/api/v1/promotions/available": {
+      "post": {
+        "summary": "查询可用促销活动（根据商品、金额等）",
+        "operationId": "PromotionService_GetAvailablePromotions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.GetAvailablePromotionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.GetAvailablePromotionsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      }
+    },
+    "/api/v1/promotions/calculate": {
+      "post": {
+        "summary": "计算优惠金额",
+        "operationId": "PromotionService_CalculateDiscount",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.CalculateDiscountResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.CalculateDiscountRequest"
+            }
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      }
+    },
+    "/api/v1/promotions/{promotionId}": {
+      "get": {
+        "summary": "获取促销活动详情",
+        "operationId": "PromotionService_GetPromotion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.GetPromotionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "promotionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      },
+      "delete": {
+        "summary": "删除促销活动",
+        "operationId": "PromotionService_DeletePromotion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.DeletePromotionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "promotionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      },
+      "put": {
+        "summary": "更新促销活动",
+        "operationId": "PromotionService_UpdatePromotion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.UpdatePromotionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "promotionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/promotion.v1.PromotionService.UpdatePromotionBody"
+            }
+          }
+        ],
+        "tags": [
+          "PromotionService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "google.protobuf.Any": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "google.rpc.Status": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/google.protobuf.Any"
+          }
+        }
+      }
+    },
+    "promotion.v1.CalculateDiscountRequest": {
+      "type": "object",
+      "properties": {
+        "productIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "商品ID列表"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/promotion.v1.CartItem"
+          },
+          "title": "购物车商品列表"
+        },
+        "totalAmount": {
+          "type": "number",
+          "format": "double",
+          "title": "订单总金额"
+        },
+        "userId": {
+          "type": "string",
+          "title": "用户ID"
+        },
+        "couponId": {
+          "type": "string",
+          "title": "使用的优惠券ID（可选）"
+        }
+      },
+      "title": "计算优惠金额请求"
+    },
+    "promotion.v1.CalculateDiscountResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/promotion.v1.DiscountDetail"
+        }
+      },
+      "title": "计算优惠金额响应"
+    },
+    "promotion.v1.CartItem": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string"
+        },
+        "skuId": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "price": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "title": "购物车商品项"
+    },
+    "promotion.v1.ClaimCouponRequest": {
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string",
+          "title": "优惠券模板ID"
+        },
+        "userId": {
+          "type": "string",
+          "title": "用户ID"
+        }
+      },
+      "title": "领取优惠券请求"
+    },
+    "promotion.v1.ClaimCouponResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "couponId": {
+          "type": "string"
+        }
+      },
+      "title": "领取优惠券响应"
+    },
+    "promotion.v1.CouponInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/promotion.v1.CouponType"
+        },
+        "description": {
+          "type": "string"
+        },
+        "discountValue": {
+          "type": "string"
+        },
+        "conditionValue": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/promotion.v1.CouponStatus"
+        },
+        "validStartTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validEndTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "usedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "orderId": {
+          "type": "string",
+          "title": "使用的订单ID"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "title": "优惠券信息"
+    },
+    "promotion.v1.CouponStatus": {
+      "type": "string",
+      "enum": [
+        "COUPON_STATUS_UNSPECIFIED",
+        "COUPON_STATUS_UNUSED",
+        "COUPON_STATUS_USED",
+        "COUPON_STATUS_EXPIRED"
+      ],
+      "default": "COUPON_STATUS_UNSPECIFIED",
+      "description": "- COUPON_STATUS_UNUSED: 未使用\n - COUPON_STATUS_USED: 已使用\n - COUPON_STATUS_EXPIRED: 已过期",
+      "title": "优惠券状态"
+    },
+    "promotion.v1.CouponType": {
+      "type": "string",
+      "enum": [
+        "COUPON_TYPE_UNSPECIFIED",
+        "COUPON_TYPE_FIXED",
+        "COUPON_TYPE_PERCENT",
+        "COUPON_TYPE_FREE_SHIPPING"
+      ],
+      "default": "COUPON_TYPE_UNSPECIFIED",
+      "description": "- COUPON_TYPE_FIXED: 固定金额券\n - COUPON_TYPE_PERCENT: 折扣券\n - COUPON_TYPE_FREE_SHIPPING: 免运费券",
+      "title": "优惠券类型"
+    },
+    "promotion.v1.CreateCouponTemplateRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "优惠券名称"
+        },
+        "type": {
+          "$ref": "#/definitions/promotion.v1.CouponType",
+          "title": "优惠券类型"
+        },
+        "description": {
+          "type": "string",
+          "title": "优惠券描述"
+        },
+        "discountValue": {
+          "type": "string",
+          "title": "优惠值（固定金额或折扣）"
+        },
+        "conditionValue": {
+          "type": "string",
+          "title": "使用条件（如：满100可用）"
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int32",
+          "title": "发放总数（0表示不限制）"
+        },
+        "perUserLimit": {
+          "type": "integer",
+          "format": "int32",
+          "title": "每人限领数量"
+        },
+        "validStartTime": {
+          "type": "string",
+          "format": "date-time",
+          "title": "有效期开始时间"
+        },
+        "validEndTime": {
+          "type": "string",
+          "format": "date-time",
+          "title": "有效期结束时间"
+        },
+        "validDays": {
+          "type": "integer",
+          "format": "int32",
+          "title": "领取后有效天数（0表示使用模板有效期）"
+        }
+      },
+      "title": "创建优惠券模板请求"
+    },
+    "promotion.v1.CreateCouponTemplateResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        }
+      },
+      "title": "创建优惠券模板响应"
+    },
+    "promotion.v1.CreatePromotionRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "促销名称"
+        },
+        "type": {
+          "$ref": "#/definitions/promotion.v1.PromotionType",
+          "title": "促销类型"
+        },
+        "description": {
+          "type": "string",
+          "title": "促销描述"
+        },
+        "productIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "适用商品ID列表（空表示全平台）"
+        },
+        "categoryIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "适用类目ID列表"
+        },
+        "conditionValue": {
+          "type": "string",
+          "title": "条件值（如：满200）"
+        },
+        "discountValue": {
+          "type": "string",
+          "title": "优惠值（如：减30 或 打8折）"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "title": "开始时间"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time",
+          "title": "结束时间"
+        },
+        "maxUseTimes": {
+          "type": "integer",
+          "format": "int32",
+          "title": "每人限用次数（0表示不限制）"
+        },
+        "totalQuota": {
+          "type": "integer",
+          "format": "int32",
+          "title": "总配额（0表示不限制）"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32",
+          "title": "排序权重"
+        }
+      },
+      "title": "创建促销活动请求"
+    },
+    "promotion.v1.CreatePromotionResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "promotionId": {
+          "type": "string"
+        }
+      },
+      "title": "创建促销活动响应"
+    },
+    "promotion.v1.DeletePromotionResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "删除促销活动响应"
+    },
+    "promotion.v1.DiscountDetail": {
+      "type": "object",
+      "properties": {
+        "totalAmount": {
+          "type": "number",
+          "format": "double",
+          "title": "商品总金额"
+        },
+        "promotionDiscount": {
+          "type": "number",
+          "format": "double",
+          "title": "促销优惠金额"
+        },
+        "couponDiscount": {
+          "type": "number",
+          "format": "double",
+          "title": "优惠券优惠金额"
+        },
+        "totalDiscount": {
+          "type": "number",
+          "format": "double",
+          "title": "总优惠金额"
+        },
+        "finalAmount": {
+          "type": "number",
+          "format": "double",
+          "title": "最终实付金额"
+        },
+        "appliedPromotions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/promotion.v1.PromotionInfo"
+          },
+          "title": "应用的促销活动"
+        },
+        "appliedCoupon": {
+          "$ref": "#/definitions/promotion.v1.CouponInfo",
+          "title": "应用的优惠券"
+        }
+      },
+      "title": "优惠明细"
+    },
+    "promotion.v1.GetAvailablePromotionsRequest": {
+      "type": "object",
+      "properties": {
+        "productIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "商品ID列表"
+        },
+        "categoryId": {
+          "type": "string",
+          "title": "类目ID"
+        },
+        "totalAmount": {
+          "type": "number",
+          "format": "double",
+          "title": "订单总金额"
+        },
+        "userId": {
+          "type": "string",
+          "title": "用户ID（用于限购判断）"
+        }
+      },
+      "title": "查询可用促销活动请求"
+    },
+    "promotion.v1.GetAvailablePromotionsResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/promotion.v1.PromotionInfo"
+          }
+        }
+      },
+      "title": "查询可用促销活动响应"
+    },
+    "promotion.v1.GetPromotionResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/promotion.v1.PromotionInfo"
+        }
+      },
+      "title": "获取促销活动响应"
+    },
+    "promotion.v1.ListPromotionsResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/promotion.v1.PromotionInfo"
+          }
+        },
+        "total": {
+          "type": "string",
+          "format": "int64"
+        }
+      },
+      "title": "查询促销活动列表响应"
+    },
+    "promotion.v1.ListUserCouponsResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/promotion.v1.CouponInfo"
+          }
+        },
+        "total": {
+          "type": "string",
+          "format": "int64"
+        }
+      },
+      "title": "查询用户优惠券列表响应"
+    },
+    "promotion.v1.PromotionInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/promotion.v1.PromotionType"
+        },
+        "description": {
+          "type": "string"
+        },
+        "productIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "categoryIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "conditionValue": {
+          "type": "string"
+        },
+        "discountValue": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "maxUseTimes": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalQuota": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "usedQuota": {
+          "type": "integer",
+          "format": "int32",
+          "title": "已使用配额"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "status": {
+          "$ref": "#/definitions/promotion.v1.PromotionStatus"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "title": "促销活动信息"
+    },
+    "promotion.v1.PromotionService.UpdatePromotionBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "productIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "categoryIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "conditionValue": {
+          "type": "string"
+        },
+        "discountValue": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "maxUseTimes": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalQuota": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "status": {
+          "$ref": "#/definitions/promotion.v1.PromotionStatus"
+        }
+      },
+      "title": "更新促销活动请求"
+    },
+    "promotion.v1.PromotionStatus": {
+      "type": "string",
+      "enum": [
+        "PROMOTION_STATUS_UNSPECIFIED",
+        "PROMOTION_STATUS_DRAFT",
+        "PROMOTION_STATUS_ACTIVE",
+        "PROMOTION_STATUS_PAUSED",
+        "PROMOTION_STATUS_ENDED",
+        "PROMOTION_STATUS_DELETED"
+      ],
+      "default": "PROMOTION_STATUS_UNSPECIFIED",
+      "description": "- PROMOTION_STATUS_DRAFT: 草稿\n - PROMOTION_STATUS_ACTIVE: 进行中\n - PROMOTION_STATUS_PAUSED: 已暂停\n - PROMOTION_STATUS_ENDED: 已结束\n - PROMOTION_STATUS_DELETED: 已删除",
+      "title": "促销活动状态"
+    },
+    "promotion.v1.PromotionType": {
+      "type": "string",
+      "enum": [
+        "PROMOTION_TYPE_UNSPECIFIED",
+        "PROMOTION_TYPE_FULL_REDUCTION",
+        "PROMOTION_TYPE_FULL_DISCOUNT",
+        "PROMOTION_TYPE_DIRECT_REDUCTION",
+        "PROMOTION_TYPE_TIME_LIMITED"
+      ],
+      "default": "PROMOTION_TYPE_UNSPECIFIED",
+      "description": "- PROMOTION_TYPE_FULL_REDUCTION: 满减：满X减Y\n - PROMOTION_TYPE_FULL_DISCOUNT: 满折：满X打Y折\n - PROMOTION_TYPE_DIRECT_REDUCTION: 直降：商品直接降价\n - PROMOTION_TYPE_TIME_LIMITED: 限时折扣",
+      "title": "促销活动类型"
+    },
+    "promotion.v1.UpdatePromotionResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "更新促销活动响应"
+    },
+    "promotion.v1.UseCouponRequest": {
+      "type": "object",
+      "properties": {
+        "couponId": {
+          "type": "string",
+          "title": "优惠券ID"
+        },
+        "userId": {
+          "type": "string",
+          "title": "用户ID"
+        },
+        "orderId": {
+          "type": "string",
+          "title": "订单ID"
+        },
+        "orderAmount": {
+          "type": "number",
+          "format": "double",
+          "title": "订单金额"
+        }
+      },
+      "title": "核销优惠券请求"
+    },
+    "promotion.v1.UseCouponResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "title": "核销优惠券响应"
+    }
+  }
+}

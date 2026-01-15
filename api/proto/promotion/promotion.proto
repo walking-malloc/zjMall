@@ -1,0 +1,369 @@
+syntax = "proto3";
+
+package promotion.v1;
+
+option go_package = "zjMall/api/proto/gen/go/promotion/v1;promotionv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+
+// 促销服务
+service PromotionService {
+  // 创建促销活动
+  rpc CreatePromotion(CreatePromotionRequest) returns (CreatePromotionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/promotions"
+      body: "*"
+    };
+  }
+  
+  // 更新促销活动
+  rpc UpdatePromotion(UpdatePromotionRequest) returns (UpdatePromotionResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/promotions/{promotion_id}"
+      body: "*"
+    };
+  }
+  
+  // 获取促销活动详情
+  rpc GetPromotion(GetPromotionRequest) returns (GetPromotionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/promotions/{promotion_id}"
+    };
+  }
+  
+  // 查询促销活动列表
+  rpc ListPromotions(ListPromotionsRequest) returns (ListPromotionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/promotions"
+    };
+  }
+  
+  // 删除促销活动
+  rpc DeletePromotion(DeletePromotionRequest) returns (DeletePromotionResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/promotions/{promotion_id}"
+    };
+  }
+  
+  // 查询可用促销活动（根据商品、金额等）
+  rpc GetAvailablePromotions(GetAvailablePromotionsRequest) returns (GetAvailablePromotionsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/promotions/available"
+      body: "*"
+    };
+  }
+  
+  // 计算优惠金额
+  rpc CalculateDiscount(CalculateDiscountRequest) returns (CalculateDiscountResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/promotions/calculate"
+      body: "*"
+    };
+  }
+  
+  // 创建优惠券模板
+  rpc CreateCouponTemplate(CreateCouponTemplateRequest) returns (CreateCouponTemplateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/coupons/templates"
+      body: "*"
+    };
+  }
+  
+  // 领取优惠券
+  rpc ClaimCoupon(ClaimCouponRequest) returns (ClaimCouponResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/coupons/claim"
+      body: "*"
+    };
+  }
+  
+  // 查询用户优惠券列表
+  rpc ListUserCoupons(ListUserCouponsRequest) returns (ListUserCouponsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/coupons/user/{user_id}"
+    };
+  }
+  
+  // 核销优惠券
+  rpc UseCoupon(UseCouponRequest) returns (UseCouponResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/coupons/use"
+      body: "*"
+    };
+  }
+}
+
+// 促销活动类型
+enum PromotionType {
+  PROMOTION_TYPE_UNSPECIFIED = 0;
+  PROMOTION_TYPE_FULL_REDUCTION = 1; // 满减：满X减Y
+  PROMOTION_TYPE_FULL_DISCOUNT = 2;  // 满折：满X打Y折
+  PROMOTION_TYPE_DIRECT_REDUCTION = 3; // 直降：商品直接降价
+  PROMOTION_TYPE_TIME_LIMITED = 4;    // 限时折扣
+}
+
+// 促销活动状态
+enum PromotionStatus {
+  PROMOTION_STATUS_UNSPECIFIED = 0;
+  PROMOTION_STATUS_DRAFT = 1;      // 草稿
+  PROMOTION_STATUS_ACTIVE = 2;     // 进行中
+  PROMOTION_STATUS_PAUSED = 3;     // 已暂停
+  PROMOTION_STATUS_ENDED = 4;      // 已结束
+  PROMOTION_STATUS_DELETED = 5;    // 已删除
+}
+
+// 优惠券类型
+enum CouponType {
+  COUPON_TYPE_UNSPECIFIED = 0;
+  COUPON_TYPE_FIXED = 1;      // 固定金额券
+  COUPON_TYPE_PERCENT = 2;    // 折扣券
+  COUPON_TYPE_FREE_SHIPPING = 3; // 免运费券
+}
+
+// 优惠券状态
+enum CouponStatus {
+  COUPON_STATUS_UNSPECIFIED = 0;
+  COUPON_STATUS_UNUSED = 1;   // 未使用
+  COUPON_STATUS_USED = 2;     // 已使用
+  COUPON_STATUS_EXPIRED = 3;  // 已过期
+}
+
+// 创建促销活动请求
+message CreatePromotionRequest {
+  string name = 1;                    // 促销名称
+  PromotionType type = 2;             // 促销类型
+  string description = 3;             // 促销描述
+  repeated string product_ids = 4;    // 适用商品ID列表（空表示全平台）
+  repeated string category_ids = 5;   // 适用类目ID列表
+  string condition_value = 6;         // 条件值（如：满200）
+  string discount_value = 7;          // 优惠值（如：减30 或 打8折）
+  google.protobuf.Timestamp start_time = 8; // 开始时间
+  google.protobuf.Timestamp end_time = 9;   // 结束时间
+  int32 max_use_times = 10;           // 每人限用次数（0表示不限制）
+  int32 total_quota = 11;             // 总配额（0表示不限制）
+  int32 sort_order = 12;              // 排序权重
+}
+
+// 创建促销活动响应
+message CreatePromotionResponse {
+  int32 code = 1;
+  string message = 2;
+  string promotion_id = 3;
+}
+
+// 更新促销活动请求
+message UpdatePromotionRequest {
+  string promotion_id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string product_ids = 4;
+  repeated string category_ids = 5;
+  string condition_value = 6;
+  string discount_value = 7;
+  google.protobuf.Timestamp start_time = 8;
+  google.protobuf.Timestamp end_time = 9;
+  int32 max_use_times = 10;
+  int32 total_quota = 11;
+  int32 sort_order = 12;
+  PromotionStatus status = 13;
+}
+
+// 更新促销活动响应
+message UpdatePromotionResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 获取促销活动请求
+message GetPromotionRequest {
+  string promotion_id = 1;
+}
+
+// 获取促销活动响应
+message GetPromotionResponse {
+  int32 code = 1;
+  string message = 2;
+  PromotionInfo data = 3;
+}
+
+// 查询促销活动列表请求
+message ListPromotionsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  PromotionType type = 3;
+  PromotionStatus status = 4;
+  string keyword = 5;
+}
+
+// 查询促销活动列表响应
+message ListPromotionsResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated PromotionInfo data = 3;
+  int64 total = 4;
+}
+
+// 删除促销活动请求
+message DeletePromotionRequest {
+  string promotion_id = 1;
+}
+
+// 删除促销活动响应
+message DeletePromotionResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 查询可用促销活动请求
+message GetAvailablePromotionsRequest {
+  repeated string product_ids = 1;    // 商品ID列表
+  string category_id = 2;             // 类目ID
+  double total_amount = 3;           // 订单总金额
+  string user_id = 4;                 // 用户ID（用于限购判断）
+}
+
+// 查询可用促销活动响应
+message GetAvailablePromotionsResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated PromotionInfo data = 3;
+}
+
+// 计算优惠金额请求
+message CalculateDiscountRequest {
+  repeated string product_ids = 1;    // 商品ID列表
+  repeated CartItem items = 2;         // 购物车商品列表
+  double total_amount = 3;           // 订单总金额
+  string user_id = 4;                 // 用户ID
+  string coupon_id = 5;              // 使用的优惠券ID（可选）
+}
+
+// 购物车商品项
+message CartItem {
+  string product_id = 1;
+  string sku_id = 2;
+  int32 quantity = 3;
+  double price = 4;
+}
+
+// 计算优惠金额响应
+message CalculateDiscountResponse {
+  int32 code = 1;
+  string message = 2;
+  DiscountDetail data = 3;
+}
+
+// 优惠明细
+message DiscountDetail {
+  double total_amount = 1;           // 商品总金额
+  double promotion_discount = 2;     // 促销优惠金额
+  double coupon_discount = 3;        // 优惠券优惠金额
+  double total_discount = 4;         // 总优惠金额
+  double final_amount = 5;          // 最终实付金额
+  repeated PromotionInfo applied_promotions = 6; // 应用的促销活动
+  CouponInfo applied_coupon = 7;     // 应用的优惠券
+}
+
+// 促销活动信息
+message PromotionInfo {
+  string id = 1;
+  string name = 2;
+  PromotionType type = 3;
+  string description = 4;
+  repeated string product_ids = 5;
+  repeated string category_ids = 6;
+  string condition_value = 7;
+  string discount_value = 8;
+  google.protobuf.Timestamp start_time = 9;
+  google.protobuf.Timestamp end_time = 10;
+  int32 max_use_times = 11;
+  int32 total_quota = 12;
+  int32 used_quota = 13;             // 已使用配额
+  int32 sort_order = 14;
+  PromotionStatus status = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp updated_at = 17;
+}
+
+// 创建优惠券模板请求
+message CreateCouponTemplateRequest {
+  string name = 1;                    // 优惠券名称
+  CouponType type = 2;               // 优惠券类型
+  string description = 3;            // 优惠券描述
+  string discount_value = 4;         // 优惠值（固定金额或折扣）
+  string condition_value = 5;        // 使用条件（如：满100可用）
+  int32 total_count = 6;             // 发放总数（0表示不限制）
+  int32 per_user_limit = 7;          // 每人限领数量
+  google.protobuf.Timestamp valid_start_time = 8; // 有效期开始时间
+  google.protobuf.Timestamp valid_end_time = 9;    // 有效期结束时间
+  int32 valid_days = 10;              // 领取后有效天数（0表示使用模板有效期）
+}
+
+// 创建优惠券模板响应
+message CreateCouponTemplateResponse {
+  int32 code = 1;
+  string message = 2;
+  string template_id = 3;
+}
+
+// 领取优惠券请求
+message ClaimCouponRequest {
+  string template_id = 1;            // 优惠券模板ID
+  string user_id = 2;                // 用户ID
+}
+
+// 领取优惠券响应
+message ClaimCouponResponse {
+  int32 code = 1;
+  string message = 2;
+  string coupon_id = 3;
+}
+
+// 查询用户优惠券列表请求
+message ListUserCouponsRequest {
+  string user_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+  CouponStatus status = 4;           // 筛选状态
+}
+
+// 查询用户优惠券列表响应
+message ListUserCouponsResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated CouponInfo data = 3;
+  int64 total = 4;
+}
+
+// 核销优惠券请求
+message UseCouponRequest {
+  string coupon_id = 1;              // 优惠券ID
+  string user_id = 2;                // 用户ID
+  string order_id = 3;               // 订单ID
+  double order_amount = 4;          // 订单金额
+}
+
+// 核销优惠券响应
+message UseCouponResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 优惠券信息
+message CouponInfo {
+  string id = 1;
+  string template_id = 2;
+  string name = 3;
+  CouponType type = 4;
+  string description = 5;
+  string discount_value = 6;
+  string condition_value = 7;
+  string user_id = 8;
+  CouponStatus status = 9;
+  google.protobuf.Timestamp valid_start_time = 10;
+  google.protobuf.Timestamp valid_end_time = 11;
+  google.protobuf.Timestamp used_at = 12;
+  string order_id = 13;              // 使用的订单ID
+  google.protobuf.Timestamp created_at = 14;
+}

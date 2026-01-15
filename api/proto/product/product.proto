@@ -1041,7 +1041,7 @@ message ListProductsResponse {
   int32 code = 1;
   string message = 2;
   int64 total = 3;              // 总记录数
-  repeated ProductInfo products = 4; // 商品列表
+  repeated ProductInfo data = 4; // 商品列表
 }
 
 // 上架商品请求

@@ -3616,7 +3616,7 @@
           "format": "int64",
           "title": "总记录数"
         },
-        "products": {
+        "data": {
           "type": "array",
           "items": {
             "type": "object",
