@@ -25,6 +25,8 @@ type AttributeValueRepository interface {
 	UpdateAttributeValue(ctx context.Context, attributeValue *model.AttributeValue) error
 	DeleteAttributeValue(ctx context.Context, id string) error
 	ListAttributeValues(ctx context.Context, filter *AttributeValueListFilter) ([]*model.AttributeValue, int64, error)
+
+	GetAttributeValueBySkuID(ctx context.Context, skuIDs []string) ([]*model.AttributeValue, error)
 }
 
 type attributeValueRepository struct {
@@ -149,4 +151,18 @@ func (r *attributeValueRepository) ListAttributeValues(ctx context.Context, filt
 	}
 
 	return attributeValues, total, nil
+}
+
+func (r *attributeValueRepository) GetAttributeValueBySkuID(ctx context.Context, skuIDs []string) ([]*model.AttributeValue, error) {
+	var attributeValues []*model.AttributeValue
+	//通过sku_attribute表查询attribute_value_id
+	err := r.db.WithContext(ctx).Model(&model.AttributeValue{}).
+		Joins("JOIN sku_attributes ON attribute_values.id = sku_attributes.attribute_value_id").
+		Where("sku_attributes.sku_id IN (?)", skuIDs).
+		Find(&attributeValues).Error
+	if err != nil {
+		return nil, err
+	}
+	return attributeValues, nil
+
 }

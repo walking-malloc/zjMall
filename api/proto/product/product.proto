@@ -625,6 +625,16 @@ service ProductService {
     };
   }
 
+  // 搜索商品
+  rpc SearchProducts(SearchProductsRequest) returns (SearchProductsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/product/search"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "商品搜索"
+    };
+  }
+
 }
 
 // ============================================
@@ -1618,3 +1628,18 @@ message ListAttributeValuesResponse {
   repeated AttributeValueInfo attribute_values = 4; // 属性值列表
 }
 
+message SearchProductsRequest {
+  string keyword = 1;        // 搜索关键词
+  int32 page = 2;           // 页码
+  int32 page_size = 3;      // 每页数量
+  string category_id = 4;   // 类目筛选（可选）
+  string brand_id = 5;      // 品牌筛选（可选）
+  repeated string tags = 6;  // 标签筛选（可选）
+}
+
+message SearchProductsResponse {
+  int32 code = 1;
+  string message = 2;
+  int64 total = 3;
+  repeated ProductInfo products = 4;
+}

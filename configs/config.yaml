@@ -21,7 +21,7 @@ service_databases:
   product-service: product_db
 
 mysql:
-  host: 47.95.221.177
+  host: 127.0.0.1
   port: 3306
   username: root
   password: root123456
@@ -33,7 +33,7 @@ mysql:
   conn_max_idle_time: 10m
 
 redis:
-  host: 47.95.221.177
+  host: 127.0.0.1
   port: 6379
   password: "redis123"
   db: 0
@@ -68,3 +68,6 @@ ignore_paths:
   - /api/v1/users/login-by-sms
   - /healthz
   - /swagger/
+
+elasticsearch:
+  host: http://127.0.0.1:9200

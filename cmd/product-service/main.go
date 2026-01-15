@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -55,6 +56,16 @@ func main() {
 	defer database.CloseRedis()
 	log.Println("✅ Redis 连接成功")
 
+	//4.初始化elasticsearch
+	log.Println("🔧 初始化 Elasticsearch 连接...")
+	elasticsearchConfig := config.GetElasticsearchConfig()
+	elasticsearchClient, err := database.NewElasticsearchClient(elasticsearchConfig)
+	if err != nil {
+		log.Fatalf("❌ Elasticsearch 初始化失败: %v", err)
+	}
+	defer elasticsearchClient.Close(context.Background())
+	log.Println("✅ Elasticsearch 连接成功")
+
 	//4.初始化校验器
 	log.Println("🔧 初始化校验器...")
 	validator.Init()
@@ -70,11 +81,36 @@ func main() {
 	skuRepo := repository.NewSkuRepository(db)
 	attributeRepo := repository.NewAttributeRepository(db)
 	attributeValueRepo := repository.NewAttributeValueRepository(db)
+
+	// 创建 ES 搜索仓库
+	searchRepo := repository.NewSearchRepository(elasticsearchClient.GetClient())
 	log.Println("✅ Repository 创建成功")
 
-	// 10. 创建Service
+	// 7. 初始化 ES 索引
+	log.Println("🔧 初始化 Elasticsearch 索引...")
+	if err := searchRepo.CreateIndex(context.Background()); err != nil {
+		log.Printf("⚠️  创建 ES 索引失败（可能已存在）: %v", err)
+	} else {
+		log.Println("✅ Elasticsearch 索引创建成功")
+	}
+
+	// 8. 创建搜索服务
+	log.Println("🔧 创建 SearchService...")
+	searchService := service.NewSearchService(
+		searchRepo,
+		productRepo,
+		categoryRepo,
+		brandRepo,
+		tagRepo,
+		attributeRepo,
+		attributeValueRepo,
+		skuRepo,
+	)
+	log.Println("✅ SearchService 创建成功")
+
+	// 9. 创建Service
 	log.Println("🔧 创建 Service...")
-	productService := service.NewProductService(categoryRepo, brandRepo, productRepo, tagRepo, skuRepo, attributeRepo, attributeValueRepo)
+	productService := service.NewProductService(categoryRepo, brandRepo, productRepo, tagRepo, skuRepo, attributeRepo, attributeValueRepo, searchService)
 	log.Println("✅ Service 创建成功")
 
 	//7.创建Handler

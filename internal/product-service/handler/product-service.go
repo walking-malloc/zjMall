@@ -667,3 +667,22 @@ func (h *ProductServiceHandler) ListAttributeValues(ctx context.Context, req *pr
 	}
 	return h.productService.ListAttributeValues(ctx, req)
 }
+
+// ============================================
+// 商品搜索接口
+// ============================================
+
+func (h *ProductServiceHandler) SearchProducts(ctx context.Context, req *productv1.SearchProductsRequest) (*productv1.SearchProductsResponse, error) {
+	// 参数校验
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 20
+	}
+	if req.PageSize > 100 {
+		req.PageSize = 100
+	}
+
+	return h.productService.SearchProducts(ctx, req)
+}

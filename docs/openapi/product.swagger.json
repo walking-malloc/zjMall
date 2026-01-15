@@ -1652,6 +1652,79 @@
         ]
       }
     },
+    "/api/v1/product/search": {
+      "get": {
+        "summary": "搜索商品",
+        "operationId": "ProductService_SearchProducts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/product.v1.SearchProductsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "keyword",
+            "description": "搜索关键词",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "page",
+            "description": "页码",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "description": "每页数量",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "categoryId",
+            "description": "类目筛选（可选）",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "brandId",
+            "description": "品牌筛选（可选）",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "tags",
+            "description": "标签筛选（可选）",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "tags": [
+          "商品搜索"
+        ]
+      }
+    },
     "/api/v1/product/skus": {
       "get": {
         "summary": "查询SKU列表（支持分页、按商品、状态筛选）",
@@ -4119,6 +4192,29 @@
         }
       },
       "title": "删除SKU属性关联响应"
+    },
+    "product.v1.SearchProductsResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/product.v1.ProductInfo"
+          }
+        }
+      }
     },
     "product.v1.SkuInfo": {
       "type": "object",

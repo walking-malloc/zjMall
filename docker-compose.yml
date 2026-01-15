@@ -35,32 +35,51 @@ services:
     networks:
       - zjmall-network
 
-  # Nacos注册中心（可选，如果暂时不用可以注释掉）
-  nacos:
-    image: nacos/nacos-server:v2.3.2
-    container_name: zjmall-nacos
+  # Elasticsearch
+  elasticsearch:
+    image: elasticsearch:8.17.2
+    container_name: zjmall-elasticsearch
     environment:
-      - MODE=standalone
-      - NACOS_AUTH_ENABLE=false
-      - SPRING_DATASOURCE_PLATFORM=mysql
-      - MYSQL_SERVICE_HOST=mysql
-      - MYSQL_SERVICE_PORT=3306
-      - MYSQL_SERVICE_DB=nacos_config
-      - MYSQL_SERVICE_USER=root
-      - MYSQL_SERVICE_PASSWORD=root123456
+      - discovery.type=single-node          # 单节点开发模式
+      - xpack.security.enabled=false        # 开发环境关闭账号密码
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m      # 限制 ES 内存占用
     ports:
-      - "8848:8848"
-      - "9848:9848"
-    depends_on:
-      - mysql
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    command: elasticsearch -E discovery.type=single-node
     restart: unless-stopped
     networks:
       - zjmall-network
+
+  # Nacos注册中心（可选，如果暂时不用可以注释掉）
+  # nacos:
+  #   image: nacos/nacos-server:v2.3.2
+  #   container_name: zjmall-nacos
+  #   environment:
+  #     - MODE=standalone
+  #     - NACOS_AUTH_ENABLE=false
+  #     - SPRING_DATASOURCE_PLATFORM=mysql
+  #     - MYSQL_SERVICE_HOST=mysql
+  #     - MYSQL_SERVICE_PORT=3306
+  #     - MYSQL_SERVICE_DB=nacos_config
+  #     - MYSQL_SERVICE_USER=root
+  #     - MYSQL_SERVICE_PASSWORD=root123456
+  #   ports:
+  #     - "8848:8848"
+  #     - "9848:9848"
+  #   depends_on:
+  #     - mysql
+  #   restart: unless-stopped
+  #   networks:
+  #     - zjmall-network
 
 volumes:
   mysql_data:
     driver: local
   redis_data:
+    driver: local
+  elasticsearch_data:
     driver: local
 
 networks:

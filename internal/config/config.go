@@ -63,6 +63,10 @@ type OSSConfig struct {
 	BaseURL         string `yaml:"base_url"`          // 访问的基础 URL（CDN 地址或 OSS 地址）
 	AvatarPath      string `yaml:"avatar_path"`       // 头像存储路径前缀
 }
+
+type ElasticsearchConfig struct {
+	Host string `yaml:"host"`
+}
 type Config struct {
 	Services         map[string]ServiceConfig `yaml:"services"`
 	MySQL            DatabaseConfig           `yaml:"mysql"`
@@ -71,6 +75,7 @@ type Config struct {
 	SMS              SMSConfig                `yaml:"sms"`
 	JWT              JWTConfig                `yaml:"jwt"`
 	OSS              OSSConfig                `yaml:"oss"`
+	Elasticsearch    ElasticsearchConfig      `yaml:"elasticsearch"`
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -153,4 +158,8 @@ func (c *Config) GetDatabaseConfigForService(serviceName string) (*DatabaseConfi
 	dbConfig.DBName = dbName
 
 	return &dbConfig, nil
+}
+
+func (c *Config) GetElasticsearchConfig() *ElasticsearchConfig {
+	return &c.Elasticsearch
 }

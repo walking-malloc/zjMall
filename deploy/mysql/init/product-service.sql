@@ -1,3 +1,4 @@
+-- Active: 1768481430314@@127.0.0.1@3306@product_db
 CREATE DATABASE IF NOT EXISTS product_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE product_db;
 -- ============================================
@@ -158,7 +159,7 @@ CREATE TABLE IF NOT EXISTS sku_attributes (
     deleted_at TIMESTAMP NULL COMMENT '软删除时间',
     UNIQUE KEY uk_sku_attribute_value_deleted (sku_id, attribute_value_id,deleted_at),
     INDEX idx_sku_id_deleted (sku_id,deleted_at),
-    INDEX idx_attribute_value_id_deleted (attribute_value_id,deleted_at),
+    INDEX idx_attribute_value_id_deleted (attribute_value_id,deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SKU属性关联表';
 
 -- ============================================
@@ -174,7 +175,7 @@ CREATE TABLE IF NOT EXISTS tags (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL COMMENT '软删除时间',
-    INDEX idx_status_sort(status,sort_order,deleted_at)
+    INDEX idx_status_sort(status,sort_order,deleted_at),
     INDEX idx_name_deleted(name,deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='标签表';
 

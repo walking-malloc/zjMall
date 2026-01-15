@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 	productv1 "zjMall/gen/go/api/proto/product"
@@ -25,6 +26,7 @@ type ProductService struct {
 	skuRepo            repository.SkuRepository
 	attributeRepo      repository.AttributeRepository
 	attributeValueRepo repository.AttributeValueRepository
+	searchService      *SearchService
 }
 
 // NewProductService 创建商品服务实例
@@ -36,6 +38,7 @@ func NewProductService(
 	skuRepo repository.SkuRepository,
 	attributeRepo repository.AttributeRepository,
 	attributeValueRepo repository.AttributeValueRepository,
+	searchService *SearchService,
 ) *ProductService {
 	return &ProductService{
 		categoryRepo:       categoryRepo,
@@ -45,6 +48,7 @@ func NewProductService(
 		skuRepo:            skuRepo,
 		attributeRepo:      attributeRepo,
 		attributeValueRepo: attributeValueRepo,
+		searchService:      searchService,
 	}
 }
 
@@ -807,6 +811,13 @@ func (s *ProductService) UpdateProduct(ctx context.Context, req *productv1.Updat
 		}, nil
 	}
 
+	// 异步同步到 ES
+	go func() {
+		if err := s.searchService.SyncProductToES(context.Background(), req.ProductId); err != nil {
+			log.Printf("WARN: 同步商品到 ES 失败 (productID: %s): %v", req.ProductId, err)
+		}
+	}()
+
 	return &productv1.UpdateProductResponse{
 		Code:    0,
 		Message: "更新成功",
@@ -829,6 +840,13 @@ func (s *ProductService) DeleteProduct(ctx context.Context, req *productv1.Delet
 			Message: fmt.Sprintf("删除商品失败: %v", err),
 		}, nil
 	}
+
+	// 异步从 ES 删除
+	go func() {
+		if err := s.searchService.searchRepo.DeleteProduct(context.Background(), req.ProductId); err != nil {
+			log.Printf("WARN: 从 ES 删除商品失败 (productID: %s): %v", req.ProductId, err)
+		}
+	}()
 
 	return &productv1.DeleteProductResponse{
 		Code:    0,
@@ -899,6 +917,12 @@ func (s *ProductService) OnShelfProduct(ctx context.Context, req *productv1.OnSh
 		}, nil
 	}
 
+	go func() {
+		if err := s.searchService.SyncProductToES(context.Background(), req.ProductId); err != nil {
+			log.Printf("WARN: 同步商品到 ES 失败 (productID: %s): %v", req.ProductId, err)
+		}
+	}()
+
 	return &productv1.OnShelfProductResponse{
 		Code:    0,
 		Message: "上架成功",
@@ -921,6 +945,13 @@ func (s *ProductService) OffShelfProduct(ctx context.Context, req *productv1.Off
 			Message: fmt.Sprintf("下架商品失败: %v", err),
 		}, nil
 	}
+
+	// 异步从 ES 删除（下架商品不显示在搜索结果中）
+	go func() {
+		if err := s.searchService.searchRepo.DeleteProduct(context.Background(), req.ProductId); err != nil {
+			log.Printf("WARN: 从 ES 删除商品失败 (productID: %s): %v", req.ProductId, err)
+		}
+	}()
 
 	return &productv1.OffShelfProductResponse{
 		Code:    0,
@@ -2192,5 +2223,62 @@ func (s *ProductService) ListAttributeValues(ctx context.Context, req *productv1
 		Message:         "查询成功",
 		Total:           total,
 		AttributeValues: attributeValueList,
+	}, nil
+}
+
+// ============================================
+// 商品搜索接口
+// ============================================
+
+// SearchProducts 搜索商品
+func (s *ProductService) SearchProducts(ctx context.Context, req *productv1.SearchProductsRequest) (*productv1.SearchProductsResponse, error) {
+	// 参数校验
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 20
+	}
+	if req.PageSize > 100 {
+		req.PageSize = 100
+	}
+
+	// 构建搜索过滤器
+	filters := &repository.SearchFilters{
+		CategoryID: req.CategoryId,
+		BrandID:    req.BrandId,
+		Tags:       req.Tags,
+		Status:     int8(repository.ProductStatusOnShelf), // 只搜索已上架商品（状态=4）
+	}
+
+	// 调用搜索服务
+	result, err := s.searchService.SearchProducts(ctx, req.Keyword, req.Page, req.PageSize, filters)
+	if err != nil {
+		return &productv1.SearchProductsResponse{
+			Code:    1,
+			Message: fmt.Sprintf("搜索失败: %v", err),
+		}, nil
+	}
+
+	// 转换结果
+	productList := make([]*productv1.ProductInfo, 0, len(result.Products))
+	for _, productIndex := range result.Products {
+		// 从 ES 索引中获取商品ID，然后从数据库查询完整信息
+		product, err := s.productRepo.GetProduct(ctx, productIndex.ID)
+		if err != nil {
+			// 如果数据库查询失败，跳过该商品
+			continue
+		}
+		if product == nil {
+			continue
+		}
+		productList = append(productList, convertProductToProto(product))
+	}
+
+	return &productv1.SearchProductsResponse{
+		Code:     0,
+		Message:  "搜索成功",
+		Total:    result.Total,
+		Products: productList,
 	}, nil
 }
