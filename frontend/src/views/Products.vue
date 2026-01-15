@@ -1,41 +1,39 @@
 <template>
   <div class="products-page">
-    <el-container>
-      <el-header>
-        <div class="header-content">
-          <div class="logo" @click="$router.push('/')">
-            <h1>zjMall</h1>
-          </div>
-          <div class="search-bar">
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索商品"
-              @keyup.enter="handleSearch"
-            >
-              <template #append>
-                <el-button @click="handleSearch">搜索</el-button>
-              </template>
-            </el-input>
-          </div>
-          <div class="user-actions">
-            <el-button type="text" @click="$router.push('/')">首页</el-button>
-            <el-button v-if="!userStore.isLoggedIn" type="text" @click="$router.push('/login')">登录</el-button>
-          </div>
-        </div>
-      </el-header>
-
-      <el-main>
         <div class="products-container">
           <div class="filter-section">
-            <el-select v-model="selectedCategory" placeholder="选择类目" clearable>
-              <el-option label="全部" value="" />
-              <el-option
-                v-for="category in categories"
-                :key="category.id"
-                :label="category.name"
-                :value="category.id"
-              />
-            </el-select>
+            <el-row :gutter="20">
+              <el-col :span="6">
+                <el-select v-model="selectedCategory" placeholder="选择类目" clearable @change="handleFilterChange">
+                  <el-option label="全部" value="" />
+                  <el-option
+                    v-for="category in categories"
+                    :key="category.id"
+                    :label="category.name"
+                    :value="category.id"
+                  />
+                </el-select>
+              </el-col>
+              <el-col :span="6">
+                <el-select v-model="selectedBrand" placeholder="选择品牌" clearable @change="handleFilterChange">
+                  <el-option label="全部" value="" />
+                  <el-option
+                    v-for="brand in brands"
+                    :key="brand.id"
+                    :label="brand.name"
+                    :value="brand.id"
+                  />
+                </el-select>
+              </el-col>
+              <el-col :span="6">
+                <el-select v-model="sortBy" placeholder="排序方式" @change="handleFilterChange">
+                  <el-option label="默认排序" value="default" />
+                  <el-option label="价格从低到高" value="price_asc" />
+                  <el-option label="价格从高到低" value="price_desc" />
+                  <el-option label="最新上架" value="newest" />
+                </el-select>
+              </el-col>
+            </el-row>
           </div>
 
           <div class="products-list" v-loading="loading">
@@ -67,23 +65,23 @@
             />
           </div>
         </div>
-      </el-main>
-    </el-container>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-import { getProductList, getCategoryList, searchProducts } from '@/api/product'
+import { useRouter, useRoute } from 'vue-router'
+import { getProductList, getCategoryList, searchProducts, getBrandList } from '@/api/product'
 
 const router = useRouter()
-const userStore = useUserStore()
+const route = useRoute()
 
-const searchKeyword = ref('')
-const selectedCategory = ref('')
+const searchKeyword = ref(route.query.keyword || '')
+const selectedCategory = ref(route.query.category_id || '')
+const selectedBrand = ref('')
+const sortBy = ref('default')
 const categories = ref([])
+const brands = ref([])
 const products = ref([])
 const loading = ref(false)
 const currentPage = ref(1)
@@ -101,6 +99,17 @@ const loadCategories = async () => {
   }
 }
 
+const loadBrands = async () => {
+  try {
+    const res = await getBrandList({ page: 1, page_size: 100 })
+    if (res.data.code === 0) {
+      brands.value = res.data.data || []
+    }
+  } catch (error) {
+    console.error('获取品牌失败:', error)
+  }
+}
+
 const loadProducts = async () => {
   loading.value = true
   try {
@@ -112,26 +121,48 @@ const loadProducts = async () => {
     if (selectedCategory.value) {
       params.category_id = selectedCategory.value
     }
+    
+    if (selectedBrand.value) {
+      params.brand_id = selectedBrand.value
+    }
 
     let res
     if (searchKeyword.value) {
       res = await searchProducts(searchKeyword.value, params)
+      console.log('搜索商品响应:', res.data)
+      // SearchProductsResponse 返回的字段是 products
+      if (res.data.code === 0) {
+        products.value = res.data.products || []
+        total.value = res.data.total || 0
+      } else {
+        console.error('搜索商品失败:', res.data.message)
+      }
     } else {
       res = await getProductList(params)
-    }
-
-    if (res.data.code === 0) {
-      products.value = res.data.data || []
-      total.value = res.data.total || 0
+      console.log('商品列表响应:', res.data)
+      // ListProductsResponse 返回的字段是 data
+      if (res.data.code === 0) {
+        products.value = res.data.data || []
+        total.value = res.data.total || 0
+        console.log('商品数据:', products.value)
+      } else {
+        console.error('获取商品列表失败:', res.data.message)
+      }
     }
   } catch (error) {
     console.error('获取商品列表失败:', error)
+    console.error('错误详情:', error.response?.data || error.message)
   } finally {
     loading.value = false
   }
 }
 
 const handleSearch = () => {
+  currentPage.value = 1
+  loadProducts()
+}
+
+const handleFilterChange = () => {
   currentPage.value = 1
   loadProducts()
 }
@@ -146,7 +177,7 @@ const handlePageChange = () => {
 }
 
 const goToDetail = (id) => {
-  router.push(`/product/${id}`)
+  router.push(`/product/products/${id}`)
 }
 
 watch(selectedCategory, () => {
@@ -156,37 +187,16 @@ watch(selectedCategory, () => {
 
 onMounted(() => {
   loadCategories()
+  loadBrands()
   loadProducts()
 })
 </script>
 
 <style scoped>
 .products-page {
-  min-height: 100vh;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 100%;
-}
-
-.logo h1 {
-  margin: 0;
-  color: #409eff;
-  cursor: pointer;
-}
-
-.search-bar {
-  flex: 1;
-  max-width: 500px;
-  margin: 0 20px;
-}
-
-.user-actions {
-  display: flex;
-  gap: 10px;
+  min-height: calc(100vh - 140px);
+  padding: 20px;
+  background: #f5f5f5;
 }
 
 .products-container {

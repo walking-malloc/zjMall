@@ -4,9 +4,51 @@ import { useUserStore } from '@/stores/user'
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: () => import('@/views/Home.vue'),
-    meta: { requiresAuth: false }
+    component: () => import('@/components/Layout.vue'),
+    children: [
+      {
+        path: '',
+        name: 'Home',
+        component: () => import('@/views/Home.vue'),
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'product/products',
+        name: 'Products',
+        component: () => import('@/views/Products.vue'),
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'product/products/:id',
+        name: 'ProductDetail',
+        component: () => import('@/views/ProductDetail.vue'),
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'cart',
+        name: 'Cart',
+        component: () => import('@/views/Cart.vue'),
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/Profile.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'orders',
+        name: 'Orders',
+        component: () => import('@/views/Orders.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'addresses',
+        name: 'Addresses',
+        component: () => import('@/views/Addresses.vue'),
+        meta: { requiresAuth: true }
+      }
+    ]
   },
   {
     path: '/login',
@@ -21,22 +63,10 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
-    path: '/product/products',
-    name: 'Products',
-    component: () => import('@/views/Products.vue'),
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('@/views/NotFound.vue'),
     meta: { requiresAuth: false }
-  },
-  {
-    path: '/product/products/:id',
-    name: 'ProductDetail',
-    component: () => import('@/views/ProductDetail.vue'),
-    meta: { requiresAuth: false }
-  },
-  {
-    path: '/profile',
-    name: 'Profile',
-    component: () => import('@/views/Profile.vue'),
-    meta: { requiresAuth: true }
   }
 ]
 

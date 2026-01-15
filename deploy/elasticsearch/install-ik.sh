@@ -12,3 +12,4 @@ elasticsearch-plugin install https://github.com/medcl/elasticsearch-analysis-ik/
 # 退出容器后执行：
 # docker restart zjmall-elasticsearch
 
+

@@ -3,6 +3,15 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
+import { useCartStore } from '@/stores/cart'
+
+const cartStore = useCartStore()
+
+onMounted(() => {
+  // 初始化购物车
+  cartStore.loadCart()
+})
 </script>
 
 <style>

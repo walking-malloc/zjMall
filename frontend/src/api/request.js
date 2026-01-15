@@ -18,6 +18,15 @@ request.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    // 添加调试日志
+    console.log('API 请求:', {
+      url: config.url,
+      method: config.method,
+      baseURL: config.baseURL,
+      fullURL: config.baseURL + config.url,
+      params: config.params,
+      data: config.data
+    })
     return config
   },
   error => {
@@ -28,6 +37,13 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   response => {
+    // 添加调试日志
+    console.log('API 响应:', {
+      url: response.config.url,
+      method: response.config.method,
+      status: response.status,
+      data: response.data
+    })
     return response
   },
   error => {

@@ -1,47 +1,5 @@
 <template>
   <div class="home">
-    <el-container>
-      <!-- 头部导航 -->
-      <el-header>
-        <div class="header-content">
-          <div class="logo" @click="$router.push('/')">
-            <h1>zjMall</h1>
-          </div>
-          <div class="nav-menu">
-            <el-menu
-              mode="horizontal"
-              :default-active="activeMenu"
-              @select="handleMenuSelect"
-            >
-              <el-menu-item index="home">首页</el-menu-item>
-              <el-menu-item index="products">商品</el-menu-item>
-            </el-menu>
-            <div class="user-actions">
-              <template v-if="userStore.isLoggedIn">
-                <el-dropdown @command="handleUserCommand">
-                  <span class="user-name">
-                    {{ userStore.userInfo?.nickname || userStore.userInfo?.phone }}
-                    <el-icon><arrow-down /></el-icon>
-                  </span>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-                      <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </template>
-              <template v-else>
-                <el-button type="text" @click="$router.push('/login')">登录</el-button>
-                <el-button type="primary" @click="$router.push('/register')">注册</el-button>
-              </template>
-            </div>
-          </div>
-        </div>
-      </el-header>
-
-      <!-- 主要内容 -->
-      <el-main>
         <div class="banner">
           <h2>欢迎来到 zjMall</h2>
           <p>发现更多优质商品</p>
@@ -50,68 +8,95 @@
           </el-button>
         </div>
 
+        <!-- 分类导航 -->
+        <div class="category-section">
+          <h3>商品分类</h3>
+          <el-row :gutter="20">
+            <el-col 
+              :span="4" 
+              v-for="category in categories.slice(0, 8)" 
+              :key="category.id"
+              @click="goToCategory(category.id)"
+            >
+              <div class="category-item">
+                <div class="category-icon">
+                  <el-icon :size="40"><Box /></el-icon>
+                </div>
+                <p>{{ category.name }}</p>
+              </div>
+            </el-col>
+          </el-row>
+        </div>
+
         <!-- 热门商品 -->
         <div class="hot-products">
           <h3>热门商品</h3>
-          <el-row :gutter="20" v-loading="loading">
+          <el-empty v-if="!loading && products.length === 0" description="暂无商品" />
+          <el-row :gutter="20" v-loading="loading" v-else>
             <el-col :span="6" v-for="product in products" :key="product.id">
               <el-card class="product-card" @click="goToDetail(product.id)">
                 <img :src="product.main_image || '/placeholder.png'" class="product-image" />
                 <div class="product-info">
                   <h4>{{ product.title }}</h4>
+                  <p class="subtitle">{{ product.subtitle }}</p>
                   <p class="price">¥{{ product.price || '0.00' }}</p>
                 </div>
               </el-card>
             </el-col>
           </el-row>
         </div>
-      </el-main>
-    </el-container>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-import { getProductList } from '@/api/product'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { getProductList, getCategoryList } from '@/api/product'
+import { Box } from '@element-plus/icons-vue'
 
 const router = useRouter()
-const userStore = useUserStore()
 
-const activeMenu = ref('home')
 const products = ref([])
+const categories = ref([])
 const loading = ref(false)
 
-const handleMenuSelect = (index) => {
-  if (index === 'products') {
-    router.push('/product/products')
-  }
-}
-
-const handleUserCommand = (command) => {
-  if (command === 'profile') {
-    router.push('/profile')
-  } else if (command === 'logout') {
-    userStore.logout()
-    router.push('/')
-  }
-}
-
 const goToDetail = (id) => {
-  router.push(`/product/${id}`)
+  router.push(`/product/products/${id}`)
+}
+
+const goToCategory = (categoryId) => {
+  router.push({
+    path: '/product/products',
+    query: { category_id: categoryId }
+  })
 }
 
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await getProductList({ page: 1, page_size: 8 })
-    if (res.data.code === 0) {
-      products.value = res.data.data || []
+    const [productsRes, categoriesRes] = await Promise.all([
+      getProductList({ page: 1, page_size: 8 }),
+      getCategoryList()
+    ])
+    
+    console.log('商品列表响应:', productsRes.data)
+    console.log('分类列表响应:', categoriesRes.data)
+    
+    if (productsRes.data.code === 0) {
+      products.value = productsRes.data.data || []
+      console.log('商品数据:', products.value)
+    } else {
+      console.error('获取商品列表失败:', productsRes.data.message)
+    }
+    
+    if (categoriesRes.data.code === 0) {
+      categories.value = categoriesRes.data.data || []
+    } else {
+      console.error('获取分类列表失败:', categoriesRes.data.message)
     }
   } catch (error) {
-    console.error('获取商品列表失败:', error)
+    console.error('获取数据失败:', error)
+    console.error('错误详情:', error.response?.data || error.message)
   } finally {
     loading.value = false
   }
@@ -123,36 +108,8 @@ onMounted(async () => {
   min-height: 100vh;
 }
 
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 100%;
-}
-
-.logo h1 {
-  margin: 0;
-  color: #409eff;
-  cursor: pointer;
-}
-
-.nav-menu {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.user-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.user-name {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.home {
+  padding: 20px;
 }
 
 .banner {
@@ -177,11 +134,58 @@ onMounted(async () => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
+  min-height: 300px;
+}
+
+.category-section {
+  max-width: 1200px;
+  margin: 0 auto 40px;
+  padding: 0 20px;
+}
+
+.category-section h3 {
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+.category-item {
+  text-align: center;
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: 1px solid #eee;
+}
+
+.category-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.category-icon {
+  color: #409eff;
+  margin-bottom: 10px;
+}
+
+.category-item p {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
 }
 
 .hot-products h3 {
   font-size: 24px;
   margin-bottom: 20px;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: #999;
+  margin: 5px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .product-card {

@@ -108,3 +108,4 @@ curl -X POST "http://127.0.0.1:9200/_analyze" -H 'Content-Type: application/json
 - IK 分词器 Releases: https://github.com/infinilabs/analysis-ik/releases
 - Elasticsearch 插件文档: https://www.elastic.co/guide/en/elasticsearch/plugins/current/index.html
 
+

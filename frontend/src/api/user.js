@@ -39,8 +39,9 @@ export function getUserInfo(userId) {
 }
 
 // 更新用户信息
-export function updateUserInfo(data) {
-  return request.put('/users/me', data)
+// 注意：需要从 token 或 userStore 中获取 user_id
+export function updateUserInfo(userId, data) {
+  return request.put(`/users/${userId}`, data)
 }
 
 // 登出
