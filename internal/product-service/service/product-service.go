@@ -716,21 +716,77 @@ func (s *ProductService) GetProduct(ctx context.Context, req *productv1.GetProdu
 
 	productInfo := convertProductToProto(product)
 
+	// 关联查询 category 和 brand 信息
+	if product.CategoryID != "" {
+		category, err := s.categoryRepo.GetCategoryByID(ctx, product.CategoryID)
+		if err == nil && category != nil {
+			productInfo.Category = &productv1.CategoryInfo{
+				Id:        category.ID,
+				Name:      category.Name,
+				ParentId:  category.ParentID,
+				Level:     int32(category.Level),
+				IsLeaf:    category.IsLeaf,
+				IsVisible: category.IsVisible,
+				SortOrder: category.SortOrder,
+				Icon:      category.Icon,
+				Status:    int32(category.Status),
+			}
+		}
+	}
+
+	if product.BrandID != "" {
+		brand, err := s.brandRepo.GetBrandByID(ctx, product.BrandID)
+		if err == nil && brand != nil {
+			productInfo.Brand = &productv1.BrandInfo{
+				Id:          brand.ID,
+				Name:        brand.Name,
+				LogoUrl:     brand.LogoURL,
+				Country:     brand.Country,
+				Description: brand.Description,
+				FirstLetter: brand.FirstLetter,
+				SortOrder:   int32(brand.SortOrder),
+				Status:      int32(brand.Status),
+			}
+		}
+	}
+
 	response := &productv1.GetProductResponse{
 		Code:    0,
 		Message: "查询成功",
 		Product: productInfo,
 	}
 
-	// TODO: 如果需要包含SKU列表和标签列表，需要调用相应的repository方法
-	// if req.IncludeSkus {
-	//     skus, err := s.skuRepo.ListSkusByProductID(ctx, req.ProductId)
-	//     ...
-	// }
-	// if req.IncludeTags {
-	//     tags, err := s.tagRepo.GetProductTags(ctx, req.ProductId)
-	//     ...
-	// }
+	if req.IncludeSkus {
+		skus, total, err := s.skuRepo.ListSkus(ctx, &repository.SkuListFilter{
+			ProductID: req.ProductId,
+			Status:    1,
+		})
+		if err != nil {
+			return &productv1.GetProductResponse{
+				Code:    1,
+				Message: fmt.Sprintf("查询SKU列表失败: %v", err),
+			}, nil
+		}
+		skuList := make([]*productv1.SkuInfo, 0, total)
+		for _, sku := range skus {
+			skuList = append(skuList, convertSkuToProto(sku))
+		}
+		response.Skus = skuList
+	}
+	if req.IncludeTags {
+		tags, err := s.productRepo.GetProductTags(ctx, req.ProductId)
+		if err != nil {
+			return &productv1.GetProductResponse{
+				Code:    1,
+				Message: fmt.Sprintf("查询标签列表失败: %v", err),
+			}, nil
+		}
+		tagList := make([]*productv1.TagInfo, 0, len(tags))
+		for _, tag := range tags {
+			tagList = append(tagList, convertTagToProto(tag))
+		}
+		response.Tags = tagList
+	}
 
 	return response, nil
 }

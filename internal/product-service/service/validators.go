@@ -71,7 +71,7 @@ type ListCategoriesRequestValidator struct {
 	Page      int32  `validate:"omitempty,min=1" label:"页码"`
 	PageSize  int32  `validate:"omitempty,min=1" label:"每页条数"`
 	Level     int32  `validate:"omitempty,min=1" label:"类目层级"`
-	Status    int32  `validate:"required,oneof=1 2" label:"状态"`
+	Status    int32  `validate:"omitempty,oneof=1 2" label:"状态"`
 	IsVisible bool   `validate:"-" label:"是否在前台展示"`
 	Keyword   string `validate:"omitempty,min=2,max=100" label:"关键词"`
 }
@@ -180,7 +180,7 @@ func (v *UpdateBrandRequestValidator) Validate() error {
 type ListBrandsRequestValidator struct {
 	Page        int32  `validate:"omitempty,min=1" label:"页码"`
 	PageSize    int32  `validate:"omitempty,min=1" label:"每页条数"`
-	Status      int32  `validate:"required,oneof=1 2" label:"状态"`
+	Status      int32  `validate:"omitempty,oneof=1 2" label:"状态"`
 	Keyword     string `validate:"omitempty,min=2,max=100" label:"关键词"`
 	FirstLetter string `validate:"omitempty,min=1,max=1" label:"首字母"`
 	Country     string `validate:"omitempty,min=2,max=100" label:"国家"`

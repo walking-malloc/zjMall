@@ -63,11 +63,29 @@ const handleLogout = () => {
 }
 
 onMounted(async () => {
-  // 如果用户信息不存在，尝试从token中获取用户ID
-  // 这里简化处理，实际应该从token payload中解析用户ID
-  if (!userStore.userInfo && userStore.token) {
-    // 暂时显示提示，需要后端提供获取当前用户信息的接口
-    ElMessage.warning('请重新登录以获取用户信息')
+  // 检查是否已登录（检查 localStorage 中的 token）
+  const token = localStorage.getItem('token')
+  if (!token) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+
+  // 如果用户信息不存在，尝试从 localStorage 恢复
+  if (!userStore.userInfo) {
+    const savedUserInfo = localStorage.getItem('userInfo')
+    if (savedUserInfo) {
+      try {
+        const userInfo = JSON.parse(savedUserInfo)
+        userStore.setUserInfo(userInfo)
+      } catch (error) {
+        console.error('解析用户信息失败:', error)
+        ElMessage.warning('用户信息已过期，请重新登录')
+      }
+    } else {
+      // 如果没有保存的用户信息，提示用户重新登录
+      ElMessage.warning('用户信息已过期，请重新登录')
+    }
   }
 })
 </script>

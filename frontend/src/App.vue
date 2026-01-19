@@ -8,9 +8,10 @@ import { useCartStore } from '@/stores/cart'
 
 const cartStore = useCartStore()
 
-onMounted(() => {
-  // 初始化购物车
-  cartStore.loadCart()
+onMounted(async () => {
+  // 初始化购物车，从后端加载数据
+  await cartStore.loadCart()
+  await cartStore.refreshSummary()
 })
 </script>
 

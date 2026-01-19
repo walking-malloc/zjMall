@@ -1,10 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login, register, getUserInfo } from '@/api/user'
+import { login, register, getUserInfo, loginBySMS as loginBySMSApi } from '@/api/user'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
-  const userInfo = ref(null)
+  // 初始化时尝试从 localStorage 恢复用户信息
+  let initialUserInfo = null
+  try {
+    const savedUserInfo = localStorage.getItem('userInfo')
+    if (savedUserInfo) {
+      initialUserInfo = JSON.parse(savedUserInfo)
+    }
+  } catch (error) {
+    console.error('恢复用户信息失败:', error)
+  }
+  const userInfo = ref(initialUserInfo)
 
   const isLoggedIn = computed(() => !!token.value)
 
@@ -19,6 +29,12 @@ export const useUserStore = defineStore('user', () => {
 
   function setUserInfo(info) {
     userInfo.value = info
+    // 同时保存到 localStorage，方便页面刷新后恢复
+    if (info) {
+      localStorage.setItem('userInfo', JSON.stringify(info))
+    } else {
+      localStorage.removeItem('userInfo')
+    }
   }
 
   async function loginUser(phone, password) {
@@ -72,16 +88,38 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  async function loginBySMS(phone, smsCode) {
+    try {
+      const res = await loginBySMSApi(phone, smsCode)
+      if (res.data.code === 0) {
+        setToken(res.data.data.token)
+        if (res.data.data.user) {
+          setUserInfo(res.data.data.user)
+        }
+        return { success: true }
+      } else {
+        return { success: false, message: res.data.message }
+      }
+    } catch (error) {
+      return { success: false, message: error.message || '登录失败' }
+    }
+  }
+
   function logout() {
     setToken('')
     setUserInfo(null)
+    // 清除 localStorage 中的用户信息
+    localStorage.removeItem('userInfo')
   }
 
   return {
     token,
     userInfo,
     isLoggedIn,
+    setToken,
+    setUserInfo,
     loginUser,
+    loginBySMS,
     registerUser,
     fetchUserInfo,
     logout

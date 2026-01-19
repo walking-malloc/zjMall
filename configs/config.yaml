@@ -14,11 +14,18 @@ services:
       port: 50053
     http:
       port: 8082
+  cart-service:
+    grpc:
+      port: 50054
+    http:
+      port: 8083
       
 # 服务名到数据库名的映射（可选，如果不配置则使用命名约定）
 service_databases:
   user-service: user_db
   product-service: product_db
+  cart-service: cart_db
+
 
 mysql:
   host: 127.0.0.1
@@ -71,3 +78,23 @@ ignore_paths:
 
 elasticsearch:
   host: http://127.0.0.1:9200
+
+rocketmq:
+  # RocketMQ 5.x 使用 Proxy 的 gRPC Endpoint（不再是 NameServer）
+  endpoint: "127.0.0.1:8081"  # Proxy gRPC 端口（默认 8081）
+  # 可选：如果启用了认证，配置 access_key 和 secret_key
+  # access_key: ""
+  # secret_key: ""
+  retry_times: 3  # 发送重试次数（默认值）
+  send_msg_timeout: 5  # 发送消息超时（秒，默认值）
+  enable_trace: false  # 是否开启消息轨迹
+  # 每个服务的生产者组名映射（如果不配置，则使用默认命名：service-name-producer-group）
+  service_groups:
+    cart-service: "cart-producer-group"
+    order-service: "order-producer-group"
+    payment-service: "payment-producer-group"
+    # 其他服务会自动使用默认命名：service-name-producer-group
+
+# 服务客户端配置（用于服务间调用）
+service_clients:
+  product_service_addr: "127.0.0.1:50053"  # 商品服务 gRPC 地址

@@ -15,6 +15,7 @@ import (
 	"zjMall/internal/product-service/handler"
 	"zjMall/internal/product-service/repository"
 	"zjMall/internal/product-service/service"
+	"zjMall/pkg"
 	"zjMall/pkg/validator"
 
 	"google.golang.org/grpc"
@@ -32,6 +33,13 @@ func main() {
 		log.Fatalf("❌ 加载配置失败: %v", err)
 	}
 	log.Println("✅ 配置文件加载成功")
+
+	//初始化JWT
+	log.Println("🔧 初始化 JWT...")
+	jwtConfig := config.GetJWTConfig()
+	pkg.InitJWT(jwtConfig)
+	log.Println("✅ JWT 初始化成功")
+
 	//2.初始化数据库（使用服务特定的数据库配置）
 	serviceName := "product-service"
 	log.Printf("🔧 初始化数据库连接 (服务: %s)...", serviceName)
@@ -164,6 +172,7 @@ func main() {
 		middleware.Recovery(),                           // 2. 捕获 panic（需要 TraceID）
 		middleware.Logging(),                            // 3. 记录日志（需要 TraceID）
 		middleware.TraceID(),                            // 4. 生成 TraceID（供 Logging 和 Recovery 使用）
+		middleware.Auth(),                               // 5. 认证中间件：验证 token 并注入 user_id 到 context
 	)
 
 	// 启动服务器（阻塞）

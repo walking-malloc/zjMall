@@ -461,11 +461,11 @@ func (s *UserService) UploadAvatarFromReader(ctx context.Context, userID string,
 }
 
 // =============== 地址管理 ===============
-// 添加单个地址
-func (s *UserService) CreateAddress(ctx context.Context, req *userv1.CreateAddressRequest) (*userv1.CreateAddressResponse, error) {
+// 添加单个地址（userID 从 context 中获取）
+func (s *UserService) CreateAddress(ctx context.Context, userID string, req *userv1.CreateAddressRequest) (*userv1.CreateAddressResponse, error) {
 
 	address := &model.Address{
-		UserID:        req.UserId,
+		UserID:        userID,
 		ReceiverName:  req.ReceiverName,
 		ReceiverPhone: req.ReceiverPhone,
 		Province:      req.Province,
@@ -508,9 +508,9 @@ func (s *UserService) CreateAddress(ctx context.Context, req *userv1.CreateAddre
 	}, nil
 }
 
-// 查询收货地址列表
-func (s *UserService) ListAddresses(ctx context.Context, req *userv1.ListAddressesRequest) (*userv1.ListAddressesResponse, error) {
-	addresses, err := s.userRepo.ListAddresses(ctx, req.UserId)
+// 查询收货地址列表（userID 从 context 中获取）
+func (s *UserService) ListAddresses(ctx context.Context, userID string) (*userv1.ListAddressesResponse, error) {
+	addresses, err := s.userRepo.ListAddresses(ctx, userID)
 	if err != nil {
 		return &userv1.ListAddressesResponse{
 			Code:    1,
@@ -541,11 +541,11 @@ func (s *UserService) ListAddresses(ctx context.Context, req *userv1.ListAddress
 	}, nil
 }
 
-// 更新收货地址
-func (s *UserService) UpdateAddress(ctx context.Context, req *userv1.UpdateAddressRequest) (*userv1.UpdateAddressResponse, error) {
+// 更新收货地址（userID 从 context 中获取）
+func (s *UserService) UpdateAddress(ctx context.Context, userID string, req *userv1.UpdateAddressRequest) (*userv1.UpdateAddressResponse, error) {
 	// 如果设置为默认地址，先取消其他地址的默认状态
 	if req.IsDefault {
-		err := s.userRepo.SetDefaultAddress(ctx, req.UserId, req.AddressId)
+		err := s.userRepo.SetDefaultAddress(ctx, userID, req.AddressId)
 		if err != nil {
 			return &userv1.UpdateAddressResponse{
 				Code:    1,
@@ -556,7 +556,7 @@ func (s *UserService) UpdateAddress(ctx context.Context, req *userv1.UpdateAddre
 
 	address := &model.Address{
 		BaseModel:     pkg.BaseModel{ID: req.AddressId}, // 设置地址ID
-		UserID:        req.UserId,
+		UserID:        userID,
 		ReceiverName:  req.ReceiverName,
 		ReceiverPhone: req.ReceiverPhone,
 		Province:      req.Province,
@@ -579,9 +579,9 @@ func (s *UserService) UpdateAddress(ctx context.Context, req *userv1.UpdateAddre
 	}, nil
 }
 
-// 删除收货地址
-func (s *UserService) DeleteAddress(ctx context.Context, req *userv1.DeleteAddressRequest) (*userv1.DeleteAddressResponse, error) {
-	err := s.userRepo.DeleteAddress(ctx, req.UserId, req.AddressId)
+// 删除收货地址（userID 从 context 中获取）
+func (s *UserService) DeleteAddress(ctx context.Context, userID string, addressID string) (*userv1.DeleteAddressResponse, error) {
+	err := s.userRepo.DeleteAddress(ctx, userID, addressID)
 	if err != nil {
 		return &userv1.DeleteAddressResponse{
 			Code:    1,
@@ -594,9 +594,9 @@ func (s *UserService) DeleteAddress(ctx context.Context, req *userv1.DeleteAddre
 	}, nil
 }
 
-// 设置默认收货地址
-func (s *UserService) SetDefaultAddress(ctx context.Context, req *userv1.SetDefaultAddressRequest) (*userv1.SetDefaultAddressResponse, error) {
-	err := s.userRepo.SetDefaultAddress(ctx, req.UserId, req.AddressId)
+// 设置默认收货地址（userID 从 context 中获取）
+func (s *UserService) SetDefaultAddress(ctx context.Context, userID string, addressID string) (*userv1.SetDefaultAddressResponse, error) {
+	err := s.userRepo.SetDefaultAddress(ctx, userID, addressID)
 	if err != nil {
 		return &userv1.SetDefaultAddressResponse{
 			Code:    1,

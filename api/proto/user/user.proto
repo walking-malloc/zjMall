@@ -67,41 +67,41 @@ service UserService {
   }
 
   
-  // 添加收货地址
+  // 添加收货地址（user_id 从 token 中获取）
   rpc CreateAddress(CreateAddressRequest) returns (CreateAddressResponse) {
     option (google.api.http) = {
-      post: "/api/v1/users/{user_id}/addresses"
+      post: "/api/v1/users/addresses"
       body: "*"
     };
   }
   
-  // 查询收货地址列表
+  // 查询收货地址列表（user_id 从 token 中获取）
   rpc ListAddresses(ListAddressesRequest) returns (ListAddressesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/addresses"
+      get: "/api/v1/users/addresses"
     };
   }
   
   
-  // 更新收货地址
+  // 更新收货地址（user_id 从 token 中获取）
   rpc UpdateAddress(UpdateAddressRequest) returns (UpdateAddressResponse) {
     option (google.api.http) = {
-      put: "/api/v1/users/{user_id}/addresses/{address_id}"
+      put: "/api/v1/users/addresses/{address_id}"
       body: "*"
     };
   }
   
-  // 删除收货地址
+  // 删除收货地址（user_id 从 token 中获取）
   rpc DeleteAddress(DeleteAddressRequest) returns (DeleteAddressResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/users/{user_id}/addresses/{address_id}"
+      delete: "/api/v1/users/addresses/{address_id}"
     };
   }
   
-  // 设置默认地址
+  // 设置默认地址（user_id 从 token 中获取）
   rpc SetDefaultAddress(SetDefaultAddressRequest) returns (SetDefaultAddressResponse) {
     option (google.api.http) = {
-      put: "/api/v1/users/{user_id}/addresses/{address_id}/default"
+      put: "/api/v1/users/addresses/{address_id}/default"
       body: "*"
     };
   }
@@ -280,17 +280,16 @@ message Address {
 
 }
 
-// 添加收货地址请求
+// 添加收货地址请求（user_id 从 token 中获取，不需要传）
 message CreateAddressRequest {
-  string user_id = 1;       // 用户ID
-  string receiver_name = 2; // 收货人姓名
-  string receiver_phone = 3; // 收货人手机号
-  string province = 4;     // 省份
-  string city = 5;         // 城市
-  string district = 6;     // 区县
-  string detail = 7;       // 详细地址
-  string postal_code = 8;  // 邮政编码（可选）
-  bool is_default = 9;     // 是否设为默认地址
+  string receiver_name = 1; // 收货人姓名
+  string receiver_phone = 2; // 收货人手机号
+  string province = 3;     // 省份
+  string city = 4;         // 城市
+  string district = 5;     // 区县
+  string detail = 6;       // 详细地址
+  string postal_code = 7;  // 邮政编码（可选）
+  bool is_default = 8;     // 是否设为默认地址
 }
 
 // 添加收货地址响应
@@ -300,9 +299,8 @@ message CreateAddressResponse {
   Address data = 3;
 }
 
-// 查询收货地址列表请求
+// 查询收货地址列表请求（user_id 从 token 中获取，不需要传）
 message ListAddressesRequest {
-  string user_id = 1;       // 用户ID
 }
 
 // 查询收货地址列表响应
@@ -313,18 +311,17 @@ message ListAddressesResponse {
 }
 
 
-// 更新收货地址请求
+// 更新收货地址请求（user_id 从 token 中获取，不需要传）
 message UpdateAddressRequest {
-  string user_id = 1;       // 用户ID
-  string address_id = 2;    // 地址ID
-  string receiver_name = 3; // 收货人姓名（可选）
-  string receiver_phone = 4; // 收货人手机号（可选）
-  string province = 5;     // 省份（可选）
-  string city = 6;         // 城市（可选）
-  string district = 7;     // 区县（可选）
-  string detail = 8;       // 详细地址（可选）
-  string postal_code = 9;  // 邮政编码（可选）
-  bool is_default = 10;    // 是否设为默认地址（可选）
+  string address_id = 1;    // 地址ID（路径参数）
+  string receiver_name = 2; // 收货人姓名（可选）
+  string receiver_phone = 3; // 收货人手机号（可选）
+  string province = 4;     // 省份（可选）
+  string city = 5;         // 城市（可选）
+  string district = 6;     // 区县（可选）
+  string detail = 7;       // 详细地址（可选）
+  string postal_code = 8;  // 邮政编码（可选）
+  bool is_default = 9;    // 是否设为默认地址（可选）
 }
 
 // 更新收货地址响应
@@ -333,10 +330,9 @@ message UpdateAddressResponse {
   string message = 2;
 }
 
-// 删除收货地址请求
+// 删除收货地址请求（user_id 从 token 中获取，不需要传）
 message DeleteAddressRequest {
-  string user_id = 1;       // 用户ID
-  string address_id = 2;    // 地址ID
+  string address_id = 1;    // 地址ID（路径参数）
 }
 
 // 删除收货地址响应（无数据）
@@ -345,10 +341,9 @@ message DeleteAddressResponse {
   string message = 2;
 }
 
-// 设置默认地址请求
+// 设置默认地址请求（user_id 从 token 中获取，不需要传）
 message SetDefaultAddressRequest {
-  string user_id = 1;       // 用户ID
-  string address_id = 2;    // 地址ID
+  string address_id = 1;    // 地址ID（路径参数）
 }
 
 // 设置默认地址响应（无数据）

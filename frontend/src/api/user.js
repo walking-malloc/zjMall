@@ -49,3 +49,23 @@ export function logout() {
   return request.post('/users/logout')
 }
 
+
+export function createAddress(data) {
+  return request.post('/users/addresses', data)
+}
+
+export function getAddressList() {
+  return request.get('/users/addresses')
+}
+
+export function updateAddress(addressId, data) {
+  return request.put(`/users/addresses/${addressId}`, data)
+}
+
+export function deleteAddress(addressId) {
+  return request.delete(`/users/addresses/${addressId}`)
+}
+
+export function setDefaultAddress(addressId) {
+  return request.put(`/users/addresses/${addressId}/default`)
+}

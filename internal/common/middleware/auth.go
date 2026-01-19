@@ -2,15 +2,41 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strings"
 	"zjMall/pkg"
+
+	"google.golang.org/grpc/metadata"
 )
 
 // ContextKey 用于从 context 中获取用户ID
 type ContextKey string
 
 const UserIDKey ContextKey = "user_id"
+
+// GetUserIDFromContext 从 context 中获取用户ID
+// 优先从 HTTP context 中获取，如果没有则从 gRPC metadata 中获取
+func GetUserIDFromContext(ctx context.Context) string {
+	// 1. 优先从 HTTP context 中获取（由 HTTP 中间件设置）
+	if userID, ok := ctx.Value(UserIDKey).(string); ok && userID != "" {
+		log.Printf("从 HTTP context 获取 user_id: %s", userID)
+		return userID
+	}
+
+	// 2. 从 gRPC metadata 中获取（由 gRPC Gateway 传递）
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		log.Printf("从 gRPC metadata 获取 user_id: %v", md)
+		userIDs := md.Get("authorization")
+		if len(userIDs) > 0 && userIDs[0] != "" {
+			log.Printf("从 gRPC metadata 获取 user_id: %s", userIDs[0])
+			return userIDs[0]
+		}
+	}
+
+	return ""
+}
 
 // 白名单路径（不需要认证的接口）
 var publicPaths = []string{
@@ -51,6 +77,7 @@ func Auth() Middleware {
 			// 支持两种格式：
 			// 1. Authorization: Bearer <token>
 			// 2. Authorization: <token>
+
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
 				http.Error(w, `{"code": 401, "message": "未登录，请先登录"}`, http.StatusUnauthorized)
@@ -69,6 +96,7 @@ func Auth() Middleware {
 			// 验证 Token
 			userID, err := pkg.VerifyJWT(token)
 			if err != nil {
+				log.Println("VerifyJWT error:", err)
 				http.Error(w, `{"code": 401, "message": "Token 无效或已过期"}`, http.StatusUnauthorized)
 				return
 			}

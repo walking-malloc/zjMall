@@ -79,8 +79,32 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
   
-  if (to.meta.requiresAuth && !userStore.isLoggedIn) {
-    next({ name: 'Login', query: { redirect: to.fullPath } })
+  // 检查是否需要认证
+  if (to.meta.requiresAuth) {
+    // 同时检查 store 和 localStorage 中的 token（防止 store 未初始化）
+    const tokenInStore = userStore.isLoggedIn
+    const tokenInStorage = localStorage.getItem('token')
+    
+    console.log('路由守卫检查:', {
+      path: to.path,
+      tokenInStore,
+      tokenInStorage: !!tokenInStorage,
+      tokenValue: tokenInStorage ? tokenInStorage.substring(0, 20) + '...' : 'null'
+    })
+    
+    if (!tokenInStore && !tokenInStorage) {
+      // 如果都没有 token，跳转到登录页
+      console.log('路由守卫: 未找到 token，跳转到登录页')
+      next({ name: 'Login', query: { redirect: to.fullPath } })
+    } else {
+      // 如果 localStorage 有但 store 没有，同步一下
+      if (tokenInStorage && !tokenInStore) {
+        console.log('路由守卫: 同步 token 到 store')
+        userStore.setToken(tokenInStorage)
+      }
+      console.log('路由守卫: 允许访问')
+      next()
+    }
   } else {
     next()
   }

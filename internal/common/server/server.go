@@ -11,10 +11,12 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"zjMall/internal/common/middleware"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // Config 服务器配置
@@ -38,9 +40,28 @@ type Server struct {
 func NewServer(cfg *Config) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// 配置 gRPC Gateway 的 metadata 传递
+	// 将 HTTP context 中的 user_id 传递到 gRPC metadata
+	// 注意：这里使用字符串 "user_id" 作为 key，与 middleware.UserIDKey 的值一致
+	gwMux := runtime.NewServeMux(
+		runtime.WithMetadata(func(ctx context.Context, req *http.Request) metadata.MD {
+			md := metadata.MD{}
+			// 从 HTTP context 中获取 user_id（由认证中间件设置），并传递到 gRPC metadata
+			// middleware.UserIDKey 的值是 "user_id"
+			if userID := ctx.Value("user_id"); userID != nil {
+				if userIDStr, ok := userID.(string); ok && userIDStr != "" {
+					md.Set("user_id", userIDStr)
+					log.Printf("gRPC Gateway: 传递 user_id 到 metadata: %s", userIDStr)
+				}
+			}
+			return md
+		}),
+	)
+
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(middleware.UnaryAuthInterceptor))
 	s := &Server{
-		grpcServer: grpc.NewServer(),
-		gwMux:      runtime.NewServeMux(),
+		grpcServer: grpcServer,
+		gwMux:      gwMux,
 		httpMux:    http.NewServeMux(),
 		config:     cfg,
 		ctx:        ctx,

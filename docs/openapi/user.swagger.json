@@ -16,6 +16,170 @@
     "application/json"
   ],
   "paths": {
+    "/api/v1/users/addresses": {
+      "get": {
+        "summary": "查询收货地址列表（user_id 从 token 中获取）",
+        "operationId": "UserService_ListAddresses",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.ListAddressesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "tags": [
+          "UserService"
+        ]
+      },
+      "post": {
+        "summary": "添加收货地址（user_id 从 token 中获取）",
+        "operationId": "UserService_CreateAddress",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.CreateAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.CreateAddressRequest"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/addresses/{addressId}": {
+      "delete": {
+        "summary": "删除收货地址（user_id 从 token 中获取）",
+        "operationId": "UserService_DeleteAddress",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.DeleteAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "addressId",
+            "description": "地址ID（路径参数）",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      },
+      "put": {
+        "summary": "更新收货地址（user_id 从 token 中获取）",
+        "operationId": "UserService_UpdateAddress",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.UpdateAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "addressId",
+            "description": "地址ID（路径参数）",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.UserService.UpdateAddressBody"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/api/v1/users/addresses/{addressId}/default": {
+      "put": {
+        "summary": "设置默认地址（user_id 从 token 中获取）",
+        "operationId": "UserService_SetDefaultAddress",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/user.v1.SetDefaultAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "addressId",
+            "description": "地址ID（路径参数）",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/user.v1.UserService.SetDefaultAddressBody"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
     "/api/v1/users/login": {
       "post": {
         "summary": "密码登录",
@@ -253,207 +417,6 @@
         ]
       }
     },
-    "/api/v1/users/{userId}/addresses": {
-      "get": {
-        "summary": "查询收货地址列表",
-        "operationId": "UserService_ListAddresses",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/user.v1.ListAddressesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/google.rpc.Status"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "description": "用户ID",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "UserService"
-        ]
-      },
-      "post": {
-        "summary": "添加收货地址",
-        "operationId": "UserService_CreateAddress",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/user.v1.CreateAddressResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/google.rpc.Status"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "description": "用户ID",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/user.v1.UserService.CreateAddressBody"
-            }
-          }
-        ],
-        "tags": [
-          "UserService"
-        ]
-      }
-    },
-    "/api/v1/users/{userId}/addresses/{addressId}": {
-      "delete": {
-        "summary": "删除收货地址",
-        "operationId": "UserService_DeleteAddress",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/user.v1.DeleteAddressResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/google.rpc.Status"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "description": "用户ID",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "addressId",
-            "description": "地址ID",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "UserService"
-        ]
-      },
-      "put": {
-        "summary": "更新收货地址",
-        "operationId": "UserService_UpdateAddress",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/user.v1.UpdateAddressResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/google.rpc.Status"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "description": "用户ID",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "addressId",
-            "description": "地址ID",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/user.v1.UserService.UpdateAddressBody"
-            }
-          }
-        ],
-        "tags": [
-          "UserService"
-        ]
-      }
-    },
-    "/api/v1/users/{userId}/addresses/{addressId}/default": {
-      "put": {
-        "summary": "设置默认地址",
-        "operationId": "UserService_SetDefaultAddress",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/user.v1.SetDefaultAddressResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/google.rpc.Status"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "description": "用户ID",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "addressId",
-            "description": "地址ID",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/user.v1.UserService.SetDefaultAddressBody"
-            }
-          }
-        ],
-        "tags": [
-          "UserService"
-        ]
-      }
-    },
     "/api/v1/users/{userId}/password": {
       "put": {
         "summary": "修改密码",
@@ -645,6 +608,44 @@
         }
       },
       "title": "修改密码响应（无数据）"
+    },
+    "user.v1.CreateAddressRequest": {
+      "type": "object",
+      "properties": {
+        "receiverName": {
+          "type": "string",
+          "title": "收货人姓名"
+        },
+        "receiverPhone": {
+          "type": "string",
+          "title": "收货人手机号"
+        },
+        "province": {
+          "type": "string",
+          "title": "省份"
+        },
+        "city": {
+          "type": "string",
+          "title": "城市"
+        },
+        "district": {
+          "type": "string",
+          "title": "区县"
+        },
+        "detail": {
+          "type": "string",
+          "title": "详细地址"
+        },
+        "postalCode": {
+          "type": "string",
+          "title": "邮政编码（可选）"
+        },
+        "isDefault": {
+          "type": "boolean",
+          "title": "是否设为默认地址"
+        }
+      },
+      "title": "添加收货地址请求（user_id 从 token 中获取，不需要传）"
     },
     "user.v1.CreateAddressResponse": {
       "type": "object",
@@ -1001,47 +1002,9 @@
       },
       "title": "修改密码请求"
     },
-    "user.v1.UserService.CreateAddressBody": {
-      "type": "object",
-      "properties": {
-        "receiverName": {
-          "type": "string",
-          "title": "收货人姓名"
-        },
-        "receiverPhone": {
-          "type": "string",
-          "title": "收货人手机号"
-        },
-        "province": {
-          "type": "string",
-          "title": "省份"
-        },
-        "city": {
-          "type": "string",
-          "title": "城市"
-        },
-        "district": {
-          "type": "string",
-          "title": "区县"
-        },
-        "detail": {
-          "type": "string",
-          "title": "详细地址"
-        },
-        "postalCode": {
-          "type": "string",
-          "title": "邮政编码（可选）"
-        },
-        "isDefault": {
-          "type": "boolean",
-          "title": "是否设为默认地址"
-        }
-      },
-      "title": "添加收货地址请求"
-    },
     "user.v1.UserService.SetDefaultAddressBody": {
       "type": "object",
-      "title": "设置默认地址请求"
+      "title": "设置默认地址请求（user_id 从 token 中获取，不需要传）"
     },
     "user.v1.UserService.UpdateAddressBody": {
       "type": "object",
@@ -1079,7 +1042,7 @@
           "title": "是否设为默认地址（可选）"
         }
       },
-      "title": "更新收货地址请求"
+      "title": "更新收货地址请求（user_id 从 token 中获取，不需要传）"
     },
     "user.v1.UserService.UpdateUserBody": {
       "type": "object",

@@ -1,50 +1,49 @@
 <template>
   <div class="home">
-        <div class="banner">
-          <h2>欢迎来到 zjMall</h2>
-          <p>发现更多优质商品</p>
-          <el-button type="primary" size="large" @click="$router.push('/product/products')">
-            开始购物
-          </el-button>
-        </div>
+    <div class="banner">
+      <h2>欢迎来到 zjMall</h2>
+      <p>发现更多优质商品</p>
+      <el-button type="primary" size="large" @click="$router.push('/product/products')">
+        开始购物
+      </el-button>
+    </div>
 
-        <!-- 分类导航 -->
-        <div class="category-section">
-          <h3>商品分类</h3>
-          <el-row :gutter="20">
-            <el-col 
-              :span="4" 
-              v-for="category in categories.slice(0, 8)" 
-              :key="category.id"
-              @click="goToCategory(category.id)"
-            >
-              <div class="category-item">
-                <div class="category-icon">
-                  <el-icon :size="40"><Box /></el-icon>
-                </div>
-                <p>{{ category.name }}</p>
-              </div>
-            </el-col>
-          </el-row>
-        </div>
+    <!-- 分类导航 -->
+    <div class="category-section">
+      <h3>商品分类</h3>
+      <el-row :gutter="10">
+        <el-col :span="3" v-for="category in categories" :key="category.id"
+          @click="goToCategory(category.id)">
+          <div class="category-item">
+            <div class="category-icon">
+              <el-icon :size="40">
+                <Box />
+              </el-icon>
+            </div>
+            <p>{{ category.name }}</p>
+          </div>
+        </el-col>
+      </el-row>
+      <el-empty v-if="!loading && categories.length === 0" description="暂无分类" />
+    </div>
 
-        <!-- 热门商品 -->
-        <div class="hot-products">
-          <h3>热门商品</h3>
-          <el-empty v-if="!loading && products.length === 0" description="暂无商品" />
-          <el-row :gutter="20" v-loading="loading" v-else>
-            <el-col :span="6" v-for="product in products" :key="product.id">
-              <el-card class="product-card" @click="goToDetail(product.id)">
-                <img :src="product.main_image || '/placeholder.png'" class="product-image" />
-                <div class="product-info">
-                  <h4>{{ product.title }}</h4>
-                  <p class="subtitle">{{ product.subtitle }}</p>
-                  <p class="price">¥{{ product.price || '0.00' }}</p>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </div>
+    <!-- 热门商品 -->
+    <div class="hot-products">
+      <h3>热门商品</h3>
+      <el-empty v-if="!loading && products.length === 0" description="暂无商品" />
+      <el-row :gutter="20" v-loading="loading" v-else>
+        <el-col :span="6" v-for="product in products" :key="product.id">
+          <el-card class="product-card" @click="goToDetail(product.id)">
+            <img :src="product.main_image || '/placeholder.png'" class="product-image" />
+            <div class="product-info">
+              <h4>{{ product.title }}</h4>
+              <p class="subtitle">{{ product.subtitle }}</p>
+              <p class="price">¥{{ product.price || '0.00' }}</p>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
   </div>
 </template>
 
@@ -64,35 +63,41 @@ const goToDetail = (id) => {
   router.push(`/product/products/${id}`)
 }
 
-const goToCategory = (categoryId) => {
-  router.push({
-    path: '/product/products',
-    query: { category_id: categoryId }
-  })
-}
 
 onMounted(async () => {
   loading.value = true
   try {
     const [productsRes, categoriesRes] = await Promise.all([
       getProductList({ page: 1, page_size: 8 }),
-      getCategoryList()
+      // 使用 ListCategories 接口，只获取一级分类且可见的分类
+      getCategoryList({ 
+        is_visible: true // 前台可见
+      })
     ])
-    
+
     console.log('商品列表响应:', productsRes.data)
     console.log('分类列表响应:', categoriesRes.data)
-    
+
     if (productsRes.data.code === 0) {
       products.value = productsRes.data.data || []
       console.log('商品数据:', products.value)
     } else {
       console.error('获取商品列表失败:', productsRes.data.message)
     }
-    
+
     if (categoriesRes.data.code === 0) {
-      categories.value = categoriesRes.data.data || []
+      // ListCategories 接口返回的 Data 是数组
+      const categoryData = categoriesRes.data.data
+      if (Array.isArray(categoryData)) {
+        categories.value = categoryData
+      } else {
+        categories.value = []
+      }
+      console.log('分类数据:', categories.value)
+      console.log('分类总数:', categoriesRes.data.total || categories.value.length)
     } else {
       console.error('获取分类列表失败:', categoriesRes.data.message)
+      categories.value = []
     }
   } catch (error) {
     console.error('获取数据失败:', error)
@@ -221,4 +226,3 @@ onMounted(async () => {
   font-weight: bold;
 }
 </style>
-

@@ -14,22 +14,49 @@ const request = axios.create({
 // 请求拦截器，每次发送请求时直接执行此函数
 request.interceptors.request.use(
   config => {
+    // 强制从 localStorage 读取 token（确保获取最新值）
     const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    
+    // 详细日志
+    console.log('=== 请求拦截器执行 ===', {
+      url: config.url,
+      method: config.method,
+      tokenExists: !!token,
+      tokenValue: token ? token.substring(0, 50) + '...' : 'null',
+      tokenLength: token ? token.length : 0,
+      allLocalStorageKeys: Object.keys(localStorage)
+    })
+    
+    if (token && token.trim() !== '') {
+      // 确保设置 Authorization header
+      config.headers.Authorization = `Bearer ${token.trim()}`
+      console.log('✅ Token 已设置到请求头:', {
+        url: config.url,
+        headerValue: config.headers.Authorization.substring(0, 50) + '...'
+      })
+    } else {
+      console.error('❌ Token 不存在或为空:', {
+        url: config.url,
+        token: token,
+        localStorageKeys: Object.keys(localStorage),
+        localStorageToken: localStorage.getItem('token')
+      })
     }
-    // 添加调试日志
-    console.log('API 请求:', {
+    
+    // 最终确认
+    console.log('请求配置:', {
       url: config.url,
       method: config.method,
       baseURL: config.baseURL,
       fullURL: config.baseURL + config.url,
-      params: config.params,
-      data: config.data
+      hasAuthorization: !!config.headers.Authorization,
+      authorizationHeader: config.headers.Authorization ? config.headers.Authorization.substring(0, 50) + '...' : '未设置'
     })
+    
     return config
   },
   error => {
+    console.error('请求拦截器错误:', error)
     return Promise.reject(error)
   }
 )
@@ -44,6 +71,20 @@ request.interceptors.response.use(
       status: response.status,
       data: response.data
     })
+    
+    // 检查业务错误码（后端返回 code !== 0 表示业务失败）
+    if (response.data && response.data.code !== undefined && response.data.code !== 0) {
+      const errorMessage = response.data.message || '操作失败'
+      ElMessage.error(errorMessage)
+      // 如果是未登录错误，跳转到登录页
+      if (response.data.code === 401 || errorMessage.includes('未登录') || errorMessage.includes('登录')) {
+        localStorage.removeItem('token')
+        router.push('/login')
+      }
+      // 返回一个 rejected promise，让调用方知道失败了
+      return Promise.reject(new Error(errorMessage))
+    }
+    
     return response
   },
   error => {

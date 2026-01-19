@@ -1,0 +1,271 @@
+syntax = "proto3";
+
+package cart.v1;
+
+option go_package = "zjMall/api/proto/gen/go/cart/v1;cartv1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+// 购物车服务
+service CartService {
+  // 添加商品到购物车
+  rpc AddItem(AddItemRequest) returns (AddItemResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/cart/items"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "购物车管理"
+    };
+  }
+
+  // 更新购物车商品数量
+  rpc UpdateItemQuantity(UpdateItemQuantityRequest) returns (UpdateItemQuantityResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/cart/items/{item_id}/quantity"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "购物车管理"
+    };
+  }
+
+  // 删除购物车商品
+  rpc RemoveItem(RemoveItemRequest) returns (RemoveItemResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/cart/items/{item_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "购物车管理"
+    };
+  }
+
+  // 批量删除购物车商品
+  rpc RemoveItems(RemoveItemsRequest) returns (RemoveItemsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/cart/items/batch-delete"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "购物车管理"
+    };
+  }
+
+  // 清空购物车
+  rpc ClearCart(ClearCartRequest) returns (ClearCartResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/cart"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "购物车管理"
+    };
+  }
+
+  // 获取购物车列表
+  rpc GetCart(GetCartRequest) returns (GetCartResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/cart"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "购物车管理"
+    };
+  }
+
+  // 获取购物车统计信息
+  rpc GetCartSummary(GetCartSummaryRequest) returns (GetCartSummaryResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/cart/summary"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "购物车管理"
+    };
+  }
+
+  // 结算预览（计算价格和优惠）
+  rpc CheckoutPreview(CheckoutPreviewRequest) returns (CheckoutPreviewResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/cart/checkout-preview"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "购物车管理"
+    };
+  }
+}
+
+// ============================================
+// 购物车项信息
+// ============================================
+
+message CartItem {
+  string id = 1;                    // 购物车项ID
+  string user_id = 2;               // 用户ID
+  string product_id = 3;            // 商品ID（SPU ID）
+  string sku_id = 4;                // SKU ID
+  string product_title = 5;         // 商品标题
+  string product_image = 6;         // 商品主图
+  string sku_name = 7;              // SKU 名称（规格描述）
+  string price = 8;                 // 单价（加购时的价格快照）
+  string current_price = 9;         // 当前价格（实时查询）
+  int32 quantity = 10;              // 数量
+  int32 stock = 11;                  // 当前库存
+  bool is_valid = 12;               // 是否有效（上架且有库存）
+  string invalid_reason = 13;       // 失效原因（如有）
+  google.protobuf.Timestamp created_at = 14;  // 添加时间
+  google.protobuf.Timestamp updated_at = 15;  // 更新时间
+}
+
+// ============================================
+// 添加商品到购物车
+// ============================================
+
+message AddItemRequest {
+  string product_id = 1;            // 商品ID（SPU ID）
+  string sku_id = 2;                // SKU ID
+  int32 quantity = 3;              // 数量
+}
+
+message AddItemResponse {
+  int32 code = 1;
+  string message = 2;
+  CartItem data = 3;
+}
+
+// ============================================
+// 更新购物车商品数量
+// ============================================
+
+message UpdateItemQuantityRequest {
+  string item_id = 1;               // 购物车项ID
+  int32 quantity = 2;               // 新数量
+}
+
+message UpdateItemQuantityResponse {
+  int32 code = 1;
+  string message = 2;
+  CartItem data = 3;
+}
+
+// ============================================
+// 删除购物车商品
+// ============================================
+
+message RemoveItemRequest {
+  string item_id = 1;               // 购物车项ID
+}
+
+message RemoveItemResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// ============================================
+// 批量删除购物车商品
+// ============================================
+
+message RemoveItemsRequest {
+  repeated string item_ids = 1;     // 购物车项ID列表
+}
+
+message RemoveItemsResponse {
+  int32 code = 1;
+  string message = 2;
+  int32 deleted_count = 3;          // 删除的数量
+}
+
+// ============================================
+// 清空购物车
+// ============================================
+
+message ClearCartRequest {
+}
+
+message ClearCartResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// ============================================
+// 获取购物车列表
+// ============================================
+
+message GetCartRequest {
+}
+
+message GetCartResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated CartItem items = 3;      // 购物车商品列表
+  CartSummary summary = 4;          // 购物车统计信息
+}
+
+// ============================================
+// 获取购物车统计信息
+// ============================================
+
+message GetCartSummaryRequest {
+}
+
+message GetCartSummaryResponse {
+  int32 code = 1;
+  string message = 2;
+  CartSummary data = 3;
+}
+
+message CartSummary {
+  int32 total_items = 1;            // 商品总数（有效商品数量）
+  int32 total_quantity = 2;         // 商品总数量
+  string total_price = 3;           // 商品总金额
+  bool has_invalid_items = 4;       // 是否有失效商品
+}
+
+// ============================================
+// 结算预览
+// ============================================
+
+message CheckoutPreviewRequest {
+  repeated string item_ids = 1;     // 选中的购物车项ID（为空则选择全部有效商品）
+  string address_id = 2;            // 配送地址ID（可选）
+  string coupon_id = 3;            // 优惠券ID（可选）
+}
+
+message CheckoutPreviewResponse {
+  int32 code = 1;
+  string message = 2;
+  CheckoutPreviewData data = 3;
+}
+
+message CheckoutPreviewData {
+  repeated CartItem items = 1;      // 选中的商品列表
+  string product_total = 2;         // 商品总金额
+  string promotion_discount = 3;    // 促销优惠金额
+  string coupon_discount = 4;       // 优惠券优惠金额
+  string shipping_fee = 5;          // 运费
+  string final_amount = 6;          // 最终实付金额
+  repeated PromotionInfo promotions = 7;  // 促销明细
+  CouponInfo coupon = 8;             // 优惠券信息
+  AddressInfo address = 9;          // 配送地址信息
+}
+
+message PromotionInfo {
+  string id = 1;
+  string name = 2;
+  string type = 3;                 // 促销类型：FULL_REDUCTION, FULL_DISCOUNT, etc.
+  string discount_amount = 4;       // 优惠金额
+}
+
+message CouponInfo {
+  string id = 1;
+  string name = 2;
+  string discount_amount = 3;       // 优惠金额
+}
+
+message AddressInfo {
+  string id = 1;
+  string receiver_name = 2;
+  string receiver_phone = 3;
+  string full_address = 4;          // 完整地址
+}
+

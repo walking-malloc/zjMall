@@ -4,7 +4,26 @@
           <div class="filter-section">
             <el-row :gutter="20">
               <el-col :span="6">
-                <el-select v-model="selectedCategory" placeholder="选择类目" clearable @change="handleFilterChange">
+                <el-select 
+                  v-model="selectedCategory" 
+                  placeholder="选择类目" 
+                  clearable 
+                  @change="handleFilterChange"
+                  teleported
+                  :popper-options="{
+                    modifiers: [
+                      {
+                        name: 'offset',
+                        options: { offset: [0, 4] }
+                      },
+                      {
+                        name: 'flip',
+                        enabled: false
+                      }
+                    ],
+                    placement: 'bottom-start'
+                  }"
+                >
                   <el-option label="全部" value="" />
                   <el-option
                     v-for="category in categories"
@@ -15,7 +34,26 @@
                 </el-select>
               </el-col>
               <el-col :span="6">
-                <el-select v-model="selectedBrand" placeholder="选择品牌" clearable @change="handleFilterChange">
+                <el-select 
+                  v-model="selectedBrand" 
+                  placeholder="选择品牌" 
+                  clearable 
+                  @change="handleFilterChange"
+                  teleported
+                  :popper-options="{
+                    modifiers: [
+                      {
+                        name: 'offset',
+                        options: { offset: [0, 4] }
+                      },
+                      {
+                        name: 'flip',
+                        enabled: false
+                      }
+                    ],
+                    placement: 'bottom-start'
+                  }"
+                >
                   <el-option label="全部" value="" />
                   <el-option
                     v-for="brand in brands"
@@ -26,7 +64,25 @@
                 </el-select>
               </el-col>
               <el-col :span="6">
-                <el-select v-model="sortBy" placeholder="排序方式" @change="handleFilterChange">
+                <el-select 
+                  v-model="sortBy" 
+                  placeholder="排序方式" 
+                  @change="handleFilterChange"
+                  teleported
+                  :popper-options="{
+                    modifiers: [
+                      {
+                        name: 'offset',
+                        options: { offset: [0, 4] }
+                      },
+                      {
+                        name: 'flip',
+                        enabled: false
+                      }
+                    ],
+                    placement: 'bottom-start'
+                  }"
+                >
                   <el-option label="默认排序" value="default" />
                   <el-option label="价格从低到高" value="price_asc" />
                   <el-option label="价格从高到低" value="price_desc" />
@@ -254,6 +310,24 @@ onMounted(() => {
   color: #f56c6c;
   font-size: 20px;
   font-weight: bold;
+}
+</style>
+
+<style>
+/* 全局样式：确保下拉框在下方显示，防止自动调整到上方 */
+.el-select-dropdown {
+  margin-top: 0 !important;
+}
+
+/* 强制下拉框在下方显示 */
+.el-popper[data-popper-placement^="top"] {
+  transform: translateY(0) !important;
+  margin-top: 0 !important;
+}
+
+/* 确保下拉框始终在下方 */
+.el-select-dropdown__wrap {
+  max-height: 274px;
 }
 </style>
 

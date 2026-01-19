@@ -43,6 +43,21 @@ type RedisConfig struct {
 	ReadTimeout  int    `yaml:"readTimeout"`
 	WriteTimeout int    `yaml:"writeTimeout"`
 }
+
+type RocketMQConfig struct {
+	// RocketMQ 5.x 使用 Proxy 的 gRPC Endpoint（不再是 NameServer）
+	Endpoint      string            `yaml:"endpoint"`        // Proxy gRPC Endpoint（例如 "127.0.0.1:8081"）
+	AccessKey     string            `yaml:"access_key"`      // 访问密钥（可选，如果启用了认证）
+	SecretKey     string            `yaml:"secret_key"`      // 密钥（可选，如果启用了认证）
+	RetryTimes    int               `yaml:"retry_times"`     // 发送重试次数（默认值）
+	SendMsgTimeout int              `yaml:"send_msg_timeout"` // 发送消息超时（秒，默认值）
+	EnableTrace   bool             `yaml:"enable_trace"`     // 是否开启消息轨迹
+	ServiceGroups map[string]string `yaml:"service_groups"`  // 服务名到生产者组名的映射
+	
+	// 兼容 4.x 配置（如果配置了 name_servers，则使用 4.x 客户端）
+	NameServers   []string          `yaml:"name_servers"`     // NameServer 地址列表（4.x 使用，5.x 不使用）
+}
+
 type SMSConfig struct {
 	CodeLength   int `yaml:"code_length"`
 	ExpireTime   int `yaml:"expire_time"`
@@ -55,6 +70,7 @@ type JWTConfig struct {
 	ExpiresIn           time.Duration `yaml:"expires_in"`
 	RememberMeExpiresIn time.Duration `yaml:"remember_me_expires_in"`
 }
+
 type OSSConfig struct {
 	Endpoint        string `yaml:"endpoint"`          // OSS 访问端点
 	AccessKeyID     string `yaml:"access_key_id"`     // AccessKey ID
@@ -67,15 +83,22 @@ type OSSConfig struct {
 type ElasticsearchConfig struct {
 	Host string `yaml:"host"`
 }
+
+type ServiceClientConfig struct {
+	ProductServiceAddr string `yaml:"product_service_addr"` // 商品服务 gRPC 地址，例如 "localhost:50053"
+}
+
 type Config struct {
 	Services         map[string]ServiceConfig `yaml:"services"`
 	MySQL            DatabaseConfig           `yaml:"mysql"`
 	ServiceDatabases map[string]string        `yaml:"service_databases"` // 服务名到数据库名的映射
 	Redis            RedisConfig              `yaml:"redis"`
+	RocketMQ         RocketMQConfig           `yaml:"rocketmq"`
 	SMS              SMSConfig                `yaml:"sms"`
 	JWT              JWTConfig                `yaml:"jwt"`
 	OSS              OSSConfig                `yaml:"oss"`
 	Elasticsearch    ElasticsearchConfig      `yaml:"elasticsearch"`
+	ServiceClients   ServiceClientConfig      `yaml:"service_clients"` // 服务客户端配置
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -102,12 +125,45 @@ func (c *Config) GetServiceConfig(serviceName string) (*ServiceConfig, error) {
 	return &serviceConfig, nil
 }
 
-func (c *Config) GetMySQLConfig() *DatabaseConfig {
-	return &c.MySQL
+func (c *Config) GetDatabaseConfigForService(serviceName string) (*DatabaseConfig, error) {
+	dbName, exists := c.ServiceDatabases[serviceName]
+	if !exists {
+		// 如果没有配置，使用命名约定：service_name -> service_name_db
+		dbName = serviceName + "_db"
+	}
+
+	config := c.MySQL
+	config.DBName = dbName
+	return &config, nil
 }
 
 func (c *Config) GetRedisConfig() *RedisConfig {
 	return &c.Redis
+}
+
+// GetRocketMQConfig 获取 RocketMQ 配置（全局公共配置）
+func (c *Config) GetRocketMQConfig() *RocketMQConfig {
+	return &c.RocketMQ
+}
+
+// GetRocketMQConfigForService 获取指定服务的 RocketMQ 配置
+// 返回该服务的生产者组名和公共配置
+func (c *Config) GetRocketMQConfigForService(serviceName string) (groupName string, config *RocketMQConfig, err error) {
+	config = &c.RocketMQ
+
+	// 从服务映射中获取该服务的生产者组名
+	if c.RocketMQ.ServiceGroups != nil {
+		if gName, exists := c.RocketMQ.ServiceGroups[serviceName]; exists {
+			groupName = gName
+		}
+	}
+
+	// 如果没有配置，使用默认命名约定：service-name -> service-name-producer-group
+	if groupName == "" {
+		groupName = serviceName + "-producer-group"
+	}
+
+	return groupName, config, nil
 }
 
 func (c *Config) GetSMSConfig() *SMSConfig {
@@ -122,44 +178,10 @@ func (c *Config) GetOSSConfig() *OSSConfig {
 	return &c.OSS
 }
 
-// GetDatabaseConfigForService 根据服务名返回对应的数据库配置
-// 优先从配置文件中的 service_databases 映射获取，如果没有则使用命名约定
-func (c *Config) GetDatabaseConfigForService(serviceName string) (*DatabaseConfig, error) {
-	// 验证服务是否存在
-	_, exists := c.Services[serviceName]
-	if !exists {
-		return nil, fmt.Errorf("service %s not found in config", serviceName)
-	}
-
-	var dbName string
-
-	// 优先从配置文件中获取映射
-	if c.ServiceDatabases != nil {
-		if mappedDbName, ok := c.ServiceDatabases[serviceName]; ok {
-			dbName = mappedDbName
-		}
-	}
-
-	// 如果配置文件中没有映射，使用命名约定：service-name -> service_db
-	if dbName == "" {
-		// 去掉 "-service" 后缀，然后加上 "_db"
-		// 例如：user-service -> user_db
-		if len(serviceName) > 8 && serviceName[len(serviceName)-8:] == "-service" {
-			dbName = serviceName[:len(serviceName)-8] + "_db"
-		} else {
-			// 如果没有 "-service" 后缀，直接加上 "_db"
-			dbName = serviceName + "_db"
-		}
-	}
-
-	// 复制基础 MySQL 配置
-	dbConfig := c.MySQL
-	// 设置服务特定的数据库名
-	dbConfig.DBName = dbName
-
-	return &dbConfig, nil
-}
-
 func (c *Config) GetElasticsearchConfig() *ElasticsearchConfig {
 	return &c.Elasticsearch
+}
+
+func (c *Config) GetServiceClientsConfig() *ServiceClientConfig {
+	return &c.ServiceClients
 }

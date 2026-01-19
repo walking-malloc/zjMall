@@ -13,14 +13,20 @@
           v-for="address in addresses" 
           :key="address.id"
           class="address-card"
-          :class="{ 'default-address': address.is_default }"
+          :class="{ 'default-address': address.isDefault === true || address.isDefault === 'true' || address.isDefault === 1 }"
         >
           <div class="address-content">
             <div class="address-info">
               <div class="address-header">
-                <span class="receiver-name">{{ address.receiver_name }}</span>
-                <span class="receiver-phone">{{ address.receiver_phone }}</span>
-                <el-tag v-if="address.is_default" type="danger" size="small">默认</el-tag>
+                <span class="receiver-name">{{ address.receiverName }}</span>
+                <span class="receiver-phone">{{ address.receiverPhone }}</span>
+                <el-tag 
+                  v-if="address.isDefault === true || address.isDefault === 'true' || address.isDefault === 1" 
+                  type="danger" 
+                  size="small"
+                >
+                  默认
+                </el-tag>
               </div>
               <div class="address-detail">
                 {{ address.province }} {{ address.city }} {{ address.district }} {{ address.detail }}
@@ -28,7 +34,7 @@
             </div>
             <div class="address-actions">
               <el-button 
-                v-if="!address.is_default" 
+                v-if="!(address.isDefault === true || address.isDefault === 'true' || address.isDefault === 1)" 
                 text 
                 @click="setDefault(address.id)"
               >
@@ -95,7 +101,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-// import { listAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress } from '@/api/user'
+import { getAddressList, createAddress, updateAddress, deleteAddress as deleteAddressApi, setDefaultAddress } from '@/api/user'
 
 const userStore = useUserStore()
 
@@ -118,32 +124,108 @@ const addressForm = ref({
 const loadAddresses = async () => {
   loading.value = true
   try {
-    // TODO: 调用地址API
-    // const res = await listAddresses(userStore.userInfo.id)
-    // if (res.data.code === 0) {
-    //   addresses.value = res.data.data || []
-    // }
+    // 检查是否已登录（有 token）
+    const token = localStorage.getItem('token')
+    console.log('loadAddresses - Token 检查:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token ? token.substring(0, 30) + '...' : 'null'
+    })
     
-    // 模拟数据
-    addresses.value = []
+    if (!token) {
+      ElMessage.error('请先登录')
+      loading.value = false
+      return
+    }
+
+    console.log('loadAddresses - 开始请求地址列表')
+    // 后端会从 token 中解析 user_id，前端不需要传 user_id
+    const res = await getAddressList()
+    console.log('loadAddresses - 请求成功:', res.data)
+    
+    if (res.data.code === 0) {
+      const addressList = res.data.data || []
+      // 将默认地址置顶：默认地址排在前面，其他按创建时间倒序
+      addresses.value = addressList.sort((a, b) => {
+        // 如果一个是默认地址，另一个不是，默认地址排在前面
+        if (a.isDefault && !b.isDefault) return -1
+        if (!a.isDefault && b.isDefault) return 1
+        // 如果都是默认或都不是默认，按创建时间倒序（最新的在前）
+        return new Date(b.createdAt) - new Date(a.createdAt)
+      })
+      console.log('loadAddresses - 地址列表（已排序）:', addresses.value)
+    } else {
+      console.error('loadAddresses - 业务错误:', res.data)
+      ElMessage.error(res.data.message || '获取地址列表失败')
+    }
   } catch (error) {
-    ElMessage.error('获取地址列表失败')
+    console.error('loadAddresses - 请求异常:', error)
+    console.error('loadAddresses - 错误详情:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      headers: error.response?.headers
+    })
+    
+    // 如果返回的是 HTML，说明请求被前端路由拦截了
+    if (error.response?.data && typeof error.response.data === 'string' && error.response.data.includes('<!DOCTYPE')) {
+      ElMessage.error('请求路径错误，请检查后端服务是否运行')
+    } else if (error.response?.status === 401) {
+      ElMessage.error('登录已过期，请重新登录')
+      // 清除 token 并跳转到登录页
+      localStorage.removeItem('token')
+      userStore.logout()
+    } else {
+      ElMessage.error('获取地址列表失败: ' + (error.response?.data?.message || error.message))
+    }
   } finally {
     loading.value = false
   }
 }
 
 const saveAddress = async () => {
-  // TODO: 调用保存地址API
-  ElMessage.success(editingAddress.value ? '地址更新成功' : '地址添加成功')
-  showDialog.value = false
-  resetForm()
-  loadAddresses()
+  try {
+    if (editingAddress.value) {
+      // 更新地址
+      const res = await updateAddress(editingAddress.value.id, addressForm.value)
+      if (res.data.code === 0) {
+        ElMessage.success('地址更新成功')
+        showDialog.value = false
+        resetForm()
+        loadAddresses()
+      } else {
+        ElMessage.error(res.data.message || '更新失败')
+      }
+    } else {
+      // 创建地址
+      const res = await createAddress(addressForm.value)
+      if (res.data.code === 0) {
+        ElMessage.success('地址添加成功')
+        showDialog.value = false
+        resetForm()
+        loadAddresses()
+      } else {
+        ElMessage.error(res.data.message || '添加失败')
+      }
+    }
+  } catch (error) {
+    ElMessage.error('操作失败: ' + (error.response?.data?.message || error.message))
+  }
 }
 
 const editAddress = (address) => {
   editingAddress.value = address
-  addressForm.value = { ...address }
+  // 转换字段名：后端返回的是驼峰命名，表单需要下划线命名
+  addressForm.value = {
+    receiver_name: address.receiverName,
+    receiver_phone: address.receiverPhone,
+    province: address.province,
+    city: address.city,
+    district: address.district,
+    detail: address.detail,
+    postal_code: address.postalCode,
+    is_default: address.isDefault
+  }
   showDialog.value = true
 }
 
@@ -152,20 +234,32 @@ const deleteAddress = async (id) => {
     await ElMessageBox.confirm('确定要删除这个地址吗？', '提示', {
       type: 'warning'
     })
-    // TODO: 调用删除地址API
-    // await deleteAddress(userStore.userInfo.id, id)
-    ElMessage.success('删除成功')
-    loadAddresses()
+    const res = await deleteAddressApi(id)
+    if (res.data.code === 0) {
+      ElMessage.success('删除成功')
+      loadAddresses()
+    } else {
+      ElMessage.error(res.data.message || '删除失败')
+    }
   } catch (error) {
-    // 用户取消
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败: ' + (error.response?.data?.message || error.message))
+    }
   }
 }
 
 const setDefault = async (id) => {
-  // TODO: 调用设置默认地址API
-  // await setDefaultAddress(userStore.userInfo.id, id)
-  ElMessage.success('设置成功')
-  loadAddresses()
+  try {
+    const res = await setDefaultAddress(id)
+    if (res.data.code === 0) {
+      ElMessage.success('设置成功')
+      loadAddresses()
+    } else {
+      ElMessage.error(res.data.message || '设置失败')
+    }
+  } catch (error) {
+    ElMessage.error('设置失败: ' + (error.response?.data?.message || error.message))
+  }
 }
 
 const resetForm = () => {
@@ -220,10 +314,34 @@ onMounted(() => {
 
 .address-card {
   margin-bottom: 15px;
+  transition: all 0.3s ease;
+}
+
+.address-card:hover {
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .default-address {
-  border: 2px solid #409eff;
+  border: 2px solid #409eff !important;
+  background: linear-gradient(135deg, #e6f4ff 0%, #f0f9ff 100%) !important;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2) !important;
+  position: relative;
+}
+
+.default-address :deep(.el-card__body) {
+  background: transparent !important;
+}
+
+.default-address::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #409eff;
+  border-radius: 4px 0 0 4px;
+  z-index: 1;
 }
 
 .address-content {

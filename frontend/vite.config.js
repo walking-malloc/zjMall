@@ -14,11 +14,18 @@ export default defineConfig({
     proxy: {
       '/api/v1/users': {
         target: 'http://localhost:8081',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: (path) => path // 保持路径不变
       },
       '/api/v1/product': {
         target: 'http://localhost:8082',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: (path) => path
+      },
+      '/api/v1/cart': {
+        target: 'http://localhost:8083',
+        changeOrigin: true,
+        rewrite: (path) => path
       }
     }
   }

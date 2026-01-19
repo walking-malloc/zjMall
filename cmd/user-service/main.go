@@ -124,6 +124,7 @@ func main() {
 		middleware.Recovery(),                           // 2. 捕获 panic（需要 TraceID）
 		middleware.Logging(),                            // 3. 记录日志（需要 TraceID）
 		middleware.TraceID(),                            // 4. 生成 TraceID（供 Logging 和 Recovery 使用）
+		middleware.Auth(),                               // 5. 认证中间件：验证 token 并注入 user_id 到 context
 	)
 
 	// 启动服务器（阻塞）

@@ -27,8 +27,8 @@
 
             <div class="cart-items">
               <div 
-                v-for="(item, index) in cartStore.items" 
-                :key="index"
+                v-for="item in cartStore.items" 
+                :key="item.id"
                 class="cart-item"
               >
                 <el-checkbox 
@@ -43,17 +43,17 @@
                 <div class="price">¥{{ item.price.toFixed(2) }}</div>
                 <div class="quantity">
                   <el-input-number
-                    v-model="item.quantity"
+                  v-model="item.quantity"
                     :min="1"
                     :max="999"
-                    @change="(val) => cartStore.updateQuantity(index, val)"
+                  @change="(val) => handleQuantityChange(item, val)"
                   />
                 </div>
                 <div class="subtotal">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
                 <el-button 
                   type="danger" 
                   text 
-                  @click="cartStore.removeItem(index)"
+                  @click="handleRemove(item)"
                 >
                   删除
                 </el-button>
@@ -92,7 +92,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
 import { ElMessage } from 'element-plus'
@@ -126,27 +126,49 @@ const updateSelected = () => {
   selectAll.value = cartStore.items.every(item => item.selected)
 }
 
-const handleCheckout = () => {
+const handleQuantityChange = async (item, quantity) => {
+  try {
+    await cartStore.updateQuantity(item, quantity)
+  } catch (error) {
+    console.error('更新数量失败:', error)
+    ElMessage.error('更新数量失败，请稍后重试')
+  }
+}
+
+const handleRemove = async (item) => {
+  try {
+    await cartStore.removeItem(item)
+    ElMessage.success('已删除该商品')
+  } catch (error) {
+    console.error('删除商品失败:', error)
+    ElMessage.error('删除商品失败，请稍后重试')
+  }
+}
+
+const handleCheckout = async () => {
   if (!selectedItems.value.length) {
     ElMessage.warning('请选择要结算的商品')
     return
   }
-  // 跳转到结算页面
-  router.push({
-    path: '/checkout',
-    query: { items: JSON.stringify(selectedItems.value.map(item => ({
-      productId: item.productId,
-      skuId: item.skuId,
-      quantity: item.quantity
-    }))) }
-  })
+
+  try {
+    const itemIds = selectedItems.value.map(item => item.id)
+    const res = await cartStore.previewCheckout(itemIds)
+    if (res && res.code === 0) {
+      console.log('结算预览结果:', res.data)
+      ElMessage.success('已完成结算预览，后续可接入订单创建流程')
+    } else {
+      ElMessage.error(res?.message || '结算预览失败')
+    }
+  } catch (error) {
+    console.error('结算预览失败:', error)
+    ElMessage.error('结算预览失败，请稍后重试')
+  }
 }
 
-// 初始化选中状态
-cartStore.items.forEach(item => {
-  if (item.selected === undefined) {
-    item.selected = true
-  }
+onMounted(async () => {
+  await cartStore.loadCart()
+  await cartStore.refreshSummary()
 })
 </script>
 

@@ -142,53 +142,81 @@ func (h *UserServiceHandler) UploadAvatarHTTP(w http.ResponseWriter, r *http.Req
 }
 
 func (h *UserServiceHandler) CreateAddress(ctx context.Context, req *userv1.CreateAddressRequest) (*userv1.CreateAddressResponse, error) {
-	if req.UserId == "" {
+	// 从 context 中获取用户 ID（由认证中间件设置）
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == "" {
 		return &userv1.CreateAddressResponse{
 			Code:    1,
-			Message: "用户ID不能为空",
+			Message: "未登录或用户ID无效",
 		}, nil
 	}
-	return h.userService.CreateAddress(ctx, req)
+	return h.userService.CreateAddress(ctx, userID, req)
 }
 
 func (h *UserServiceHandler) ListAddresses(ctx context.Context, req *userv1.ListAddressesRequest) (*userv1.ListAddressesResponse, error) {
-	if req.UserId == "" {
+	// 从 context 中获取用户 ID（由认证中间件设置）
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == "" {
 		return &userv1.ListAddressesResponse{
 			Code:    1,
-			Message: "用户ID不能为空",
+			Message: "未登录或用户ID无效",
 		}, nil
 	}
-	return h.userService.ListAddresses(ctx, req)
+	return h.userService.ListAddresses(ctx, userID)
 }
 
 func (h *UserServiceHandler) UpdateAddress(ctx context.Context, req *userv1.UpdateAddressRequest) (*userv1.UpdateAddressResponse, error) {
-	if req.AddressId == "" || req.UserId == "" {
+	if req.AddressId == "" {
 		return &userv1.UpdateAddressResponse{
 			Code:    1,
-			Message: "地址ID或用户ID不能为空",
+			Message: "地址ID不能为空",
 		}, nil
 	}
-	return h.userService.UpdateAddress(ctx, req)
+	// 从 context 中获取用户 ID（由认证中间件设置）
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == "" {
+		return &userv1.UpdateAddressResponse{
+			Code:    1,
+			Message: "未登录或用户ID无效",
+		}, nil
+	}
+	return h.userService.UpdateAddress(ctx, userID, req)
 }
 
 func (h *UserServiceHandler) DeleteAddress(ctx context.Context, req *userv1.DeleteAddressRequest) (*userv1.DeleteAddressResponse, error) {
-	if req.AddressId == "" || req.UserId == "" {
+	if req.AddressId == "" {
 		return &userv1.DeleteAddressResponse{
 			Code:    1,
-			Message: "地址ID或用户ID不能为空",
+			Message: "地址ID不能为空",
 		}, nil
 	}
-	return h.userService.DeleteAddress(ctx, req)
+	// 从 context 中获取用户 ID（由认证中间件设置）
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == "" {
+		return &userv1.DeleteAddressResponse{
+			Code:    1,
+			Message: "未登录或用户ID无效",
+		}, nil
+	}
+	return h.userService.DeleteAddress(ctx, userID, req.AddressId)
 }
 
 func (h *UserServiceHandler) SetDefaultAddress(ctx context.Context, req *userv1.SetDefaultAddressRequest) (*userv1.SetDefaultAddressResponse, error) {
-	if req.AddressId == "" || req.UserId == "" {
+	if req.AddressId == "" {
 		return &userv1.SetDefaultAddressResponse{
 			Code:    1,
-			Message: "地址ID或用户ID不能为空",
+			Message: "地址ID不能为空",
 		}, nil
 	}
-	return h.userService.SetDefaultAddress(ctx, req)
+	// 从 context 中获取用户 ID（由认证中间件设置）
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == "" {
+		return &userv1.SetDefaultAddressResponse{
+			Code:    1,
+			Message: "未登录或用户ID无效",
+		}, nil
+	}
+	return h.userService.SetDefaultAddress(ctx, userID, req.AddressId)
 }
 
 func (h *UserServiceHandler) ChangePassword(ctx context.Context, req *userv1.ChangePasswordRequest) (*userv1.ChangePasswordResponse, error) {

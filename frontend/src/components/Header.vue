@@ -4,16 +4,13 @@
       <div class="logo" @click="$router.push('/')">
         <h1>zjMall</h1>
       </div>
-      
+
       <div class="search-bar">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索商品"
-          @keyup.enter="handleSearch"
-          clearable
-        >
+        <el-input v-model="searchKeyword" placeholder="搜索商品" @keyup.enter="handleSearch" clearable>
           <template #prefix>
-            <el-icon><Search /></el-icon>
+            <el-icon>
+              <Search />
+            </el-icon>
           </template>
           <template #append>
             <el-button @click="handleSearch">搜索</el-button>
@@ -24,10 +21,12 @@
       <div class="nav-menu">
         <el-button type="text" @click="$router.push('/')">首页</el-button>
         <el-button type="text" @click="$router.push('/product/products')">商品</el-button>
-        
+
         <el-badge :value="cartCount" :hidden="cartCount === 0" class="cart-badge">
           <el-button type="text" @click="$router.push('/cart')">
-            <el-icon><ShoppingCart /></el-icon>
+            <el-icon>
+              <ShoppingCart />
+            </el-icon>
             购物车
           </el-button>
         </el-badge>
@@ -42,24 +41,34 @@
                 <span style="margin-left: 8px;">
                   {{ userStore.userInfo?.nickname || userStore.userInfo?.phone }}
                 </span>
-                <el-icon><ArrowDown /></el-icon>
+                <el-icon>
+                  <ArrowDown />
+                </el-icon>
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="profile">
-                    <el-icon><User /></el-icon>
+                    <el-icon>
+                      <User />
+                    </el-icon>
                     个人中心
                   </el-dropdown-item>
                   <el-dropdown-item command="orders">
-                    <el-icon><List /></el-icon>
+                    <el-icon>
+                      <List />
+                    </el-icon>
                     我的订单
                   </el-dropdown-item>
                   <el-dropdown-item command="addresses">
-                    <el-icon><Location /></el-icon>
+                    <el-icon>
+                      <Location />
+                    </el-icon>
                     收货地址
                   </el-dropdown-item>
                   <el-dropdown-item command="logout" divided>
-                    <el-icon><SwitchButton /></el-icon>
+                    <el-icon>
+                      <SwitchButton />
+                    </el-icon>
                     退出登录
                   </el-dropdown-item>
                 </el-dropdown-menu>
@@ -81,14 +90,14 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useCartStore } from '@/stores/cart'
-import { 
-  Search, 
-  ShoppingCart, 
-  ArrowDown, 
-  User, 
-  List, 
-  Location, 
-  SwitchButton 
+import {
+  Search,
+  ShoppingCart,
+  ArrowDown,
+  User,
+  List,
+  Location,
+  SwitchButton
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -192,4 +201,3 @@ const handleUserCommand = (command) => {
   background-color: #f5f5f5;
 }
 </style>
-

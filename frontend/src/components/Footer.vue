@@ -39,7 +39,7 @@
     </div>
     
     <div class="footer-bottom">
-      <p>&copy; 2024 zjMall. All rights reserved.</p>
+      <p>&copy; 2025 zjMall. All rights reserved.</p>
     </div>
   </el-footer>
 </template>
@@ -51,7 +51,7 @@
 .app-footer {
   background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
   color: #fff;
-  padding: 60px 20px 30px;
+  padding: 30px 30px 150px;
   margin-top: auto;
   width: 100%;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
@@ -59,15 +59,7 @@
   overflow: hidden;
 }
 
-.app-footer::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #409eff, #67c23a, #e6a23c, #f56c6c);
-}
+
 
 .footer-content {
   max-width: 1200px;
