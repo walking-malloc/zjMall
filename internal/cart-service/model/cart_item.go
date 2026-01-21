@@ -15,8 +15,9 @@ type CartItem struct {
 	UserID string `gorm:"type:varchar(26);not null;comment:用户ID" json:"user_id"`
 
 	// 商品信息
-	ProductID    string `gorm:"type:varchar(26);not null;comment:商品ID（SPU ID）" json:"product_id"`
-	SKUID        string `gorm:"type:varchar(26);not null;comment:SKU ID" json:"sku_id"`
+	ProductID string `gorm:"type:varchar(26);not null;comment:商品ID（SPU ID）" json:"product_id"`
+	// 注意：数据库列名是 sku_id，字段名是 SKUID，这里显式指定 column，避免默认映射成 sk_uid
+	SKUID        string `gorm:"column:sku_id;type:varchar(26);not null;comment:SKU ID" json:"sku_id"`
 	ProductTitle string `gorm:"type:varchar(200);not null;comment:商品标题" json:"product_title"`
 	ProductImage string `gorm:"type:varchar(255);comment:商品主图" json:"product_image"`
 	SKUName      string `gorm:"type:varchar(100);comment:SKU 名称（规格描述）" json:"sku_name"`

@@ -44,18 +44,13 @@ type RedisConfig struct {
 	WriteTimeout int    `yaml:"writeTimeout"`
 }
 
-type RocketMQConfig struct {
-	// RocketMQ 5.x 使用 Proxy 的 gRPC Endpoint（不再是 NameServer）
-	Endpoint      string            `yaml:"endpoint"`        // Proxy gRPC Endpoint（例如 "127.0.0.1:8081"）
-	AccessKey     string            `yaml:"access_key"`      // 访问密钥（可选，如果启用了认证）
-	SecretKey     string            `yaml:"secret_key"`      // 密钥（可选，如果启用了认证）
-	RetryTimes    int               `yaml:"retry_times"`     // 发送重试次数（默认值）
-	SendMsgTimeout int              `yaml:"send_msg_timeout"` // 发送消息超时（秒，默认值）
-	EnableTrace   bool             `yaml:"enable_trace"`     // 是否开启消息轨迹
-	ServiceGroups map[string]string `yaml:"service_groups"`  // 服务名到生产者组名的映射
-	
-	// 兼容 4.x 配置（如果配置了 name_servers，则使用 4.x 客户端）
-	NameServers   []string          `yaml:"name_servers"`     // NameServer 地址列表（4.x 使用，5.x 不使用）
+type RabbitMQConfig struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	VHost    string `yaml:"vhost"`
+	Queue    string `yaml:"queue"`
 }
 
 type SMSConfig struct {
@@ -88,17 +83,25 @@ type ServiceClientConfig struct {
 	ProductServiceAddr string `yaml:"product_service_addr"` // 商品服务 gRPC 地址，例如 "localhost:50053"
 }
 
+type NacosConfig struct {
+	Host      string `yaml:"host"`
+	Port      uint64 `yaml:"port"`
+	Username  string `yaml:"username"`
+	Password  string `yaml:"password"`
+	Namespace string `yaml:"namespace"`
+}
 type Config struct {
 	Services         map[string]ServiceConfig `yaml:"services"`
 	MySQL            DatabaseConfig           `yaml:"mysql"`
 	ServiceDatabases map[string]string        `yaml:"service_databases"` // 服务名到数据库名的映射
 	Redis            RedisConfig              `yaml:"redis"`
-	RocketMQ         RocketMQConfig           `yaml:"rocketmq"`
 	SMS              SMSConfig                `yaml:"sms"`
 	JWT              JWTConfig                `yaml:"jwt"`
 	OSS              OSSConfig                `yaml:"oss"`
 	Elasticsearch    ElasticsearchConfig      `yaml:"elasticsearch"`
 	ServiceClients   ServiceClientConfig      `yaml:"service_clients"` // 服务客户端配置
+	Nacos            NacosConfig              `yaml:"nacos"`
+	RabbitMQ         RabbitMQConfig           `yaml:"rabbitmq"`
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -141,31 +144,6 @@ func (c *Config) GetRedisConfig() *RedisConfig {
 	return &c.Redis
 }
 
-// GetRocketMQConfig 获取 RocketMQ 配置（全局公共配置）
-func (c *Config) GetRocketMQConfig() *RocketMQConfig {
-	return &c.RocketMQ
-}
-
-// GetRocketMQConfigForService 获取指定服务的 RocketMQ 配置
-// 返回该服务的生产者组名和公共配置
-func (c *Config) GetRocketMQConfigForService(serviceName string) (groupName string, config *RocketMQConfig, err error) {
-	config = &c.RocketMQ
-
-	// 从服务映射中获取该服务的生产者组名
-	if c.RocketMQ.ServiceGroups != nil {
-		if gName, exists := c.RocketMQ.ServiceGroups[serviceName]; exists {
-			groupName = gName
-		}
-	}
-
-	// 如果没有配置，使用默认命名约定：service-name -> service-name-producer-group
-	if groupName == "" {
-		groupName = serviceName + "-producer-group"
-	}
-
-	return groupName, config, nil
-}
-
 func (c *Config) GetSMSConfig() *SMSConfig {
 	return &c.SMS
 }
@@ -184,4 +162,12 @@ func (c *Config) GetElasticsearchConfig() *ElasticsearchConfig {
 
 func (c *Config) GetServiceClientsConfig() *ServiceClientConfig {
 	return &c.ServiceClients
+}
+
+func (c *Config) GetNacosConfig() *NacosConfig {
+	return &c.Nacos
+}
+
+func (c *Config) GetRabbitMQConfig() *RabbitMQConfig {
+	return &c.RabbitMQ
 }

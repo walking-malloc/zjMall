@@ -9,6 +9,7 @@ import (
 	productv1 "zjMall/gen/go/api/proto/product"
 	"zjMall/internal/common/cache"
 	"zjMall/internal/common/middleware"
+	registry "zjMall/internal/common/register"
 	"zjMall/internal/common/server"
 	"zjMall/internal/config"
 	"zjMall/internal/database"
@@ -20,6 +21,9 @@ import (
 
 	"google.golang.org/grpc"
 )
+
+const serviceName = "product-service"
+const serviceIP = "127.0.0.1"
 
 // todo 需要改为商品服务的配置
 func main() {
@@ -34,6 +38,14 @@ func main() {
 	}
 	log.Println("✅ 配置文件加载成功")
 
+	//2.初始化Nacos
+	svcCfg, _ := config.GetServiceConfig(serviceName)
+	nacosConfig := config.GetNacosConfig()
+	nacosClient, err := registry.NewNacosNamingClient(nacosConfig)
+	if err != nil {
+		log.Fatalf("❌ Nacos 初始化失败: %v", err)
+	}
+	registry.RegisterService(nacosClient, serviceName, serviceIP, uint64(svcCfg.GRPC.Port))
 	//初始化JWT
 	log.Println("🔧 初始化 JWT...")
 	jwtConfig := config.GetJWTConfig()

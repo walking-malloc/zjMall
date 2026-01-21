@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -16,6 +17,7 @@ import (
 	"zjMall/internal/common/client"
 	"zjMall/internal/common/middleware"
 	"zjMall/internal/common/mq"
+	registry "zjMall/internal/common/register"
 	"zjMall/internal/common/server"
 	"zjMall/internal/config"
 	"zjMall/internal/database"
@@ -25,6 +27,7 @@ import (
 )
 
 const serviceName = "cart-service"
+const serviceIP = "127.0.0.1"
 
 func main() {
 	// 0. 初始化日志：同时输出到控制台和文件 logs/cart-service.log
@@ -47,6 +50,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
+	//2.初始化Nacos
+	svcCfg, _ := cfg.GetServiceConfig(serviceName)
+	nacosConfig := cfg.GetNacosConfig()
+	nacosClient, err := registry.NewNacosNamingClient(nacosConfig)
+	if err != nil {
+		log.Fatalf("❌ Nacos 初始化失败: %v", err)
+	}
+	registry.RegisterService(nacosClient, serviceName, serviceIP, uint64(svcCfg.GRPC.Port))
 	//初始化JWT
 	pkg.InitJWT(cfg.GetJWTConfig())
 	// 2. 初始化数据库（购物车数据存储在 MySQL）
@@ -71,39 +82,61 @@ func main() {
 	// 4. 创建通用的缓存仓库
 	baseCacheRepo := cache.NewCacheRepository(redisClient)
 
-	// 5. 初始化 RocketMQ 5.x（可选，如果配置了才初始化）
+	// 5. 初始化 RabbitMQ（可选，如果配置了才初始化）
 	var mqProducer mq.MessageProducer
-	groupName, rocketMQConfig, err := cfg.GetRocketMQConfigForService(serviceName)
-	if err == nil && rocketMQConfig.Endpoint != "" {
-		rocketMQProducer, err := database.InitRocketMQ(groupName, rocketMQConfig)
+	rabbitCfg := cfg.GetRabbitMQConfig()
+	if rabbitCfg != nil && rabbitCfg.Host != "" {
+		ch, err := database.InitRabbitMQ(rabbitCfg)
 		if err != nil {
-			log.Printf("⚠️ RocketMQ 5.x 初始化失败，将使用同步模式: %v", err)
+			log.Printf("⚠️ RabbitMQ 初始化失败，将使用同步模式: %v", err)
 		} else {
-			defer database.CloseRocketMQ()
-			mqProducer = mq.NewMessageProducer(rocketMQProducer)
-			log.Printf("✅ RocketMQ 5.x 初始化成功，使用异步同步模式: GroupName=%s, Endpoint=%s", groupName, rocketMQConfig.Endpoint)
+			defer database.CloseRabbitMQ()
+			mqProducer = mq.NewMessageProducer(ch, rabbitCfg.Queue)
+			log.Printf("✅ RabbitMQ 初始化成功，队列=%s", rabbitCfg.Queue)
+
+			// 启动购物车事件消费者：从 MQ 同步数据到 MySQL
+			consumerCtx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			go mq.StartCartEventConsumer(consumerCtx, db, ch, rabbitCfg.Queue)
 		}
 	} else {
-		log.Println("ℹ️ 未配置 RocketMQ，将使用同步模式（Redis + MySQL 双写）")
+		log.Println("ℹ️ 未配置 RabbitMQ，将使用同步模式（Redis + MySQL 双写）")
 	}
 
 	// 6. 创建购物车仓库（Redis 主存储 + MQ 异步同步到 MySQL）
 	log.Printf("🔍 [DEBUG] 创建 CartRepository，mqProducer 是否为 nil: %v", mqProducer == nil)
 	cartRepo := repository.NewCartRepository(db, redisClient, baseCacheRepo, mqProducer)
 
-	// 7. 初始化商品服务客户端
+	// 7. 初始化商品服务客户端（优先通过 Nacos 发现，其次使用配置中的备用地址）
 	var productClient client.ProductClient
-	serviceClientsConfig := cfg.GetServiceClientsConfig()
-	if serviceClientsConfig.ProductServiceAddr != "" {
-		productClient, err = client.NewProductClient(serviceClientsConfig.ProductServiceAddr)
+	productServiceAddr := ""
+
+	// 7.1 尝试从 Nacos 发现 product-service
+	productServiceAddr, err = registry.SelectOneHealthyInstance(nacosClient, "product-service")
+	if err != nil {
+		log.Printf("⚠️ 从 Nacos 发现商品服务失败，将尝试使用配置中的备用地址: %v", err)
+	}
+
+	// 7.2 如果 Nacos 没有可用实例，则回退到配置文件中的地址
+	if productServiceAddr == "" {
+		serviceClientsConfig := cfg.GetServiceClientsConfig()
+		if serviceClientsConfig.ProductServiceAddr != "" {
+			productServiceAddr = serviceClientsConfig.ProductServiceAddr
+			log.Printf("ℹ️ 使用配置中的商品服务备用地址: %s", productServiceAddr)
+		}
+	}
+
+	// 7.3 如果拿到了地址，则创建 gRPC 客户端
+	if productServiceAddr != "" {
+		productClient, err = client.NewProductClient(productServiceAddr)
 		if err != nil {
 			log.Printf("⚠️ 商品服务客户端初始化失败，购物车功能可能受限: %v", err)
 		} else {
 			defer productClient.Close()
-			log.Printf("✅ 商品服务客户端连接成功: %s", serviceClientsConfig.ProductServiceAddr)
+			log.Printf("✅ 商品服务客户端连接成功: %s", productServiceAddr)
 		}
 	} else {
-		log.Println("ℹ️ 未配置商品服务地址，将使用模拟数据")
+		log.Println("ℹ️ 未找到商品服务地址，将使用模拟数据")
 	}
 
 	// 8. 创建购物车服务

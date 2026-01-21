@@ -9,6 +9,7 @@ import (
 	"zjMall/internal/common/cache"
 	"zjMall/internal/common/middleware"
 	upload "zjMall/internal/common/oss"
+	registry "zjMall/internal/common/register"
 	"zjMall/internal/common/server"
 	"zjMall/internal/config"
 	"zjMall/internal/database"
@@ -22,6 +23,9 @@ import (
 	"google.golang.org/grpc"
 )
 
+const serviceName = "user-service"
+const serviceIP = "127.0.0.1"
+
 func main() {
 	//1.加载配置
 	configPath := filepath.Join("./configs", "config.yaml")
@@ -29,8 +33,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
+	//2.初始化Nacos
+	svcCfg, _ := config.GetServiceConfig(serviceName)
+	nacosConfig := config.GetNacosConfig()
+	nacosClient, err := registry.NewNacosNamingClient(nacosConfig)
+	if err != nil {
+		log.Fatalf("❌ Nacos 初始化失败: %v", err)
+	}
+	registry.RegisterService(nacosClient, serviceName, serviceIP, uint64(svcCfg.GRPC.Port))
 	//2.初始化数据库（使用服务特定的数据库配置）
-	serviceName := "user-service"
 	mysqlConfig, err := config.GetDatabaseConfigForService(serviceName)
 	if err != nil {
 		log.Fatalf("Error getting database config for %s: %v", serviceName, err)

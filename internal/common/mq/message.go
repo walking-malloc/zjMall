@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	rmq "github.com/apache/rocketmq-clients/golang/v5"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 // MessageProducer 消息生产者接口
@@ -23,13 +23,16 @@ type MessageProducer interface {
 }
 
 type messageProducer struct {
-	producer rmq.Producer
+	channel *amqp.Channel
+	queue   string
 }
 
-// NewMessageProducer 创建消息生产者（RocketMQ 5.x）
-func NewMessageProducer(p rmq.Producer) MessageProducer {
+// NewMessageProducer 创建消息生产者（RabbitMQ）
+// 这里的参数是 RabbitMQ 的 Channel 和队列名
+func NewMessageProducer(ch *amqp.Channel, queue string) MessageProducer {
 	return &messageProducer{
-		producer: p,
+		channel: ch,
+		queue:   queue,
 	}
 }
 
@@ -41,18 +44,23 @@ func (m *messageProducer) SendMessage(ctx context.Context, topic string, data in
 		return fmt.Errorf("序列化消息失败: %w", err)
 	}
 
-	// 创建消息（RocketMQ 5.x API）
-	msg := &rmq.Message{
-		Topic: topic,
-		Body:  body,
-	}
-
-	// 发送消息
-	if _, err := m.producer.Send(ctx, msg); err != nil {
+	// RabbitMQ 中我们使用队列名作为目标（这里忽略 topic，或将 topic 写入 header）
+	err = m.channel.PublishWithContext(ctx,
+		"",      // exchange
+		m.queue, // routing key (queue 名)
+		false,   // mandatory
+		false,   // immediate
+		amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         body,
+		},
+	)
+	if err != nil {
 		return fmt.Errorf("发送消息失败: %w", err)
 	}
 
-	log.Printf("✅ 消息发送成功: Topic=%s", topic)
+	log.Printf("✅ RabbitMQ 消息发送成功: Queue=%s, Topic=%s", m.queue, topic)
 	return nil
 }
 
@@ -65,16 +73,18 @@ func (m *messageProducer) SendOrderedMessage(ctx context.Context, topic string, 
 		return fmt.Errorf("序列化消息失败: %w", err)
 	}
 
-	// 创建消息（RocketMQ 5.x API）
-	msg := &rmq.Message{
-		Topic: topic,
-		Body:  body,
-	}
-
-	// 注意：RocketMQ Go v5 SDK 的顺序消息需要使用 Message Group 相关 API。
-	// 这里为了先让代码编译运行，暂时按普通消息发送，后续如需严格顺序再按官方文档补充。
-
-	if _, err := m.producer.Send(ctx, msg); err != nil {
+	// RabbitMQ 简单实现：同样发送到队列（如需严格有序可根据 key 使用不同队列或 exchange+routingKey）
+	err = m.channel.PublishWithContext(ctx,
+		"",
+		m.queue,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+	if err != nil {
 		return fmt.Errorf("发送顺序消息失败: %w", err)
 	}
 

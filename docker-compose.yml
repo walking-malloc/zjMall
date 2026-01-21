@@ -5,7 +5,6 @@ services:
     container_name: zjmall-mysql
     environment:
       MYSQL_ROOT_PASSWORD: root123456
-      MYSQL_DATABASE: zjmall
       MYSQL_USER: zjmall
       MYSQL_PASSWORD: zjmall123
       TZ: Asia/Shanghai
@@ -52,87 +51,41 @@ services:
     networks:
       - zjmall-network
 
-  # RocketMQ NameServer（路由中心）
-  # 命令解释：
-  #   docker run -d                    -> 后台运行容器
-  #   --name rmqnamesrv                -> 容器名称
-  #   -p 9876:9876                     -> 端口映射（宿主机:容器）
-  #   --network rocketmq               -> 使用 Docker 网络（docker-compose 会自动创建 zjmall-network）
-  #   apache/rocketmq:5.3.2            -> 镜像版本（5.3.2 比 4.9.6 更稳定）
-  #   sh mqnamesrv                     -> 启动 NameServer 命令
-  rocketmq-nameserver:
-    image: apache/rocketmq:5.1.4                           
-    container_name: zjmall-rocketmq-nameserver             
+  # RabbitMQ（替代 RocketMQ 作为消息队列）
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: zjmall-rabbitmq
     ports:
-      - "9876:9876"                                        
-    volumes:
-      - rocketmq_nameserver_logs:/home/rocketmq/logs      # 持久化 NameServer 日志（方便排查问题）
-    command: sh mqnamesrv                                  
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # 管理控制台
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     restart: unless-stopped                               
     networks:
       - zjmall-network                                    
 
-  # RocketMQ Broker（消息存储和转发）
-  rocketmq-broker:
-    image: apache/rocketmq:5.1.4
-    container_name: zjmall-rocketmq-broker
-    depends_on:
-      - rocketmq-nameserver
-    ports:
-      - "10911:10911"
-      - "10912:10912"  # VIP 通道端口
-    volumes:
-      - rocketmq_broker_store:/home/rocketmq/store        # 持久化 Broker 消息数据
-      - rocketmq_broker_logs:/home/rocketmq/logs          # 持久化 Broker 日志
-    environment:
-      - NAMESRV_ADDR=rocketmq-nameserver:9876
-      - JAVA_OPT_EXT=-server -Xms256m -Xmx256m -Xmn128m -Drocketmq.brokerIP1=host.docker.internal -Drocketmq.storePathRootDir=/home/rocketmq/store
-    # 使用最简单的启动方式，让 Broker 自动处理配置
-    command: sh mqbroker -n rocketmq-nameserver:9876 autoCreateTopicEnable=true
-    restart: unless-stopped
-    networks:
-      - zjmall-network
-
-  # RocketMQ Proxy（5.x gRPC 访问入口，供 Go 客户端使用）
-  # 默认监听 8081 端口，对应 config.yaml 中 rocketmq.endpoint
-  rocketmq-proxy:
-    image: apache/rocketmq:5.1.4
-    container_name: zjmall-rocketmq-proxy
-    depends_on:
-      - rocketmq-nameserver
-      - rocketmq-broker
-    ports:
-      - "8081:8081"
-    environment:
-      - NAMESRV_ADDR=rocketmq-nameserver:9876
-      # PROXY_NAME 可选，标识该 Proxy 实例名称
-      - PROXY_NAME=zjmall-rocketmq-proxy
-    command: sh mqproxy
-    restart: unless-stopped
-    networks:
-      - zjmall-network
-
   # Nacos注册中心（可选，如果暂时不用可以注释掉）
-  # nacos:
-  #   image: nacos/nacos-server:v2.3.2
-  #   container_name: zjmall-nacos
-  #   environment:
-  #     - MODE=standalone
-  #     - NACOS_AUTH_ENABLE=false
-  #     - SPRING_DATASOURCE_PLATFORM=mysql
-  #     - MYSQL_SERVICE_HOST=mysql
-  #     - MYSQL_SERVICE_PORT=3306
-  #     - MYSQL_SERVICE_DB=nacos_config
-  #     - MYSQL_SERVICE_USER=root
-  #     - MYSQL_SERVICE_PASSWORD=root123456
-  #   ports:
-  #     - "8848:8848"
-  #     - "9848:9848"
-  #   depends_on:
-  #     - mysql
-  #   restart: unless-stopped
-  #   networks:
-  #     - zjmall-network
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: zjmall-nacos
+    environment:
+      - MODE=standalone
+      - NACOS_AUTH_ENABLE=false
+      - SPRING_DATASOURCE_PLATFORM=mysql
+      - MYSQL_SERVICE_HOST=mysql
+      - MYSQL_SERVICE_PORT=3306
+      - MYSQL_SERVICE_DB_NAME=nacos_config
+      - MYSQL_SERVICE_USER=root
+      - MYSQL_SERVICE_PASSWORD=root123456
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    depends_on:
+      - mysql
+    restart: unless-stopped
+    networks:
+      - zjmall-network
 
 volumes:
   mysql_data:
@@ -140,12 +93,6 @@ volumes:
   redis_data:
     driver: local
   elasticsearch_data:
-    driver: local
-  rocketmq_nameserver_logs:
-    driver: local
-  rocketmq_broker_store:
-    driver: local
-  rocketmq_broker_logs:
     driver: local
 
 networks:

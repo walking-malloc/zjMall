@@ -4,13 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 	cartv1 "zjMall/gen/go/api/proto/cart"
 	"zjMall/internal/cart-service/service"
 	"zjMall/internal/common/middleware"
-	"zjMall/pkg"
-
-	"google.golang.org/grpc/metadata"
 )
 
 type CartServiceHandler struct {
@@ -24,49 +20,10 @@ func NewCartServiceHandler(cartService *service.CartService) *CartServiceHandler
 	}
 }
 
-// getUserID 从上下文中获取用户 ID
-// 优先使用 HTTP 层中间件注入的 user_id；如果没有，则从 gRPC Metadata 的 Authorization 中解析 JWT
-func getUserID(ctx context.Context) string {
-	// 1. 优先从 HTTP 中间件注入的 Context 中获取
-	if userID := middleware.GetUserIDFromContext(ctx); userID != "" {
-		return userID
-	}
-
-	// 2. 从 gRPC Metadata 中获取 Authorization 头
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return ""
-	}
-
-	authVals := md.Get("authorization")
-	if len(authVals) == 0 {
-		return ""
-	}
-
-	authHeader := authVals[0]
-	if authHeader == "" {
-		return ""
-	}
-
-	// 去掉前缀 "Bearer "
-	token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
-	if token == "" {
-		return ""
-	}
-
-	// 验证 JWT 并解析出 userID
-	userID, err := pkg.VerifyJWT(token)
-	if err != nil {
-		log.Printf("⚠️ [Handler] JWT 验证失败: %v", err)
-		return ""
-	}
-	return userID
-}
-
 // AddItem 添加商品到购物车
 func (h *CartServiceHandler) AddItem(ctx context.Context, req *cartv1.AddItemRequest) (*cartv1.AddItemResponse, error) {
 	// 从 context 中获取用户ID（由认证中间件注入）
-	userID := getUserID(ctx)
+	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
 		log.Printf("⚠️ [Handler] AddItem: 用户未登录")
 		return &cartv1.AddItemResponse{
@@ -105,7 +62,7 @@ func (h *CartServiceHandler) AddItem(ctx context.Context, req *cartv1.AddItemReq
 
 // UpdateItemQuantity 更新购物车商品数量
 func (h *CartServiceHandler) UpdateItemQuantity(ctx context.Context, req *cartv1.UpdateItemQuantityRequest) (*cartv1.UpdateItemQuantityResponse, error) {
-	userID := getUserID(ctx)
+	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
 		log.Printf("⚠️ [Handler] UpdateItemQuantity: 用户未登录")
 		return &cartv1.UpdateItemQuantityResponse{
@@ -146,7 +103,7 @@ func (h *CartServiceHandler) UpdateItemQuantity(ctx context.Context, req *cartv1
 
 // RemoveItem 删除购物车商品
 func (h *CartServiceHandler) RemoveItem(ctx context.Context, req *cartv1.RemoveItemRequest) (*cartv1.RemoveItemResponse, error) {
-	userID := getUserID(ctx)
+	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
 		log.Printf("⚠️ [Handler] RemoveItem: 用户未登录")
 		return &cartv1.RemoveItemResponse{
@@ -180,7 +137,7 @@ func (h *CartServiceHandler) RemoveItem(ctx context.Context, req *cartv1.RemoveI
 
 // RemoveItems 批量删除购物车商品
 func (h *CartServiceHandler) RemoveItems(ctx context.Context, req *cartv1.RemoveItemsRequest) (*cartv1.RemoveItemsResponse, error) {
-	userID := getUserID(ctx)
+	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
 		log.Printf("⚠️ [Handler] RemoveItems: 用户未登录")
 		return &cartv1.RemoveItemsResponse{
@@ -217,7 +174,7 @@ func (h *CartServiceHandler) RemoveItems(ctx context.Context, req *cartv1.Remove
 
 // ClearCart 清空购物车
 func (h *CartServiceHandler) ClearCart(ctx context.Context, req *cartv1.ClearCartRequest) (*cartv1.ClearCartResponse, error) {
-	userID := getUserID(ctx)
+	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
 		log.Printf("⚠️ [Handler] ClearCart: 用户未登录")
 		return &cartv1.ClearCartResponse{
@@ -242,7 +199,7 @@ func (h *CartServiceHandler) ClearCart(ctx context.Context, req *cartv1.ClearCar
 
 // GetCart 获取购物车列表
 func (h *CartServiceHandler) GetCart(ctx context.Context, req *cartv1.GetCartRequest) (*cartv1.GetCartResponse, error) {
-	userID := getUserID(ctx)
+	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
 		log.Printf("⚠️ [Handler] GetCart: 用户未登录")
 		return &cartv1.GetCartResponse{
@@ -267,7 +224,7 @@ func (h *CartServiceHandler) GetCart(ctx context.Context, req *cartv1.GetCartReq
 
 // GetCartSummary 获取购物车统计信息
 func (h *CartServiceHandler) GetCartSummary(ctx context.Context, req *cartv1.GetCartSummaryRequest) (*cartv1.GetCartSummaryResponse, error) {
-	userID := getUserID(ctx)
+	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
 		log.Printf("⚠️ [Handler] GetCartSummary: 用户未登录")
 		return &cartv1.GetCartSummaryResponse{
@@ -292,7 +249,7 @@ func (h *CartServiceHandler) GetCartSummary(ctx context.Context, req *cartv1.Get
 
 // CheckoutPreview 结算预览
 func (h *CartServiceHandler) CheckoutPreview(ctx context.Context, req *cartv1.CheckoutPreviewRequest) (*cartv1.CheckoutPreviewResponse, error) {
-	userID := getUserID(ctx)
+	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
 		log.Printf("⚠️ [Handler] CheckoutPreview: 用户未登录")
 		return &cartv1.CheckoutPreviewResponse{

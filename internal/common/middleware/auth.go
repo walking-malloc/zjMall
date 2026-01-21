@@ -28,7 +28,7 @@ func GetUserIDFromContext(ctx context.Context) string {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if ok {
 		log.Printf("从 gRPC metadata 获取 user_id: %v", md)
-		userIDs := md.Get("authorization")
+		userIDs := md.Get(string(UserIDKey))
 		if len(userIDs) > 0 && userIDs[0] != "" {
 			log.Printf("从 gRPC metadata 获取 user_id: %s", userIDs[0])
 			return userIDs[0]
