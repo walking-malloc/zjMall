@@ -1,0 +1,130 @@
+syntax = "proto3";
+
+package inventory.v1;
+
+option go_package = "zjMall/api/proto/gen/go/inventory/v1;inventoryv1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+// 库存服务
+service InventoryService {
+  // 查询单个 SKU 库存
+  rpc GetStock(GetStockRequest) returns (GetStockResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/inventory/stocks/{sku_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "库存管理"
+    };
+  }
+
+  // 批量查询多个 SKU 库存
+  rpc BatchGetStock(BatchGetStockRequest) returns (BatchGetStockResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/inventory/stocks/batch-get"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "库存管理"
+    };
+  }
+
+  // 扣减库存（通常由订单服务调用）
+  rpc DeductStock(DeductStockRequest) returns (DeductStockResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/inventory/stocks/deduct"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "库存管理"
+    };
+  }
+
+  // 回滚库存（订单取消/关闭时调用）
+  rpc RollbackStock(RollbackStockRequest) returns (RollbackStockResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/inventory/stocks/rollback"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "库存管理"
+    };
+  }
+}
+
+// ============================================
+// 库存实体
+// ============================================
+
+// 单个 SKU 库存信息
+message Stock {
+  string id = 1;                       // 库存记录ID
+  string sku_id = 2;                   // SKU ID
+  int64 available_stock = 3;           // 可用库存数量
+  int64 version = 4;                   // 版本号（预留）
+  google.protobuf.Timestamp created_at = 5; // 创建时间
+  google.protobuf.Timestamp updated_at = 6; // 更新时间
+}
+
+// SKU + 数量
+message SkuQuantity {
+  string sku_id = 1;                   // SKU ID
+  int64 quantity = 2;                  // 数量（必须 > 0）
+}
+
+// ============================================
+// 查询库存
+// ============================================
+
+message GetStockRequest {
+  string sku_id = 1;                   // SKU ID
+}
+
+message GetStockResponse {
+  int32 code = 1;
+  string message = 2;
+  Stock data = 3;                      // 若不存在则为 null
+}
+
+message BatchGetStockRequest {
+  repeated string sku_ids = 1;         // SKU ID 列表
+}
+
+message BatchGetStockResponse {
+  int32 code = 1;
+  string message = 2;
+  // 使用 map 返回，key 为 sku_id
+  map<string, Stock> data = 3;
+}
+
+// ============================================
+// 扣减库存
+// ============================================
+
+message DeductStockRequest {
+  string order_id = 1;                 // 订单ID（用于幂等和审计）
+  repeated SkuQuantity items = 2;      // 需要扣减的 SKU 列表
+}
+
+message DeductStockResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// ============================================
+// 回滚库存
+// ============================================
+
+message RollbackStockRequest {
+  string order_id = 1;                 // 订单ID（用于幂等和审计）
+  repeated SkuQuantity items = 2;      // 需要回滚的 SKU 列表
+}
+
+message RollbackStockResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+

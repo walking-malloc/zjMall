@@ -117,6 +117,27 @@ func main() {
 		log.Printf("⚠️ 从 Nacos 发现商品服务失败，将尝试使用配置中的备用地址: %v", err)
 	}
 
+	// 8. 初始化库存服务客户端（优先通过 Nacos 发现）
+	var inventoryClient client.InventoryClient
+	inventoryServiceAddr := ""
+
+	inventoryServiceAddr, err = registry.SelectOneHealthyInstance(nacosClient, "inventory-service")
+	if err != nil {
+		log.Printf("⚠️ 从 Nacos 发现库存服务失败: %v", err)
+	}
+
+	if inventoryServiceAddr != "" {
+		inventoryClient, err = client.NewInventoryClient(inventoryServiceAddr)
+		if err != nil {
+			log.Printf("⚠️ 库存服务客户端初始化失败，部分库存校验功能将不可用: %v", err)
+		} else {
+			defer inventoryClient.Close()
+			log.Printf("✅ 库存服务客户端连接成功: %s", inventoryServiceAddr)
+		}
+	} else {
+		log.Println("ℹ️ 未找到库存服务地址，将跳过库存实时校验")
+	}
+
 	// 7.2 如果 Nacos 没有可用实例，则回退到配置文件中的地址
 	if productServiceAddr == "" {
 		serviceClientsConfig := cfg.GetServiceClientsConfig()
@@ -139,30 +160,30 @@ func main() {
 		log.Println("ℹ️ 未找到商品服务地址，将使用模拟数据")
 	}
 
-	// 8. 创建购物车服务
-	cartService := service.NewCartService(cartRepo, productClient)
+	// 9. 创建购物车服务
+	cartService := service.NewCartService(cartRepo, productClient, inventoryClient)
 
-	// 9. 创建购物车 Handler
+	// 10. 创建购物车 Handler
 	cartServiceHandler := handler.NewCartServiceHandler(cartService)
 
-	// 10. 获取服务配置
+	// 11. 获取服务配置
 	serviceCfg, err := cfg.GetServiceConfig(serviceName)
 	if err != nil {
 		log.Fatalf("Error getting service config: %v", err)
 	}
 
-	// 11. 创建服务器实例
+	// 12. 创建服务器实例
 	srv := server.NewServer(&server.Config{
 		GRPCAddr: fmt.Sprintf(":%d", serviceCfg.GRPC.Port),
 		HTTPAddr: fmt.Sprintf(":%d", serviceCfg.HTTP.Port),
 	})
 
-	// 12. 注册 gRPC 服务
+	// 13. 注册 gRPC 服务
 	srv.RegisterGRPCService(func(grpcServer *grpc.Server) {
 		cartv1.RegisterCartServiceServer(grpcServer, cartServiceHandler)
 	})
 
-	// 13. 注册 HTTP 网关处理器
+	// 14. 注册 HTTP 网关处理器
 	if err := srv.RegisterHTTPGateway(commonv1.RegisterHealthServiceHandlerFromEndpoint); err != nil {
 		log.Fatalf("failed to register health service gateway: %v", err)
 	}
@@ -171,7 +192,7 @@ func main() {
 		log.Fatalf("failed to register cart service gateway: %v", err)
 	}
 
-	// 14. 注册 Swagger 文档
+	// 15. 注册 Swagger 文档
 	srv.RegisterSwagger(
 		server.SwaggerDoc{
 			Name:        "cart",
@@ -182,7 +203,7 @@ func main() {
 		},
 	)
 
-	// 15. 注册中间件
+	// 16. 注册中间件
 	srv.UseMiddleware(
 		middleware.CORS(middleware.DefaultCORSConfig()), // 1. 最外层：处理跨域
 		middleware.Recovery(),                           // 2. 捕获 panic
@@ -191,7 +212,7 @@ func main() {
 		middleware.Auth(),                               // 5. 认证（购物车需要登录）
 	)
 
-	// 16. 启动服务器（阻塞）
+	// 17. 启动服务器（阻塞）
 	if err := srv.Start(); err != nil {
 		log.Fatalf("failed to start server: %v", err)
 	}

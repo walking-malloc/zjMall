@@ -19,12 +19,18 @@ services:
       port: 50054
     http:
       port: 8084
+  inventory-service:
+    grpc:
+      port: 50055
+    http:
+      port: 8085
       
 # 服务名到数据库名的映射（可选，如果不配置则使用命名约定）
 service_databases:
   user-service: user_db
   product-service: product_db
   cart-service: cart_db
+  inventory-service: inventory_db
 
 
 mysql:
@@ -91,6 +97,7 @@ rabbitmq:
 # 服务客户端配置（用于服务间调用）
 service_clients:
   product_service_addr: "127.0.0.1:50053"  # 商品服务 gRPC 地址
+  inventory_service_addr: "127.0.0.1:50055"  # 库存服务 gRPC 地址
 
 nacos:
   host: 127.0.0.1

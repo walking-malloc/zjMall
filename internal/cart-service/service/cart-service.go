@@ -17,26 +17,27 @@ import (
 
 // CartService 购物车服务（业务逻辑层）
 type CartService struct {
-	cartRepo      repository.CartRepository
-	productClient client.ProductClient // 商品服务客户端（用于查询商品信息）
+	cartRepo        repository.CartRepository
+	productClient   client.ProductClient   // 商品服务客户端（用于查询商品信息）
+	inventoryClient client.InventoryClient // 库存服务客户端（用于库存校验）
 	// TODO: 添加促销服务客户端（用于计算优惠）
 	// promotionClient promotionv1.PromotionServiceClient
 }
 
 // NewCartService 创建购物车服务实例
-func NewCartService(cartRepo repository.CartRepository, productClient client.ProductClient) *CartService {
+func NewCartService(cartRepo repository.CartRepository, productClient client.ProductClient, inventoryClient client.InventoryClient) *CartService {
 	return &CartService{
-		cartRepo:      cartRepo,
-		productClient: productClient,
+		cartRepo:        cartRepo,
+		productClient:   productClient,
+		inventoryClient: inventoryClient,
 	}
 }
 
 // AddItem 添加商品到购物车
 func (s *CartService) AddItem(ctx context.Context, req *cartv1.AddItemRequest, userID string) (*cartv1.AddItemResponse, error) {
-	// 从商品服务获取商品信息
+	// 从商品服务获取商品信息（库存由独立库存服务管理，这里不做扣减）
 	var productTitle, productImage, skuName string
 	var price float64
-	var stock int32
 
 	if s.productClient != nil {
 		product, skus, err := s.productClient.GetProduct(ctx, req.ProductId)
@@ -73,16 +74,12 @@ func (s *CartService) AddItem(ctx context.Context, req *cartv1.AddItemRequest, u
 		}
 		skuName = sku.Name
 		price = sku.Price // sku.Price 已经是 float64 类型
-		// 注意：商品服务的 SkuInfo 中没有库存字段，库存可能在其他服务管理
-		// 这里暂时使用默认值，实际应该调用库存服务获取
-		stock = int32(100) // TODO: 调用库存服务获取实际库存
 	} else {
 		// 降级：使用模拟数据（商品服务未配置或不可用）
 		productTitle = "商品名称"
 		productImage = ""
 		skuName = "默认规格"
 		price = 99999.00
-		stock = int32(100)
 	}
 
 	// 检查购物车中是否已存在相同 SKU（使用数据库唯一索引优化查询）
@@ -96,17 +93,8 @@ func (s *CartService) AddItem(ctx context.Context, req *cartv1.AddItemRequest, u
 	}
 
 	if existingItem != nil {
-		// 已存在，累加数量
+		// 已存在，累加数量（库存校验放在结算/下单阶段由库存服务负责）
 		newQuantity := existingItem.Quantity + req.Quantity
-
-		// TODO: 校验库存（实际应该调用库存服务）
-		if newQuantity > stock {
-			log.Printf("⚠️ [Service] AddItem: 库存不足 - user_id=%s, item_id=%s, quantity=%d, stock=%d", userID, existingItem.ID, newQuantity, stock)
-			return &cartv1.AddItemResponse{
-				Code:    1,
-				Message: fmt.Sprintf("库存不足，当前库存: %d", stock),
-			}, nil
-		}
 
 		if err := s.cartRepo.UpdateItemQuantity(ctx, userID, existingItem.ID, newQuantity); err != nil {
 			log.Printf("❌ [Service] AddItem: 更新购物车失败 - user_id=%s, item_id=%s, error=%v", userID, existingItem.ID, err)
@@ -137,8 +125,9 @@ func (s *CartService) AddItem(ctx context.Context, req *cartv1.AddItemRequest, u
 		Price:        price, // float64
 		CurrentPrice: price, // float64
 		Quantity:     req.Quantity,
-		Stock:        stock,
-		IsValid:      true,
+		// Stock 字段仅用于展示，可在结算或下单前通过库存服务刷新
+		Stock:   0,
+		IsValid: true,
 	}
 
 	if err := s.cartRepo.AddItem(ctx, userID, item); err != nil {
@@ -176,16 +165,24 @@ func (s *CartService) UpdateItemQuantity(ctx context.Context, req *cartv1.Update
 		}, nil
 	}
 
-	// TODO: 如果需要校验库存，可以调用商品服务获取 SKU 信息
-	// 当前暂不校验库存（库存可能在其他服务管理）
-	// product, skus, err := s.productClient.GetProduct(ctx, item.ProductID)
-	// if err != nil {
-	//     return &cartv1.UpdateItemQuantityResponse{
-	//         Code:    1,
-	//         Message: fmt.Sprintf("获取商品信息失败: %v", err),
-	//     }, nil
-	// }
-	// TODO: 从库存服务获取实际库存并校验
+	// 校验库存（若库存服务可用）
+	if s.inventoryClient != nil {
+		stock, err := s.inventoryClient.GetStock(ctx, item.SKUID)
+		if err != nil {
+			log.Printf("❌ [Service] UpdateItemQuantity: 获取库存失败 - sku_id=%s, error=%v", item.SKUID, err)
+			return &cartv1.UpdateItemQuantityResponse{
+				Code:    1,
+				Message: fmt.Sprintf("获取库存失败: %v", err),
+			}, nil
+		}
+		if stock <= 0 {
+			log.Printf("⚠️ [Service] UpdateItemQuantity: 库存不足 - sku_id=%s, stock=%d", item.SKUID, stock)
+			return &cartv1.UpdateItemQuantityResponse{
+				Code:    1,
+				Message: "库存不足",
+			}, nil
+		}
+	}
 
 	// 更新数量
 	if err := s.cartRepo.UpdateItemQuantity(ctx, userID, req.ItemId, req.Quantity); err != nil {
@@ -372,12 +369,28 @@ func (s *CartService) CheckoutPreview(ctx context.Context, req *cartv1.CheckoutP
 	} else {
 		// 选择指定的商品
 		itemMap := make(map[string]*model.CartItem)
+		stocksMap, err := s.inventoryClient.BatchGetStock(ctx, req.ItemIds)
+		if err != nil {
+			log.Printf("❌ [Service] CheckoutPreview: 获取库存失败 - item_ids=%v, error=%v", req.ItemIds, err)
+			return &cartv1.CheckoutPreviewResponse{
+				Code:    1,
+				Message: fmt.Sprintf("获取库存失败: %v", err),
+			}, nil
+		}
 		for _, item := range allItems {
 			itemMap[item.ID] = item
 		}
 		for _, itemID := range req.ItemIds {
 			if item, ok := itemMap[itemID]; ok && item.IsValid {
 				selectedItems = append(selectedItems, item)
+				if stock, ok := stocksMap[itemID]; ok {
+					item.Stock = int32(stock.AvailableStock)
+					if item.Stock <= 0 {
+						item.Stock = 0
+						item.IsValid = false
+						item.InvalidReason = "库存不足"
+					}
+				}
 			}
 		}
 	}
