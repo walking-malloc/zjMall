@@ -128,7 +128,7 @@ func main() {
 		middleware.Recovery(),                           // 2. 捕获 panic
 		middleware.Logging(),                            // 3. 记录日志
 		middleware.TraceID(),                            // 4. 生成 TraceID
-		// middleware.Auth(),                               // 5. 认证（购物车需要登录）
+		middleware.Auth(),                               // 5. 认证（购物车需要登录）
 	)
 
 	// 17. 启动服务器（阻塞）

@@ -179,7 +179,7 @@ func (s *CartService) UpdateItemQuantity(ctx context.Context, req *cartv1.Update
 			log.Printf("⚠️ [Service] UpdateItemQuantity: 库存不足 - sku_id=%s, stock=%d", item.SKUID, stock)
 			return &cartv1.UpdateItemQuantityResponse{
 				Code:    1,
-				Message: "库存不足",
+				Message: fmt.Sprintf("%s库存不足", item.SKUName),
 			}, nil
 		}
 	}
