@@ -126,7 +126,7 @@ func (h *InventoryHandler) DeductStock(ctx context.Context, req *inventoryv1.Ded
 		})
 	}
 
-	if err := h.svc.TryDeductStocks(ctx, items); err != nil {
+	if err := h.svc.TryDeductStocks(ctx, req.OrderId, items); err != nil {
 		log.Printf("❌ [InventoryHandler] DeductStock: 扣减失败 order_id=%s, err=%v", req.OrderId, err)
 		return &inventoryv1.DeductStockResponse{
 			Code:    1,
@@ -160,7 +160,7 @@ func (h *InventoryHandler) RollbackStock(ctx context.Context, req *inventoryv1.R
 		})
 	}
 
-	if err := h.svc.RollbackStocks(ctx, items); err != nil {
+	if err := h.svc.RollbackStocks(ctx, req.OrderId, items); err != nil {
 		log.Printf("❌ [InventoryHandler] RollbackStock: 回滚失败 order_id=%s, err=%v", req.GetOrderId(), err)
 		return &inventoryv1.RollbackStockResponse{
 			Code:    1,

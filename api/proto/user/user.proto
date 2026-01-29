@@ -105,6 +105,14 @@ service UserService {
       body: "*"
     };
   }
+
+  // 获取用户地址（user_id 从 token 中获取）
+  // 如果 address_id 为空，返回默认地址；否则返回指定地址
+  rpc GetUserAddress(GetUserAddressRequest) returns (GetUserAddressResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/address"
+    };
+  }
   
   // 修改密码
   rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse) {
@@ -350,6 +358,18 @@ message SetDefaultAddressRequest {
 message SetDefaultAddressResponse {
   int32 code = 1;
   string message = 2;
+}
+
+// 获取用户地址请求（user_id 从 token 中获取）
+message GetUserAddressRequest {
+  string address_id = 1;    // 地址ID（可选，为空则返回默认地址）
+}
+
+// 获取用户地址响应
+message GetUserAddressResponse {
+  int32 code = 1;
+  string message = 2;
+  Address data = 3;         // 地址信息
 }
 
 // ========== 账号安全 ==========

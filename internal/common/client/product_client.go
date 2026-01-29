@@ -17,6 +17,7 @@ type ProductClient interface {
 	// GetProduct 获取商品详情（包含 SKU 列表）
 	// 返回商品信息和 SKU 列表
 	GetProduct(ctx context.Context, productID string) (*productv1.ProductInfo, []*productv1.SkuInfo, error)
+	// GetBatchProduct 批量获取商品详情（包含 SKU 列表）
 	// Close 关闭连接
 	Close() error
 }

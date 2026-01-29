@@ -1,4 +1,4 @@
--- Active: 1768481430314@@127.0.0.1@3306@inventory_db
+-- Active: 1769663211548@@127.0.0.1@3307@inventory_db
 
 -- ============================================
 -- 库存服务数据库：inventory_db
@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
     ref_id VARCHAR(64) DEFAULT NULL COMMENT '关联单号（订单号/操作单号等）',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_sku_time (sku_id, created_at),
-    INDEX idx_ref_id (ref_id)
+    INDEX idx_ref_id (ref_id),
+    INDEX idx_sku_ref (sku_id, ref_id) COMMENT '用于幂等性检查：查询某个订单是否已扣减过某个SKU的库存'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存变动明细表';
 
 

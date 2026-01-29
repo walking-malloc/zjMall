@@ -27,6 +27,12 @@ const serviceName = "user-service"
 const serviceIP = "127.0.0.1"
 
 func main() {
+	logFile, err := pkg.InitLog(serviceName)
+	if err != nil {
+		log.Fatalf("Error initializing log: %v", err)
+	}
+	defer logFile.Close()
+	log.Printf("==== %s starting ====", serviceName)
 	//1.加载配置
 	configPath := filepath.Join("./configs", "config.yaml")
 	config, err := config.LoadConfig(configPath)

@@ -727,3 +727,64 @@ func (s *UserService) BindPhone(ctx context.Context, req *userv1.BindPhoneReques
 		Message: "更新手机号成功",
 	}, nil
 }
+
+// 获取用户地址（userID 从 context 中获取）
+// 如果 address_id 为空，返回默认地址；否则返回指定地址
+func (s *UserService) GetUserAddress(ctx context.Context, userID string, addressID string) (*userv1.GetUserAddressResponse, error) {
+	var address *model.Address
+	var err error
+
+	if addressID == "" {
+		// 没有指定 address_id，返回默认地址
+		address, err = s.userRepo.GetDefaultAddress(ctx, userID)
+		if err != nil {
+			return &userv1.GetUserAddressResponse{
+				Code:    1,
+				Message: "获取默认地址失败",
+			}, nil
+		}
+		if address == nil {
+			return &userv1.GetUserAddressResponse{
+				Code:    1,
+				Message: "未设置默认地址",
+			}, nil
+		}
+	} else {
+		// 指定了 address_id，返回对应地址
+		address, err = s.userRepo.GetAddressByID(ctx, userID, addressID)
+		if err != nil {
+			return &userv1.GetUserAddressResponse{
+				Code:    1,
+				Message: "获取地址失败",
+			}, nil
+		}
+		if address == nil {
+			return &userv1.GetUserAddressResponse{
+				Code:    1,
+				Message: "地址不存在",
+			}, nil
+		}
+	}
+
+	// 转换为 proto 格式
+	addressData := &userv1.Address{
+		Id:            address.ID,
+		UserId:        address.UserID,
+		ReceiverName:  address.ReceiverName,
+		ReceiverPhone: address.ReceiverPhone,
+		Province:      address.Province,
+		City:          address.City,
+		District:      address.District,
+		Detail:        address.Detail,
+		PostalCode:    address.PostalCode,
+		IsDefault:     address.IsDefault,
+		CreatedAt:     timestamppb.New(address.CreatedAt),
+		UpdatedAt:     timestamppb.New(address.UpdatedAt),
+	}
+
+	return &userv1.GetUserAddressResponse{
+		Code:    0,
+		Message: "获取地址成功",
+		Data:    addressData,
+	}, nil
+}

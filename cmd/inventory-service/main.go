@@ -2,11 +2,8 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
-	"os"
 	"path/filepath"
-	"time"
 
 	commonv1 "zjMall/gen/go/api/proto/common"
 	inventoryv1 "zjMall/gen/go/api/proto/inventory"
@@ -27,19 +24,11 @@ const serviceName = "inventory-service"
 const serviceIP = "127.0.0.1"
 
 func main() {
-	// 0. 初始化日志：同时输出到控制台和文件 logs/cart-service.log
-	logDir := fmt.Sprintf("./logs/%s", serviceName)
-	if err := os.MkdirAll(logDir, 0755); err != nil {
-		log.Fatalf("Error creating log directory: %v", err)
-	}
-	logFilePath := filepath.Join(logDir, serviceName+time.Now().Format("20060102150405")+".log")
-	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logFile, err := pkg.InitLog(serviceName)
 	if err != nil {
-		log.Fatalf("Error opening log file: %v", err)
+		log.Fatalf("Error initializing log: %v", err)
 	}
 	defer logFile.Close()
-	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
-	log.Printf("==== %s starting ====", serviceName)
 
 	// 1. 加载配置
 	configPath := filepath.Join("./configs", "config.yaml")

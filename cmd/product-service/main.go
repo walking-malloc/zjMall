@@ -27,7 +27,12 @@ const serviceIP = "127.0.0.1"
 
 // todo 需要改为商品服务的配置
 func main() {
-	log.Println("🚀 开始启动商品服务...")
+	logFile, err := pkg.InitLog(serviceName)
+	if err != nil {
+		log.Fatalf("Error initializing log: %v", err)
+	}
+	defer logFile.Close()
+	log.Printf("==== %s starting ====", serviceName)
 
 	//1.加载配置
 	log.Println("📝 加载配置文件...")

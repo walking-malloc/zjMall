@@ -1,0 +1,174 @@
+syntax = "proto3";
+
+package order.v1;
+
+option go_package = "zjMall/gen/go/api/proto/order;orderv1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+// 订单状态枚举
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;  // 未指定（保留）
+  
+  // 正向流程
+  ORDER_STATUS_PENDING_PAY = 1;   // 待支付（可取消）
+  ORDER_STATUS_PAID = 2;          // 已支付（可退款）
+  ORDER_STATUS_SHIPPED = 3;       // 已发货（可收货/退货）
+  ORDER_STATUS_COMPLETED = 4;     // 已完成（不可修改）
+  
+  // 逆向流程
+  ORDER_STATUS_CANCELLED = 5;      // 已取消（用户主动）
+  ORDER_STATUS_REFUNDING = 6;      // 退款中
+  ORDER_STATUS_REFUNDED = 7;       // 已退款
+  ORDER_STATUS_CLOSED = 8;         // 已关闭（超时自动）
+}
+
+// 订单服务
+service OrderService {
+  // 创建订单（从购物车或直接购买）
+  rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/orders"
+      body: "*"
+    };
+  }
+
+  // 获取单个订单详情
+  rpc GetOrder(GetOrderRequest) returns (GetOrderResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/orders/{order_no}"
+    };
+  }
+
+  // 查询我的订单列表（用户侧）
+  rpc ListUserOrders(ListUserOrdersRequest) returns (ListUserOrdersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/orders"
+    };
+  }
+
+  // 用户取消订单（待支付）
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/orders/{order_no}/cancel"
+      body: "*"
+    };
+  }
+
+  // 支付成功回调（由支付服务调用）
+  rpc MarkOrderPaid(MarkOrderPaidRequest) returns (MarkOrderPaidResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/orders/{order_no}/pay"
+      body: "*"
+    };
+  }
+}
+
+
+// 订单商品明细
+message OrderItem {
+  string id = 1;                 // 明细ID
+  string order_no = 2;           // 订单号
+  string product_id = 3;         // 商品ID
+  string sku_id = 4;             // SKU ID
+  string product_title = 5;      // 商品标题快照
+  string product_image = 6;      // 商品图片快照
+  string sku_name = 7;           // SKU 名称快照
+  string price = 8;              // 商品单价（下单时）
+  int32 quantity = 9;            // 购买数量
+  string subtotal_amount = 10;   // 小计金额（price * quantity - 分摊优惠）
+}
+
+// 订单主信息
+message Order {
+  string order_no = 1;              // 订单号
+  string user_id = 2;               // 用户ID
+  OrderStatus status = 3;            // 订单状态
+  string total_amount = 4;          // 商品总金额
+  string discount_amount = 5;       // 优惠总金额
+  string shipping_amount = 6;       // 运费金额
+  string pay_amount = 7;            // 应付金额
+  string pay_channel = 8;           // 支付渠道（预留）
+  string receiver_name = 9;         // 收货人姓名快照
+  string receiver_phone = 10;       // 收货人电话快照
+  string receiver_address = 11;     // 收货地址快照（拼接好的全地址）
+  string buyer_remark = 12;         // 买家留言
+  google.protobuf.Timestamp created_at = 13; // 创建时间
+  google.protobuf.Timestamp paid_at = 14;    // 支付时间
+  google.protobuf.Timestamp shipped_at = 15; // 发货时间
+  google.protobuf.Timestamp completed_at = 16; // 完成时间
+}
+
+// 创建订单
+message CreateOrderItemInput {
+  string cart_item_id = 1;  // 购物车项ID（从购物车提交时使用）
+  string product_id = 2;    // 商品ID（立即购买时使用）
+  string sku_id = 3;        // SKU ID
+  int32 quantity = 4;       // 购买数量
+}
+
+message CreateOrderRequest {
+  repeated CreateOrderItemInput items = 1; // 下单商品列表
+  string address_id = 2;                   // 收货地址ID
+  string coupon_id = 3;                    // 优惠券ID（可选）
+  string buyer_remark = 4;                 // 买家留言
+}
+
+message CreateOrderResponse {
+  int32 code = 1;
+  string message = 2;
+  string order_no = 3;
+  string pay_amount = 4;
+}
+
+// 获取订单详情
+message GetOrderRequest {
+  string order_no = 1;
+}
+
+message GetOrderResponse {
+  int32 code = 1;
+  string message = 2;
+  Order order = 3;
+  repeated OrderItem items = 4;
+}
+
+// 用户订单列表
+message ListUserOrdersRequest {
+  int32 status = 1; // 过滤状态（0 表示全部）
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message ListUserOrdersResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated Order orders = 3;
+  int32 total = 4;
+}
+
+// 取消订单
+message CancelOrderRequest {
+  string order_no = 1;
+  string reason = 2;
+}
+
+message CancelOrderResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 标记订单已支付
+message MarkOrderPaidRequest {
+  string order_no = 1;
+  string pay_channel = 2;
+  string pay_trade_no = 3;
+}
+
+message MarkOrderPaidResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+

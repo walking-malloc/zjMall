@@ -46,6 +46,8 @@ type UserRepository interface {
 	//地址相关操作
 	AddAddress(ctx context.Context, address *model.Address) error
 	ListAddresses(ctx context.Context, userID string) ([]*model.Address, error)
+	GetAddressByID(ctx context.Context, userID string, addressID string) (*model.Address, error)
+	GetDefaultAddress(ctx context.Context, userID string) (*model.Address, error)
 	UpdateAddress(ctx context.Context, address *model.Address) error
 	DeleteAddress(ctx context.Context, userID string, addressID string) error
 	SetDefaultAddress(ctx context.Context, userID string, addressID string) error
@@ -221,6 +223,34 @@ func (r *userRepository) ListAddresses(ctx context.Context, userID string) ([]*m
 		return nil, err
 	}
 	return addresses, nil
+}
+
+func (r *userRepository) GetAddressByID(ctx context.Context, userID string, addressID string) (*model.Address, error) {
+	var address model.Address
+	err := r.db.WithContext(ctx).Model(&model.Address{}).
+		Where("user_id = ? AND id = ?", userID, addressID).
+		First(&address).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil // 地址不存在
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &address, nil
+}
+
+func (r *userRepository) GetDefaultAddress(ctx context.Context, userID string) (*model.Address, error) {
+	var address model.Address
+	err := r.db.WithContext(ctx).Model(&model.Address{}).
+		Where("user_id = ? AND is_default = ?", userID, true).
+		First(&address).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil // 没有默认地址
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &address, nil
 }
 
 func (r *userRepository) UpdateAddress(ctx context.Context, address *model.Address) error {
