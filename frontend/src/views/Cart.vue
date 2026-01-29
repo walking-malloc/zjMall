@@ -2,6 +2,7 @@
   <div class="cart-page">
     <div class="cart-container">
       <h2>购物车</h2>
+      <el-button class="refresh-button" type="primary" @click="handleRefresh">刷新</el-button>
       
       <el-card v-if="cartStore.items.length === 0" class="empty-cart">
         <el-empty description="购物车是空的">
@@ -43,10 +44,10 @@
                 <div class="price">¥{{ item.price.toFixed(2) }}</div>
                 <div class="quantity">
                   <el-input-number
-                  v-model="item.quantity"
+                    v-model="item.quantity"
                     :min="1"
                     :max="999"
-                  @change="(val) => handleQuantityChange(item, val)"
+                    @change="(val) => handleQuantityChange(item, val)"
                   />
                 </div>
                 <div class="subtotal">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
@@ -145,6 +146,20 @@ const handleRemove = async (item) => {
   }
 }
 
+const handleRefresh = async () => {
+  try {
+    const res = await cartStore.refreshCart()
+    if (res && res.code === 0) {
+      ElMessage.success('购物车已刷新')
+    } else {
+      ElMessage.error(res?.message || '刷新购物车失败')
+    }
+  } catch (error) {
+    console.error('刷新购物车失败:', error)
+    ElMessage.error('刷新购物车失败，请稍后重试')
+  }
+}
+
 const handleCheckout = async () => {
   if (!selectedItems.value.length) {
     ElMessage.warning('请选择要结算的商品')
@@ -187,6 +202,13 @@ onMounted(async () => {
 .cart-container h2 {
   margin-bottom: 20px;
   font-size: 24px;
+}
+
+.refresh-button {
+  margin-bottom: 20px;
+  background-color: #409EFF;
+  color: #fff;
+  float: right;
 }
 
 .empty-cart {

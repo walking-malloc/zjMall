@@ -320,6 +320,48 @@ func (s *CartService) GetCart(ctx context.Context, req *cartv1.GetCartRequest, u
 	}, nil
 }
 
+// RefreshCart 刷新购物车：实时同步商品价格和库存状态（仅用于展示，不创建订单）
+func (s *CartService) RefreshCart(ctx context.Context, req *cartv1.RefreshCartRequest, userID string) (*cartv1.RefreshCartResponse, error) {
+	// 1. 获取当前购物车数据
+	log.Printf("🔄 [Service] RefreshCart: 刷新购物车 - user_id=%s", userID)
+	items, err := s.cartRepo.GetCartItems(ctx, userID)
+	if err != nil {
+		log.Printf("❌ [Service] RefreshCart: 获取购物车失败 - user_id=%s, error=%v", userID, err)
+		return &cartv1.RefreshCartResponse{
+			Code:    1,
+			Message: fmt.Sprintf("获取购物车失败: %v", err),
+		}, nil
+	}
+
+	if len(items) == 0 {
+		return &cartv1.RefreshCartResponse{
+			Code:    0,
+			Message: "购物车为空",
+			Items:   []*cartv1.CartItem{},
+			Summary: &cartv1.CartSummary{},
+		}, nil
+	}
+
+	// 2. 实时刷新商品价格和库存状态（只更新内存中的 items，用于本次返回）
+	s.updateProductInfoForCheckout(ctx, items)
+
+	// 3. 转换为 Proto 格式
+	protoItems := make([]*cartv1.CartItem, 0, len(items))
+	for _, item := range items {
+		protoItems = append(protoItems, convertCartItemToProto(item))
+	}
+
+	// 4. 重新计算统计信息
+	summary := s.calculateSummary(items)
+
+	return &cartv1.RefreshCartResponse{
+		Code:    0,
+		Message: "刷新成功",
+		Items:   protoItems,
+		Summary: summary,
+	}, nil
+}
+
 // GetCartSummary 获取购物车统计信息
 func (s *CartService) GetCartSummary(ctx context.Context, req *cartv1.GetCartSummaryRequest, userID string) (*cartv1.GetCartSummaryResponse, error) {
 	items, err := s.cartRepo.GetCartItems(ctx, userID)
@@ -533,7 +575,17 @@ func (s *CartService) updateProductInfoForCheckout(ctx context.Context, items []
 	}
 
 	var wg sync.WaitGroup
-	mu := sync.Mutex{}
+
+	// 为每个 item 准备一把独立的锁，细粒度并发控制
+	itemLocks := make(map[string]*sync.Mutex, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		if _, ok := itemLocks[item.ID]; !ok {
+			itemLocks[item.ID] = &sync.Mutex{}
+		}
+	}
 
 	// 1. 并发获取商品信息（价格、状态）
 	if s.productClient != nil {
@@ -541,6 +593,12 @@ func (s *CartService) updateProductInfoForCheckout(ctx context.Context, items []
 		for _, item := range items {
 			go func(item *model.CartItem) {
 				defer wg.Done()
+				if item == nil {
+					return
+				}
+
+				lock := itemLocks[item.ID]
+
 				product, skus, err := s.productClient.GetProduct(ctx, item.ProductID)
 				if err != nil {
 					log.Printf("⚠️ [Service] CheckoutPreview: 获取商品信息失败 - product_id=%s, error=%v", item.ProductID, err)
@@ -550,10 +608,10 @@ func (s *CartService) updateProductInfoForCheckout(ctx context.Context, items []
 
 				if product == nil || len(skus) == 0 {
 					log.Printf("⚠️ [Service] CheckoutPreview: 商品不存在或没有SKU - product_id=%s", item.ProductID)
-					mu.Lock()
+					lock.Lock()
 					item.IsValid = false
 					item.InvalidReason = "商品不存在或已下架"
-					mu.Unlock()
+					lock.Unlock()
 					return
 				}
 
@@ -568,15 +626,15 @@ func (s *CartService) updateProductInfoForCheckout(ctx context.Context, items []
 
 				if targetSKU == nil {
 					log.Printf("⚠️ [Service] CheckoutPreview: SKU不存在 - sku_id=%s", item.SKUID)
-					mu.Lock()
+					lock.Lock()
 					item.IsValid = false
 					item.InvalidReason = "SKU不存在或已下架"
-					mu.Unlock()
+					lock.Unlock()
 					return
 				}
 
 				// 更新商品信息
-				mu.Lock()
+				lock.Lock()
 				// 更新当前价格（实时价格）
 				if targetSKU.Price > 0 {
 					item.CurrentPrice = targetSKU.Price
@@ -589,7 +647,7 @@ func (s *CartService) updateProductInfoForCheckout(ctx context.Context, items []
 					item.InvalidReason = "商品状态异常"
 
 				}
-				mu.Unlock()
+				lock.Unlock()
 			}(item)
 		}
 	}
@@ -600,6 +658,9 @@ func (s *CartService) updateProductInfoForCheckout(ctx context.Context, items []
 		skuIDSet := make(map[string]bool)
 		skuIDToItems := make(map[string][]*model.CartItem)
 		for _, item := range items {
+			if item == nil {
+				continue
+			}
 			if !skuIDSet[item.SKUID] {
 				skuIDSet[item.SKUID] = true
 				skuIDToItems[item.SKUID] = []*model.CartItem{item}
@@ -620,21 +681,29 @@ func (s *CartService) updateProductInfoForCheckout(ctx context.Context, items []
 			log.Printf("⚠️ [Service] CheckoutPreview: 批量获取库存失败 - error=%v", err)
 			// 降级处理：库存服务调用失败时，标记所有商品为需要重新校验
 			// 注意：不修改 item.Stock，因为旧值可能不准确
-			mu.Lock()
 			for _, item := range items {
+				if item == nil {
+					continue
+				}
+				lock := itemLocks[item.ID]
+				lock.Lock()
 				// 如果商品状态正常但库存信息获取失败，标记为无效
 				if item.IsValid {
 					item.IsValid = false
 					item.InvalidReason = "库存信息获取失败，请稍后重试"
 				}
+				lock.Unlock()
 			}
-			mu.Unlock()
 		} else {
 			// 更新库存信息
-			mu.Lock()
 			for skuID, stockInfo := range stocksMap {
 				if items, ok := skuIDToItems[skuID]; ok {
 					for _, item := range items {
+						if item == nil {
+							continue
+						}
+						lock := itemLocks[item.ID]
+						lock.Lock()
 						item.Stock = int32(stockInfo.AvailableStock)
 						// 如果库存不足，标记为无效
 						if item.Stock <= 0 {
@@ -646,10 +715,10 @@ func (s *CartService) updateProductInfoForCheckout(ctx context.Context, items []
 							item.IsValid = false
 							item.InvalidReason = fmt.Sprintf("库存不足，当前可用库存：%d", item.Stock)
 						}
+						lock.Unlock()
 					}
 				}
 			}
-			mu.Unlock()
 		}
 	}
 

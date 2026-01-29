@@ -231,6 +231,39 @@
         ]
       }
     },
+    "/api/v1/cart/refresh": {
+      "post": {
+        "summary": "刷新购物车（实时同步商品价格和库存状态，但不创建订单）",
+        "operationId": "CartService_RefreshCart",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/cart.v1.RefreshCartResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/cart.v1.RefreshCartRequest"
+            }
+          }
+        ],
+        "tags": [
+          "购物车管理"
+        ]
+      }
+    },
     "/api/v1/cart/summary": {
       "get": {
         "summary": "获取购物车统计信息",
@@ -575,6 +608,34 @@
         "discountAmount": {
           "type": "string",
           "title": "优惠金额"
+        }
+      }
+    },
+    "cart.v1.RefreshCartRequest": {
+      "type": "object",
+      "title": "刷新购物车（实时同步商品信息）"
+    },
+    "cart.v1.RefreshCartResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/cart.v1.CartItem"
+          },
+          "title": "刷新后的购物车商品列表"
+        },
+        "summary": {
+          "$ref": "#/definitions/cart.v1.CartSummary",
+          "title": "刷新后的统计信息"
         }
       }
     },

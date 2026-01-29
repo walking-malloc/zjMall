@@ -8,7 +8,8 @@ import {
   clearCart as clearCartApi,
   getCart,
   getCartSummary,
-  checkoutPreview
+  checkoutPreview,
+  refreshCart as refreshCartApi
 } from '@/api/cart'
 
 export const useCartStore = defineStore('cart', () => {
@@ -162,6 +163,26 @@ export const useCartStore = defineStore('cart', () => {
     return res.data
   }
 
+  // 刷新购物车（调用后端 refresh 接口，实时同步价格和库存）
+  const refreshCart = async () => {
+    const res = await refreshCartApi()
+    if (res.data && res.data.code === 0) {
+      const apiItems = res.data.items || []
+      items.value = apiItems.map(transformItemFromApi)
+
+      if (res.data.summary) {
+        const s = res.data.summary
+        summary.value = {
+          totalItems: s.total_items || 0,
+          totalQuantity: s.total_quantity || 0,
+          totalPrice: parseFloat(s.total_price || '0') || 0,
+          hasInvalidItems: !!s.has_invalid_items
+        }
+      }
+    }
+    return res.data
+  }
+
   return {
     items,
     summary,
@@ -174,6 +195,7 @@ export const useCartStore = defineStore('cart', () => {
     removeItem,
     removeSelectedItems,
     clearCart,
-    previewCheckout
+    previewCheckout,
+    refreshCart,
   }
 })

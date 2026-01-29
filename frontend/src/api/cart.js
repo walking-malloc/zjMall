@@ -47,4 +47,8 @@ export function checkoutPreview(payload) {
   return request.post('/cart/checkout-preview', payload)
 }
 
-
+export function refreshCart() {
+  // 后端 proto 中定义为 POST /api/v1/cart/refresh，body 为 "*"
+  // 这里发送一个空对象作为请求体
+  return request.post('/cart/refresh', {})
+}

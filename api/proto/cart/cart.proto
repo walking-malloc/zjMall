@@ -73,6 +73,17 @@ service CartService {
     };
   }
 
+  // 刷新购物车（实时同步商品价格和库存状态，但不创建订单）
+  rpc RefreshCart(RefreshCartRequest) returns (RefreshCartResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/cart/refresh"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "购物车管理"
+    };
+  }
+
   // 获取购物车统计信息
   rpc GetCartSummary(GetCartSummaryRequest) returns (GetCartSummaryResponse) {
     option (google.api.http) = {
@@ -199,6 +210,17 @@ message GetCartResponse {
   string message = 2;
   repeated CartItem items = 3;      // 购物车商品列表
   CartSummary summary = 4;          // 购物车统计信息
+}
+
+// 刷新购物车（实时同步商品信息）
+message RefreshCartRequest {
+}
+
+message RefreshCartResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated CartItem items = 3;      // 刷新后的购物车商品列表
+  CartSummary summary = 4;          // 刷新后的统计信息
 }
 
 // ============================================

@@ -222,6 +222,31 @@ func (h *CartServiceHandler) GetCart(ctx context.Context, req *cartv1.GetCartReq
 	return resp, nil
 }
 
+// RefreshCart 刷新购物车（实时同步商品信息）
+func (h *CartServiceHandler) RefreshCart(ctx context.Context, req *cartv1.RefreshCartRequest) (*cartv1.RefreshCartResponse, error) {
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == "" {
+		log.Printf("⚠️ [Handler] RefreshCart: 用户未登录")
+		return &cartv1.RefreshCartResponse{
+			Code:    1,
+			Message: "用户未登录",
+		}, nil
+	}
+
+	resp, err := h.cartService.RefreshCart(ctx, req, userID)
+	if err != nil {
+		log.Printf("❌ [Handler] RefreshCart: Service 层返回错误: %v", err)
+		return &cartv1.RefreshCartResponse{
+			Code:    1,
+			Message: fmt.Sprintf("刷新购物车失败: %v", err),
+		}, nil
+	}
+	if resp.Code != 0 {
+		log.Printf("⚠️ [Handler] RefreshCart: Service 层返回业务错误 - code=%d, message=%s", resp.Code, resp.Message)
+	}
+	return resp, nil
+}
+
 // GetCartSummary 获取购物车统计信息
 func (h *CartServiceHandler) GetCartSummary(ctx context.Context, req *cartv1.GetCartSummaryRequest) (*cartv1.GetCartSummaryResponse, error) {
 	userID := middleware.GetUserIDFromContext(ctx)
