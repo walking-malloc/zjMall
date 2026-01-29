@@ -9,7 +9,7 @@ services:
       MYSQL_PASSWORD: zjmall123
       TZ: Asia/Shanghai
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./deploy/mysql/init:/docker-entrypoint-initdb.d  # 初始化SQL脚本目录
@@ -26,7 +26,7 @@ services:
     image: redis:7.2-alpine
     container_name: zjmall-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --requirepass redis123
@@ -56,8 +56,8 @@ services:
     image: rabbitmq:3.13-management
     container_name: zjmall-rabbitmq
     ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # 管理控制台
+      - "5673:5672"     # AMQP（宿主机 5673 -> 容器 5672，避免与本地 5672 冲突）
+      - "15673:15672"   # 管理控制台（宿主机 15673 -> 容器 15672）
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest

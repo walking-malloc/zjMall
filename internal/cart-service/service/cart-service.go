@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sync"
 	cartv1 "zjMall/gen/go/api/proto/cart"
 	productv1 "zjMall/gen/go/api/proto/product"
 	"zjMall/internal/cart-service/model"
 	"zjMall/internal/cart-service/repository"
 	"zjMall/internal/common/client"
+	productRepository "zjMall/internal/product-service/repository"
 	"zjMall/pkg"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -38,6 +40,7 @@ func (s *CartService) AddItem(ctx context.Context, req *cartv1.AddItemRequest, u
 	// 从商品服务获取商品信息（库存由独立库存服务管理，这里不做扣减）
 	var productTitle, productImage, skuName string
 	var price float64
+	var stock int64
 
 	if s.productClient != nil {
 		product, skus, err := s.productClient.GetProduct(ctx, req.ProductId)
@@ -64,6 +67,25 @@ func (s *CartService) AddItem(ctx context.Context, req *cartv1.AddItemRequest, u
 				Code:    1,
 				Message: "SKU不存在",
 			}, nil
+		}
+
+		// 检查库存
+		if s.inventoryClient != nil {
+			stock, err = s.inventoryClient.GetStock(ctx, req.SkuId)
+			if err != nil {
+				log.Printf("❌ [Service] AddItem: 获取库存失败 - sku_id=%s, error=%v", req.SkuId, err)
+				return &cartv1.AddItemResponse{
+					Code:    1,
+					Message: fmt.Sprintf("获取库存失败: %v", err),
+				}, nil
+			}
+			if stock <= 0 {
+				log.Printf("⚠️ [Service] AddItem: 库存不足 - sku_id=%s, stock=%d", req.SkuId, stock)
+				return &cartv1.AddItemResponse{
+					Code:    1,
+					Message: fmt.Sprintf("库存不足: %s", sku.Name),
+				}, nil
+			}
 		}
 
 		// 提取商品信息
@@ -126,7 +148,7 @@ func (s *CartService) AddItem(ctx context.Context, req *cartv1.AddItemRequest, u
 		CurrentPrice: price, // float64
 		Quantity:     req.Quantity,
 		// Stock 字段仅用于展示，可在结算或下单前通过库存服务刷新
-		Stock:   0,
+		Stock:   int32(stock),
 		IsValid: true,
 	}
 
@@ -165,7 +187,8 @@ func (s *CartService) UpdateItemQuantity(ctx context.Context, req *cartv1.Update
 		}, nil
 	}
 
-	// 校验库存（若库存服务可用）
+	// 注意：这里只检查库存是否充足，不扣减库存
+	// 库存扣减应该在订单创建时预占，支付成功后扣减
 	if s.inventoryClient != nil {
 		stock, err := s.inventoryClient.GetStock(ctx, item.SKUID)
 		if err != nil {
@@ -175,11 +198,12 @@ func (s *CartService) UpdateItemQuantity(ctx context.Context, req *cartv1.Update
 				Message: fmt.Sprintf("获取库存失败: %v", err),
 			}, nil
 		}
-		if stock <= 0 {
-			log.Printf("⚠️ [Service] UpdateItemQuantity: 库存不足 - sku_id=%s, stock=%d", item.SKUID, stock)
+		// 检查新数量是否超过当前可用库存
+		if int64(req.Quantity) > stock {
+			log.Printf("⚠️ [Service] UpdateItemQuantity: 库存不足 - sku_id=%s, 请求数量=%d, 可用库存=%d", item.SKUID, req.Quantity, stock)
 			return &cartv1.UpdateItemQuantityResponse{
 				Code:    1,
-				Message: fmt.Sprintf("%s库存不足", item.SKUName),
+				Message: fmt.Sprintf("%s库存不足，当前可用库存：%d", item.SKUName, stock),
 			}, nil
 		}
 	}
@@ -279,35 +303,6 @@ func (s *CartService) GetCart(ctx context.Context, req *cartv1.GetCartRequest, u
 		}, nil
 	}
 
-	// TODO: 调用商品服务，更新商品实时价格和库存状态
-	// for _, item := range items {
-	//     product, err := s.productClient.GetProduct(ctx, &productv1.GetProductRequest{
-	//         ProductId: item.ProductID,
-	//     })
-	//     if err != nil {
-	//         log.Printf("获取商品信息失败 (product_id: %s): %v", item.ProductID, err)
-	//         continue
-	//     }
-	//
-	//     // 更新价格和库存
-	//     sku := findSKU(product.Skus, item.SKUID)
-	//     if sku != nil {
-	//         item.CurrentPrice = formatPrice(sku.Price)
-	//         item.Stock = sku.Stock
-	//         item.IsValid = product.Status == 4 && sku.Stock > 0
-	//         if !item.IsValid {
-	//             if product.Status != 4 {
-	//                 item.InvalidReason = "商品已下架"
-	//             } else if sku.Stock == 0 {
-	//                 item.InvalidReason = "库存不足"
-	//             }
-	//         }
-	//
-	//         // 更新到 Redis
-	//         s.cartRepo.AddItem(ctx, userID, item)
-	//     }
-	// }
-
 	// 转换为 Proto 格式
 	protoItems := make([]*cartv1.CartItem, 0, len(items))
 	for _, item := range items {
@@ -369,28 +364,12 @@ func (s *CartService) CheckoutPreview(ctx context.Context, req *cartv1.CheckoutP
 	} else {
 		// 选择指定的商品
 		itemMap := make(map[string]*model.CartItem)
-		stocksMap, err := s.inventoryClient.BatchGetStock(ctx, req.ItemIds)
-		if err != nil {
-			log.Printf("❌ [Service] CheckoutPreview: 获取库存失败 - item_ids=%v, error=%v", req.ItemIds, err)
-			return &cartv1.CheckoutPreviewResponse{
-				Code:    1,
-				Message: fmt.Sprintf("获取库存失败: %v", err),
-			}, nil
-		}
 		for _, item := range allItems {
 			itemMap[item.ID] = item
 		}
 		for _, itemID := range req.ItemIds {
-			if item, ok := itemMap[itemID]; ok && item.IsValid {
+			if item, ok := itemMap[itemID]; ok {
 				selectedItems = append(selectedItems, item)
-				if stock, ok := stocksMap[itemID]; ok {
-					item.Stock = int32(stock.AvailableStock)
-					if item.Stock <= 0 {
-						item.Stock = 0
-						item.IsValid = false
-						item.InvalidReason = "库存不足"
-					}
-				}
 			}
 		}
 	}
@@ -403,7 +382,10 @@ func (s *CartService) CheckoutPreview(ctx context.Context, req *cartv1.CheckoutP
 		}, nil
 	}
 
-	// TODO: 调用商品服务，更新实时价格和库存
+	// 实时更新商品信息（价格、库存、状态）
+	// 使用并发调用优化性能，避免串行等待
+	s.updateProductInfoForCheckout(ctx, selectedItems)
+
 	// TODO: 调用促销服务，计算促销优惠
 	// TODO: 调用用户服务，获取配送地址
 	// TODO: 计算运费
@@ -541,4 +523,136 @@ func (s *CartService) calculateFinalAmount(productTotal, promotionDiscount, coup
 		final = 0 // 防止负数
 	}
 	return fmt.Sprintf("%.2f", final)
+}
+
+// updateProductInfoForCheckout 结算预览时实时更新商品信息（价格、库存、状态）
+// 使用并发调用优化性能，避免串行等待
+func (s *CartService) updateProductInfoForCheckout(ctx context.Context, items []*model.CartItem) {
+	if len(items) == 0 {
+		return
+	}
+
+	var wg sync.WaitGroup
+	mu := sync.Mutex{}
+
+	// 1. 并发获取商品信息（价格、状态）
+	if s.productClient != nil {
+		wg.Add(len(items))
+		for _, item := range items {
+			go func(item *model.CartItem) {
+				defer wg.Done()
+				product, skus, err := s.productClient.GetProduct(ctx, item.ProductID)
+				if err != nil {
+					log.Printf("⚠️ [Service] CheckoutPreview: 获取商品信息失败 - product_id=%s, error=%v", item.ProductID, err)
+					// 降级处理：使用缓存的价格，标记为可能失效
+					return
+				}
+
+				if product == nil || len(skus) == 0 {
+					log.Printf("⚠️ [Service] CheckoutPreview: 商品不存在或没有SKU - product_id=%s", item.ProductID)
+					mu.Lock()
+					item.IsValid = false
+					item.InvalidReason = "商品不存在或已下架"
+					mu.Unlock()
+					return
+				}
+
+				// 查找对应的 SKU
+				var targetSKU *productv1.SkuInfo
+				for _, sku := range skus {
+					if sku.Id == item.SKUID {
+						targetSKU = sku
+						break
+					}
+				}
+
+				if targetSKU == nil {
+					log.Printf("⚠️ [Service] CheckoutPreview: SKU不存在 - sku_id=%s", item.SKUID)
+					mu.Lock()
+					item.IsValid = false
+					item.InvalidReason = "SKU不存在或已下架"
+					mu.Unlock()
+					return
+				}
+
+				// 更新商品信息
+				mu.Lock()
+				// 更新当前价格（实时价格）
+				if targetSKU.Price > 0 {
+					item.CurrentPrice = targetSKU.Price
+				}
+
+				// 校验商品状态（商品状态：1-待审核，2-审核失败，3-待上架，4-已上架，5-已下架）
+				if product.Status != productRepository.ProductStatusOnShelf {
+					log.Printf("商品状态异常: %d", product.Status)
+					item.IsValid = false
+					item.InvalidReason = "商品状态异常"
+
+				}
+				mu.Unlock()
+			}(item)
+		}
+	}
+
+	// 2. 并发获取库存信息
+	if s.inventoryClient != nil {
+		// 收集所有 skuID（去重）
+		skuIDSet := make(map[string]bool)
+		skuIDToItems := make(map[string][]*model.CartItem)
+		for _, item := range items {
+			if !skuIDSet[item.SKUID] {
+				skuIDSet[item.SKUID] = true
+				skuIDToItems[item.SKUID] = []*model.CartItem{item}
+			} else {
+				skuIDToItems[item.SKUID] = append(skuIDToItems[item.SKUID], item)
+			}
+		}
+
+		// 转换为 skuID 列表
+		skuIDs := make([]string, 0, len(skuIDSet))
+		for skuID := range skuIDSet {
+			skuIDs = append(skuIDs, skuID)
+		}
+
+		// 批量获取库存
+		stocksMap, err := s.inventoryClient.BatchGetStock(ctx, skuIDs)
+		if err != nil {
+			log.Printf("⚠️ [Service] CheckoutPreview: 批量获取库存失败 - error=%v", err)
+			// 降级处理：库存服务调用失败时，标记所有商品为需要重新校验
+			// 注意：不修改 item.Stock，因为旧值可能不准确
+			mu.Lock()
+			for _, item := range items {
+				// 如果商品状态正常但库存信息获取失败，标记为无效
+				if item.IsValid {
+					item.IsValid = false
+					item.InvalidReason = "库存信息获取失败，请稍后重试"
+				}
+			}
+			mu.Unlock()
+		} else {
+			// 更新库存信息
+			mu.Lock()
+			for skuID, stockInfo := range stocksMap {
+				if items, ok := skuIDToItems[skuID]; ok {
+					for _, item := range items {
+						item.Stock = int32(stockInfo.AvailableStock)
+						// 如果库存不足，标记为无效
+						if item.Stock <= 0 {
+							item.Stock = 0
+							item.IsValid = false
+							item.InvalidReason = "库存不足"
+						} else if item.Quantity > item.Stock {
+							// 如果购买数量超过库存，标记为无效
+							item.IsValid = false
+							item.InvalidReason = fmt.Sprintf("库存不足，当前可用库存：%d", item.Stock)
+						}
+					}
+				}
+			}
+			mu.Unlock()
+		}
+	}
+
+	// 等待所有商品信息查询完成
+	wg.Wait()
 }

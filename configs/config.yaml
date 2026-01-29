@@ -35,7 +35,7 @@ service_databases:
 
 mysql:
   host: 127.0.0.1
-  port: 3306
+  port: 3307
   username: root
   password: root123456
   charset: utf8mb4
@@ -47,7 +47,7 @@ mysql:
 
 redis:
   host: 127.0.0.1
-  port: 6379
+  port: 6380
   password: "redis123"
   db: 0
   poolSize: 10 
@@ -88,7 +88,7 @@ elasticsearch:
 
 rabbitmq:
   host: 127.0.0.1
-  port: 5672
+  port: 5673
   username: guest
   password: guest
   vhost: "/"
