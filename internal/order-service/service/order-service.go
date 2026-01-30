@@ -318,25 +318,46 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 	}, nil
 }
 
-// GetOrder 获取订单详情
+// GetOrder 获取订单详情（根据订单号查询订单主表和明细表）
 func (s *OrderService) GetOrder(ctx context.Context, req *orderv1.GetOrderRequest) (*orderv1.GetOrderResponse, error) {
+	// 1. 校验用户登录状态
 	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
+		log.Printf("⚠️ [OrderService] GetOrder: 用户未登录")
 		return &orderv1.GetOrderResponse{
 			Code:    1,
 			Message: "用户未登录",
 		}, nil
 	}
 
-	order, items, err := s.orderRepo.GetOrderByNo(ctx, userID, req.OrderNo)
-	if err != nil {
-		log.Printf("❌ [OrderService] GetOrder: 查询订单失败: %v", err)
+	// 2. 校验订单号
+	if req.OrderNo == "" {
+		log.Printf("⚠️ [OrderService] GetOrder: 订单号为空")
 		return &orderv1.GetOrderResponse{
 			Code:    1,
-			Message: "订单不存在",
+			Message: "订单号不能为空",
 		}, nil
 	}
 
+	// 3. 查询订单主表和明细表
+	order, items, err := s.orderRepo.GetOrderByNo(ctx, userID, req.OrderNo)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("⚠️ [OrderService] GetOrder: 订单不存在, orderNo=%s, userID=%s", req.OrderNo, userID)
+			return &orderv1.GetOrderResponse{
+				Code:    1,
+				Message: "订单不存在或无权访问",
+			}, nil
+		}
+		log.Printf("❌ [OrderService] GetOrder: 查询订单失败, orderNo=%s, userID=%s, error=%v", req.OrderNo, userID, err)
+		return &orderv1.GetOrderResponse{
+			Code:    1,
+			Message: "查询订单失败，请稍后重试",
+		}, nil
+	}
+
+	// 4. 转换并返回数据
+	log.Printf("✅ [OrderService] GetOrder: 查询成功, orderNo=%s, userID=%s, itemCount=%d", req.OrderNo, userID, len(items))
 	return &orderv1.GetOrderResponse{
 		Code:    0,
 		Message: "查询成功",
