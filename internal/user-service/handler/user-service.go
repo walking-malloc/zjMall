@@ -245,6 +245,8 @@ func (h *UserServiceHandler) BindPhone(ctx context.Context, req *userv1.BindPhon
 func (h *UserServiceHandler) GetUserAddress(ctx context.Context, req *userv1.GetUserAddressRequest) (*userv1.GetUserAddressResponse, error) {
 	// 从 context 中获取用户 ID（由认证中间件设置）
 	userID := middleware.GetUserIDFromContext(ctx)
+	log.Printf("req.AddressId: %s", req.AddressId)
+	log.Printf("userID: %s", userID)
 	if userID == "" {
 		return &userv1.GetUserAddressResponse{
 			Code:    1,

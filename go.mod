@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
 	github.com/elastic/go-elasticsearch/v8 v8.19.1
+	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5
 	github.com/rabbitmq/amqp091-go v1.10.0

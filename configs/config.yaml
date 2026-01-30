@@ -102,6 +102,10 @@ rabbitmq:
 service_clients:
   product_service_addr: "127.0.0.1:50053"  # 商品服务 gRPC 地址
   inventory_service_addr: "127.0.0.1:50055"  # 库存服务 gRPC 地址
+  user_service_addr: "127.0.0.1:50052"  # 用户服务 gRPC 地址
+  order_service_addr: "127.0.0.1:50056"  # 订单服务 gRPC 地址
+  cart_service_addr: "127.0.0.1:50054"  # 购物车服务 gRPC 地址
+
 
 nacos:
   host: 127.0.0.1

@@ -23,18 +23,33 @@ export const useCartStore = defineStore('cart', () => {
 
   const transformItemFromApi = (apiItem) => {
     const price = parseFloat(apiItem.price || apiItem.current_price || '0') || 0
+    // 确保 product_id 和 sku_id 存在
+    const productId = apiItem.product_id || apiItem.productId || ''
+    const skuId = apiItem.sku_id || apiItem.skuId || ''
+    
+    if (!productId || !skuId) {
+      console.error('⚠️ 购物车项数据不完整:', {
+        id: apiItem.id,
+        product_id: apiItem.product_id,
+        productId: apiItem.productId,
+        sku_id: apiItem.sku_id,
+        skuId: apiItem.skuId,
+        fullItem: apiItem
+      })
+    }
+    
     return {
       id: apiItem.id,
-      productId: apiItem.product_id,
-      productTitle: apiItem.product_title,
-      productImage: apiItem.product_image,
-      skuId: apiItem.sku_id,
-      skuName: apiItem.sku_name,
+      productId: productId, // 确保不为 undefined
+      productTitle: apiItem.product_title || apiItem.productTitle || '',
+      productImage: apiItem.product_image || apiItem.productImage || '',
+      skuId: skuId, // 确保不为 undefined
+      skuName: apiItem.sku_name || apiItem.skuName || '',
       price,
-      quantity: apiItem.quantity,
-      stock: apiItem.stock,
-      isValid: apiItem.is_valid,
-      invalidReason: apiItem.invalid_reason,
+      quantity: apiItem.quantity || 0,
+      stock: apiItem.stock || 0,
+      isValid: apiItem.is_valid !== false,
+      invalidReason: apiItem.invalid_reason || apiItem.invalidReason || '',
       // 默认勾选有效商品
       selected: apiItem.is_valid !== false
     }
@@ -46,7 +61,14 @@ export const useCartStore = defineStore('cart', () => {
       const res = await getCart()
       if (res.data && res.data.code === 0) {
         const apiItems = res.data.items || []
+        console.log('购物车原始数据:', apiItems)
         items.value = apiItems.map(transformItemFromApi)
+        console.log('转换后的购物车数据:', items.value.map(item => ({
+          id: item.id,
+          productId: item.productId,
+          skuId: item.skuId,
+          productTitle: item.productTitle
+        })))
 
         if (res.data.summary) {
           const s = res.data.summary

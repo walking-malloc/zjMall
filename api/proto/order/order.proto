@@ -63,6 +63,13 @@ service OrderService {
       body: "*"
     };
   }
+
+  // 生成订单幂等性Token
+  rpc GenerateOrderToken(GenerateOrderTokenRequest) returns (GenerateOrderTokenResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/orders/token"
+    };
+  }
 }
 
 
@@ -113,6 +120,7 @@ message CreateOrderRequest {
   string address_id = 2;                   // 收货地址ID
   string coupon_id = 3;                    // 优惠券ID（可选）
   string buyer_remark = 4;                 // 买家留言
+  string token = 5;
 }
 
 message CreateOrderResponse {
@@ -169,6 +177,18 @@ message MarkOrderPaidRequest {
 message MarkOrderPaidResponse {
   int32 code = 1;
   string message = 2;
+}
+
+// 生成订单幂等性Token
+message GenerateOrderTokenRequest {
+  // 空请求，Token由服务端生成
+}
+
+message GenerateOrderTokenResponse {
+  int32 code = 1;
+  string message = 2;
+  string token = 3;        // 幂等性Token
+  int64 expire_seconds = 4; // Token有效期（秒）
 }
 
 

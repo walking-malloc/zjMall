@@ -28,12 +28,14 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
     id VARCHAR(26) NOT NULL PRIMARY KEY COMMENT '日志ID',
     sku_id VARCHAR(26) NOT NULL COMMENT 'SKU ID',
     change_amount INT NOT NULL COMMENT '库存变动数量：正数增加，负数减少',
-    reason VARCHAR(50) NOT NULL COMMENT '变动原因：order_created, order_canceled, manual_adjust 等',
+    reason VARCHAR(50) NOT NULL COMMENT '变动原因：deduct, rollback, manual_adjust 等',
     ref_id VARCHAR(64) DEFAULT NULL COMMENT '关联单号（订单号/操作单号等）',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_sku_time (sku_id, created_at),
     INDEX idx_ref_id (ref_id),
-    INDEX idx_sku_ref (sku_id, ref_id) COMMENT '用于幂等性检查：查询某个订单是否已扣减过某个SKU的库存'
+    INDEX idx_sku_ref (sku_id, ref_id),
+    -- 唯一索引：防止同一个订单号对同一个SKU重复扣减/回滚（幂等性保证）
+    UNIQUE KEY uk_sku_ref_reason (sku_id, ref_id, reason)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存变动明细表';
 
 

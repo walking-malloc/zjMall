@@ -8,7 +8,9 @@ import (
 	"time"
 	commonv1 "zjMall/gen/go/api/proto/common"
 	orderv1 "zjMall/gen/go/api/proto/order"
+	"zjMall/internal/common/client"
 	"zjMall/internal/common/middleware"
+	registry "zjMall/internal/common/register"
 	"zjMall/internal/common/server"
 	"zjMall/internal/config"
 	"zjMall/internal/database"
@@ -21,6 +23,7 @@ import (
 )
 
 const serviceName = "order-service"
+const serviceIP = "127.0.0.1"
 
 func main() {
 	logFile, err := pkg.InitLog(serviceName)
@@ -36,9 +39,68 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
+	//2.初始化Nacos
+	svcCfg, _ := cfg.GetServiceConfig(serviceName)
+	nacosConfig := cfg.GetNacosConfig()
+	nacosClient, err := registry.NewNacosNamingClient(nacosConfig)
+	if err != nil {
+		log.Fatalf("❌ Nacos 初始化失败: %v", err)
+	}
+	registry.RegisterService(nacosClient, serviceName, serviceIP, uint64(svcCfg.GRPC.Port))
+	//初始化客户端
+	productServiceAddr, err := registry.SelectOneHealthyInstance(nacosClient, "product-service")
+	if err != nil || productServiceAddr == "" {
+		log.Fatalf("❌ 从 Nacos 发现商品服务失败: %v", err)
+	}
+	productClient, err := client.NewProductClient(productServiceAddr)
+	if err != nil {
+		log.Fatalf("❌ 商品服务客户端初始化失败: %v", err)
+	}
+	defer productClient.Close()
+	log.Printf("✅ 商品服务客户端连接成功: %s", productServiceAddr)
 
+	inventoryServiceAddr, err := registry.SelectOneHealthyInstance(nacosClient, "inventory-service")
+	if err != nil || inventoryServiceAddr == "" {
+		log.Fatalf("❌ 从 Nacos 发现库存服务失败: %v", err)
+	}
+	inventoryClient, err := client.NewInventoryClient(inventoryServiceAddr)
+	if err != nil {
+		log.Fatalf("❌ 库存服务客户端初始化失败: %v", err)
+	}
+	defer inventoryClient.Close()
+	log.Printf("✅ 库存服务客户端连接成功: %s", inventoryServiceAddr)
+
+	userServiceAddr, err := registry.SelectOneHealthyInstance(nacosClient, "user-service")
+	if err != nil || userServiceAddr == "" {
+		log.Fatalf("❌ 从 Nacos 发现用户服务失败: %v", err)
+	}
+	userClient, err := client.NewUserClient(userServiceAddr)
+	if err != nil {
+		log.Fatalf("❌ 用户服务客户端初始化失败: %v", err)
+	}
+	defer userClient.Close()
+	log.Printf("✅ 用户服务客户端连接成功: %s", userServiceAddr)
+
+	cartServiceAddr, err := registry.SelectOneHealthyInstance(nacosClient, "cart-service")
+	if err != nil || cartServiceAddr == "" {
+		log.Fatalf("❌ 从 Nacos 发现购物车服务失败: %v", err)
+	}
+	cartClient, err := client.NewCartClient(cartServiceAddr)
+	if err != nil {
+		log.Fatalf("❌ 购物车服务客户端初始化失败: %v", err)
+	}
+	defer cartClient.Close()
+	log.Printf("✅ 购物车服务客户端连接成功: %s", cartServiceAddr)
 	// 初始化 JWT（如果订单需要鉴权）
 	pkg.InitJWT(cfg.GetJWTConfig())
+
+	//3.初始化redis
+	redisConfig := cfg.GetRedisConfig()
+	redisClient, err := database.InitRedis(redisConfig)
+	if err != nil {
+		log.Fatalf("Error initializing Redis: %v", err)
+	}
+	defer database.CloseRedis()
 
 	// 2. 初始化数据库
 	mysqlConfig, err := cfg.GetDatabaseConfigForService(serviceName)
@@ -55,7 +117,7 @@ func main() {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 	// 3. 创建仓储与服务
 	orderRepo := repository.NewOrderRepository(db)
-	orderService := service.NewOrderService(orderRepo)
+	orderService := service.NewOrderService(orderRepo, productClient, inventoryClient, userClient, cartClient, redisClient)
 	orderHandler := handler.NewOrderServiceHandler(orderService)
 
 	// 4. 获取服务配置

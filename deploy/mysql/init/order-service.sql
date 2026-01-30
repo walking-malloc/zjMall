@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS orders (
     order_no VARCHAR(32) NOT NULL UNIQUE COMMENT '订单号',
     user_id VARCHAR(26) NOT NULL COMMENT '用户ID',
 
-    status INT NOT NULL DEFAULT 1 COMMENT '订单状态：1-待支付，2-待发货，3-待收货，4-已完成，5-已关闭',
+    status TINYINT NOT NULL DEFAULT 1 COMMENT '订单状态：1-待支付，2-待发货，3-待收货，4-已完成，5-已关闭',
 
     total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0 COMMENT '商品总金额',
     discount_amount DECIMAL(10, 2) NOT NULL DEFAULT 0 COMMENT '优惠总金额',
@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS orders (
     paid_at TIMESTAMP NULL DEFAULT NULL COMMENT '支付时间',
     shipped_at TIMESTAMP NULL DEFAULT NULL COMMENT '发货时间',
     completed_at TIMESTAMP NULL DEFAULT NULL COMMENT '完成时间',
+    version INT NOT NULL DEFAULT 0 COMMENT '版本号',
 
     INDEX idx_user_status (user_id, status),
     INDEX idx_created_at (created_at),

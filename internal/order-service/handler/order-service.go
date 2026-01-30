@@ -84,3 +84,8 @@ func (h *OrderServiceHandler) MarkOrderPaid(ctx context.Context, req *orderv1.Ma
 	}
 	return h.orderService.MarkOrderPaid(ctx, req)
 }
+
+// 生成订单幂等性Token
+func (h *OrderServiceHandler) GenerateOrderToken(ctx context.Context, req *orderv1.GenerateOrderTokenRequest) (*orderv1.GenerateOrderTokenResponse, error) {
+	return h.orderService.GenerateOrderToken(ctx, req)
+}

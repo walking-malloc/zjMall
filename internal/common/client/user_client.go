@@ -6,10 +6,12 @@ import (
 	"log"
 	"time"
 	userv1 "zjMall/gen/go/api/proto/user"
+	"zjMall/internal/common/middleware"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 )
 
 // UserClient 用户服务客户端接口
@@ -32,9 +34,9 @@ func NewUserClient(addr string) (UserClient, error) {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                10 * time.Second,
-			Timeout:             3 * time.Second,
-			PermitWithoutStream: true,
+			Time:                30 * time.Second, // 每30秒发送一次ping（降低频率）
+			Timeout:             5 * time.Second,  // ping超时时间
+			PermitWithoutStream: false,            // 只在有活跃流时发送ping
 		}),
 	}
 
@@ -61,6 +63,20 @@ func NewUserClient(addr string) (UserClient, error) {
 func (c *userClient) GetUserAddress(ctx context.Context, addressID string) (*userv1.Address, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
+
+	// 从 context 中获取 userID（由订单服务的认证中间件设置）
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == "" {
+		return nil, fmt.Errorf("无法获取用户ID，请确保已登录")
+	}
+
+	// 将 userID 放入 gRPC metadata，传递给用户服务
+	md := metadata.New(map[string]string{
+		string(middleware.UserIDKey): userID,
+	})
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	log.Printf("🔍 [UserClient] GetUserAddress: userID=%s, addressID=%s", userID, addressID)
 
 	resp, err := c.client.GetUserAddress(ctx, &userv1.GetUserAddressRequest{
 		AddressId: addressID,

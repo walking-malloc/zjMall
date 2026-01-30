@@ -8,7 +8,7 @@ import (
 // 建议对应表名：inventory_stocks
 type Stock struct {
 	ID             string    `gorm:"type:varchar(26);primaryKey;comment:主键ID"`
-	SKUID          string    `gorm:"type:varchar(26);uniqueIndex;not null;comment:SKU ID" json:"sku_id"`
+	SKUID          string    `gorm:"column:sku_id;type:varchar(26);uniqueIndex;not null;comment:SKU ID" json:"sku_id"`
 	AvailableStock int64     `gorm:"type:int;not null;default:0;comment:可用库存" json:"available_stock"`
 	Version        int64     `gorm:"type:bigint;not null;default:0;comment:乐观锁版本号" json:"version"`
 	CreatedAt      time.Time `gorm:"comment:创建时间" json:"created_at"`

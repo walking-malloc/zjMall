@@ -13,9 +13,9 @@ type OrderRepository interface {
 	CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem) error
 	GetOrderByNo(ctx context.Context, userID, orderNo string) (*model.Order, []*model.OrderItem, error)
 	GetOrderByNoNoUser(ctx context.Context, orderNo string) (*model.Order, []*model.OrderItem, error) // 不校验用户ID，用于支付回调等场景
-	ListUserOrders(ctx context.Context, userID string, status int32, offset, limit int) ([]*model.Order, int64, error)
-	UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus int32) error
-	UpdateOrderPaid(ctx context.Context, orderNo string, fromStatus, toStatus int32, payChannel, payTradeNo string, paidAt time.Time) error
+	ListUserOrders(ctx context.Context, userID string, status int8, offset, limit int) ([]*model.Order, int64, error)
+	UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus int8) error
+	UpdateOrderPaid(ctx context.Context, orderNo string, fromStatus, toStatus int8, payChannel, payTradeNo string, paidAt time.Time) error
 }
 
 type orderRepository struct {
@@ -78,7 +78,7 @@ func (r *orderRepository) GetOrderByNoNoUser(ctx context.Context, orderNo string
 	return &order, items, nil
 }
 
-func (r *orderRepository) ListUserOrders(ctx context.Context, userID string, status int32, offset, limit int) ([]*model.Order, int64, error) {
+func (r *orderRepository) ListUserOrders(ctx context.Context, userID string, status int8, offset, limit int) ([]*model.Order, int64, error) {
 	var orders []*model.Order
 	tx := r.db.WithContext(ctx).Model(&model.Order{}).Where("user_id = ?", userID)
 	if status > 0 {
@@ -94,22 +94,68 @@ func (r *orderRepository) ListUserOrders(ctx context.Context, userID string, sta
 	return orders, total, nil
 }
 
-func (r *orderRepository) UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus int32) error {
-	return r.db.WithContext(ctx).
-		Model(&model.Order{}).
+func (r *orderRepository) UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus int8) error {
+	// 先查询订单获取当前version
+	var order model.Order
+	if err := r.db.WithContext(ctx).
 		Where("order_no = ? AND status = ?", orderNo, fromStatus).
-		Update("status", toStatus).Error
+		First(&order).Error; err != nil {
+		return err
+	}
+
+	// 使用乐观锁更新：WHERE条件包含version，更新时version+1
+	result := r.db.WithContext(ctx).
+		Model(&model.Order{}).
+		Where("order_no = ? AND status = ? AND version = ?", orderNo, fromStatus, order.Version).
+		Updates(map[string]interface{}{
+			"status":  toStatus,
+			"version": gorm.Expr("version + 1"),
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// 检查是否更新成功（RowsAffected=0表示version不匹配，可能是并发修改）
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound // 或者返回自定义错误：订单已被其他请求修改
+	}
+
+	return nil
 }
 
-// UpdateOrderPaid 更新订单支付信息和状态
-func (r *orderRepository) UpdateOrderPaid(ctx context.Context, orderNo string, fromStatus, toStatus int32, payChannel, payTradeNo string, paidAt time.Time) error {
-	return r.db.WithContext(ctx).
-		Model(&model.Order{}).
+// UpdateOrderPaid 更新订单支付信息和状态（使用乐观锁）
+func (r *orderRepository) UpdateOrderPaid(ctx context.Context, orderNo string, fromStatus, toStatus int8, payChannel, payTradeNo string, paidAt time.Time) error {
+	// 先查询订单获取当前version
+	var order model.Order
+	if err := r.db.WithContext(ctx).
 		Where("order_no = ? AND status = ?", orderNo, fromStatus).
+		First(&order).Error; err != nil {
+		return err
+	}
+
+	// 使用乐观锁更新：WHERE条件包含version，更新时version+1
+	// 将 paidAt 转换为指针类型（因为模型中使用的是 *time.Time）
+	paidAtPtr := &paidAt
+	result := r.db.WithContext(ctx).
+		Model(&model.Order{}).
+		Where("order_no = ? AND status = ? AND version = ?", orderNo, fromStatus, order.Version).
 		Updates(map[string]interface{}{
 			"status":       toStatus,
 			"pay_channel":  payChannel,
 			"pay_trade_no": payTradeNo,
-			"paid_at":      paidAt,
-		}).Error
+			"paid_at":      paidAtPtr,
+			"version":      gorm.Expr("version + 1"),
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// 检查是否更新成功（RowsAffected=0表示version不匹配，可能是并发修改）
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound // 或者返回自定义错误：订单已被其他请求修改
+	}
+
+	return nil
 }

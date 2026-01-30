@@ -166,18 +166,39 @@ const handleCheckout = async () => {
     return
   }
 
+  // 先刷新购物车，确保数据是最新的
   try {
-    const itemIds = selectedItems.value.map(item => item.id)
-    const res = await cartStore.previewCheckout(itemIds)
-    if (res && res.code === 0) {
-      console.log('结算预览结果:', res.data)
-      ElMessage.success('已完成结算预览，后续可接入订单创建流程')
-    } else {
-      ElMessage.error(res?.message || '结算预览失败')
+    await cartStore.refreshCart()
+    // 重新获取选中的商品（刷新后需要重新筛选）
+    const refreshedSelectedItems = cartStore.items.filter(item => {
+      const originalItem = selectedItems.value.find(sel => sel.id === item.id)
+      return originalItem && originalItem.selected
+    })
+    
+    if (refreshedSelectedItems.length === 0) {
+      ElMessage.warning('选中的商品已不存在，请重新选择')
+      return
     }
+
+    // 检查是否有无效商品（isValid 为 false 或 null/undefined 时，如果明确标记为无效才阻止）
+    const invalidItems = refreshedSelectedItems.filter(item => item.isValid === false)
+    if (invalidItems.length > 0) {
+      const invalidNames = invalidItems.map(item => item.productTitle).join('、')
+      ElMessage.warning(`以下商品已失效，请移除后重试：${invalidNames}`)
+      return
+    }
+
+    // 跳转到确认订单页面
+    const itemIds = refreshedSelectedItems.map(item => item.id)
+    router.push({
+      name: 'Checkout',
+      query: {
+        items: JSON.stringify(itemIds)
+      }
+    })
   } catch (error) {
-    console.error('结算预览失败:', error)
-    ElMessage.error('结算预览失败，请稍后重试')
+    console.error('刷新购物车失败:', error)
+    ElMessage.error('刷新购物车失败，请稍后重试')
   }
 }
 

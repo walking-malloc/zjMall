@@ -34,9 +34,9 @@ func NewProductClient(addr string) (ProductClient, error) {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                10 * time.Second,
-			Timeout:             3 * time.Second,
-			PermitWithoutStream: true,
+			Time:                30 * time.Second, // 每30秒发送一次ping（降低频率）
+			Timeout:             5 * time.Second,  // ping超时时间
+			PermitWithoutStream: false,            // 只在有活跃流时发送ping
 		}),
 	}
 

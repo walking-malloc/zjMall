@@ -94,6 +94,29 @@
         ]
       }
     },
+    "/api/v1/orders/token": {
+      "get": {
+        "summary": "生成订单幂等性Token",
+        "operationId": "OrderService_GenerateOrderToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/order.v1.GenerateOrderTokenResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "tags": [
+          "OrderService"
+        ]
+      }
+    },
     "/api/v1/orders/{orderNo}": {
       "get": {
         "summary": "获取单个订单详情",
@@ -290,6 +313,9 @@
         "buyerRemark": {
           "type": "string",
           "title": "买家留言"
+        },
+        "token": {
+          "type": "string"
         }
       }
     },
@@ -308,6 +334,27 @@
         },
         "payAmount": {
           "type": "string"
+        }
+      }
+    },
+    "order.v1.GenerateOrderTokenResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string",
+          "title": "幂等性Token"
+        },
+        "expireSeconds": {
+          "type": "string",
+          "format": "int64",
+          "title": "Token有效期（秒）"
         }
       }
     },

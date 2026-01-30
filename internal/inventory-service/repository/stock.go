@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"zjMall/internal/inventory-service/model"
 
@@ -121,21 +123,7 @@ func (r *stockRepository) TryDeductStocks(ctx context.Context, orderNo string, i
 		stockMap[stocks[i].SKUID] = &stocks[i]
 	}
 
-	// 批量幂等性检查：查询该订单号已经扣减过的 SKU
-	var existingLogs []model.StockLog
-	if err := tx.Where("ref_id = ? AND reason = ? AND change_amount < 0", orderNo, "deduct").
-		Find(&existingLogs).Error; err != nil && err != gorm.ErrRecordNotFound {
-		tx.Rollback()
-		return fmt.Errorf("幂等性检查失败: %w", err)
-	}
-
-	// 构建已扣减的 SKU 映射（用于幂等性检查）
-	deductedMap := make(map[string]int64) // skuID -> quantity
-	for _, log := range existingLogs {
-		deductedMap[log.SKUID] = -log.ChangeAmount // ChangeAmount 是负数，取反得到正数
-	}
-
-	// 准备需要实际扣减的项（排除已扣减的）
+	// 准备需要扣减的项，检查库存是否充足
 	var toDeduct []DeductItem
 	for _, item := range items {
 		// 检查库存记录是否存在
@@ -145,50 +133,51 @@ func (r *stockRepository) TryDeductStocks(ctx context.Context, orderNo string, i
 			return fmt.Errorf("SKU %s 的库存记录不存在", item.SKUID)
 		}
 
-		// 幂等性检查：如果已经扣减过，检查是否需要补扣
-		if deductedQty, alreadyDeducted := deductedMap[item.SKUID]; alreadyDeducted {
-			if deductedQty >= item.Quantity {
-				// 已扣减的数量足够，幂等返回
-				log.Printf("ℹ️ [StockRepository] TryDeductStocks: 订单 %s 已扣减过 SKU %s 的库存（已扣减:%d, 需要:%d），幂等跳过", orderNo, item.SKUID, deductedQty, item.Quantity)
-				continue
-			} else {
-				// 已扣减的数量不足，需要补扣
-				remainingQty := item.Quantity - deductedQty
-				// 检查库存是否充足（补扣的数量）
-				if stock.AvailableStock < remainingQty {
-					tx.Rollback()
-					return fmt.Errorf("SKU %s 库存不足（补扣）: 当前库存=%d, 需要补扣=%d", item.SKUID, stock.AvailableStock, remainingQty)
-				}
-				// 创建补扣项
-				toDeduct = append(toDeduct, DeductItem{
-					SKUID:    item.SKUID,
-					Quantity: remainingQty,
-				})
-				continue
-			}
-		} else {
-			// 未扣减过，检查库存是否充足
-			if stock.AvailableStock < item.Quantity {
-				tx.Rollback()
-				return fmt.Errorf("SKU %s 库存不足: 当前库存=%d, 需要扣减=%d", item.SKUID, stock.AvailableStock, item.Quantity)
-			}
-
-			toDeduct = append(toDeduct, item)
+		// 检查库存是否充足
+		if stock.AvailableStock < item.Quantity {
+			tx.Rollback()
+			return fmt.Errorf("SKU %s 库存不足: 当前库存=%d, 需要扣减=%d", item.SKUID, stock.AvailableStock, item.Quantity)
 		}
+
+		toDeduct = append(toDeduct, item)
 	}
 
-	// 如果没有需要扣减的项（全部幂等），直接提交事务
+	// 如果没有需要扣减的项，直接提交事务
 	if len(toDeduct) == 0 {
 		tx.Commit()
 		return nil
 	}
 
 	// 批量更新库存（使用乐观锁）
+	// 先尝试插入 log（幂等性检查），如果已存在则跳过整个扣减流程
 	// UPDATE inventory_stocks
 	// SET available_stock = available_stock - ?, version = version + 1
 	// WHERE sku_id = ? AND available_stock >= ? AND version = ?
 	for _, item := range toDeduct {
 		stock := stockMap[item.SKUID]
+
+		// 先尝试插入 log（幂等性检查：如果已存在，说明已经扣减过）
+		logEntry := &model.StockLog{
+			SKUID:        item.SKUID,
+			ChangeAmount: -item.Quantity,
+			Reason:       "deduct",
+			RefID:        orderNo,
+		}
+		if err := tx.Create(logEntry).Error; err != nil {
+			// 检查是否是唯一索引冲突（幂等性：同一个订单号重复扣减）
+			if errors.Is(err, gorm.ErrDuplicatedKey) ||
+				strings.Contains(err.Error(), "Duplicate entry") ||
+				strings.Contains(err.Error(), "UNIQUE constraint") ||
+				strings.Contains(err.Error(), "duplicate key") {
+				// 幂等：已经扣减过，跳过
+				log.Printf("ℹ️ [StockRepository] TryDeductStocks: 订单 %s 已扣减过 SKU %s 的库存，幂等跳过", orderNo, item.SKUID)
+				continue
+			}
+			tx.Rollback()
+			return fmt.Errorf("写入库存日志失败 sku_id=%s: %w", item.SKUID, err)
+		}
+
+		// log 插入成功，执行库存扣减
 		res := tx.Model(&model.Stock{}).
 			Where("sku_id = ? AND available_stock >= ? AND version = ?", item.SKUID, item.Quantity, stock.Version).
 			Updates(map[string]interface{}{
@@ -207,18 +196,6 @@ func (r *stockRepository) TryDeductStocks(ctx context.Context, orderNo string, i
 			// 2. available_stock < quantity（库存不足）
 			// 3. sku_id 不存在（但前面已经检查过，理论上不会发生）
 			return fmt.Errorf("SKU %s 库存扣减失败: 可能被其他请求并发修改（乐观锁冲突）或库存不足（当前库存可能已不足 %d）", item.SKUID, item.Quantity)
-		}
-
-		// 写入库存变动日志（负数表示扣减）
-		logEntry := &model.StockLog{
-			SKUID:        item.SKUID,
-			ChangeAmount: -item.Quantity,
-			Reason:       "deduct",
-			RefID:        orderNo,
-		}
-		if err := tx.Create(logEntry).Error; err != nil {
-			tx.Rollback()
-			return fmt.Errorf("写入库存日志失败 sku_id=%s: %w", item.SKUID, err)
 		}
 	}
 
@@ -294,7 +271,7 @@ func (r *stockRepository) RollbackStocks(ctx context.Context, orderNo string, it
 			continue
 		}
 
-		// 写入库存变动日志（正数表示回滚/增加）
+		// 先尝试插入 log（幂等性检查：如果已存在，说明已经回滚过）
 		logEntry := &model.StockLog{
 			SKUID:        item.SKUID,
 			ChangeAmount: +item.Quantity,
@@ -302,6 +279,15 @@ func (r *stockRepository) RollbackStocks(ctx context.Context, orderNo string, it
 			RefID:        orderNo,
 		}
 		if err := tx.Create(logEntry).Error; err != nil {
+			// 检查是否是唯一索引冲突（幂等性：同一个订单号重复回滚）
+			if errors.Is(err, gorm.ErrDuplicatedKey) ||
+				strings.Contains(err.Error(), "Duplicate entry") ||
+				strings.Contains(err.Error(), "UNIQUE constraint") ||
+				strings.Contains(err.Error(), "duplicate key") {
+				// 幂等：已经回滚过，跳过
+				log.Printf("ℹ️ [StockRepository] RollbackStocks: 订单 %s 已回滚过 SKU %s 的库存，幂等跳过", orderNo, item.SKUID)
+				continue
+			}
 			tx.Rollback()
 			return fmt.Errorf("写入库存日志失败 sku_id=%s: %w", item.SKUID, err)
 		}

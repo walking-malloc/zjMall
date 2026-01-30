@@ -33,28 +33,31 @@
               :key="item.id"
               class="order-item"
             >
-              <img :src="item.productImage" class="item-image" />
+              <img :src="item.productImage || '/placeholder.png'" class="item-image" />
               <div class="item-info">
                 <h4>{{ item.productTitle }}</h4>
                 <p v-if="item.skuName" class="sku-name">{{ item.skuName }}</p>
                 <p class="quantity">x{{ item.quantity }}</p>
               </div>
-              <div class="item-price">¥{{ item.price.toFixed(2) }}</div>
+              <div class="item-price">¥{{ parseFloat(item.price || 0).toFixed(2) }}</div>
             </div>
           </div>
 
           <div class="order-footer">
             <div class="order-total">
-              共 {{ order.items.length }} 件商品，合计：<span class="total-price">¥{{ order.totalAmount.toFixed(2) }}</span>
+              共 {{ order.items ? order.items.length : 0 }} 件商品，合计：<span class="total-price">¥{{ parseFloat(order.totalAmount || 0).toFixed(2) }}</span>
             </div>
             <div class="order-actions">
-              <el-button v-if="order.status === 'pending'" type="primary" @click="handlePay(order.id)">
+              <el-button v-if="order.status === 1" type="primary" @click="handlePay(order.orderNo)">
                 立即付款
               </el-button>
-              <el-button v-if="order.status === 'shipped'" type="success" @click="handleConfirm(order.id)">
+              <el-button v-if="order.status === 1" @click="handleCancel(order.orderNo)">
+                取消订单
+              </el-button>
+              <el-button v-if="order.status === 3" type="success" @click="handleConfirm(order.orderNo)">
                 确认收货
               </el-button>
-              <el-button @click="handleViewDetail(order.id)">查看详情</el-button>
+              <el-button @click="handleViewDetail(order.orderNo)">查看详情</el-button>
             </div>
           </div>
         </el-card>
@@ -74,8 +77,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, onMounted, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getOrderList, cancelOrder } from '@/api/order'
 
 const activeTab = ref('all')
 const orders = ref([])
@@ -84,15 +88,27 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
+// 状态映射
+const statusMap = {
+  'all': 0,
+  'pending': 1,  // ORDER_STATUS_PENDING_PAY
+  'paid': 2,     // ORDER_STATUS_PAID
+  'shipped': 3,  // ORDER_STATUS_SHIPPED
+  'completed': 4 // ORDER_STATUS_COMPLETED
+}
+
 const getStatusText = (status) => {
-  const statusMap = {
-    pending: '待付款',
-    paid: '待发货',
-    shipped: '待收货',
-    completed: '已完成',
-    cancelled: '已取消'
+  const map = {
+    1: '待付款',
+    2: '待发货',
+    3: '待收货',
+    4: '已完成',
+    5: '已取消',
+    6: '退款中',
+    7: '已退款',
+    8: '已关闭'
   }
-  return statusMap[status] || '未知'
+  return map[status] || '未知'
 }
 
 const handleTabChange = (tab) => {
@@ -103,35 +119,63 @@ const handleTabChange = (tab) => {
 const loadOrders = async () => {
   loading.value = true
   try {
-    // TODO: 调用订单API
-    // const res = await getOrderList({ 
-    //   status: activeTab.value === 'all' ? '' : activeTab.value,
-    //   page: currentPage.value,
-    //   page_size: pageSize.value
-    // })
-    // orders.value = res.data.data || []
-    // total.value = res.data.total || 0
+    const status = statusMap[activeTab.value] || 0
+    const res = await getOrderList({ 
+      status,
+      page: currentPage.value,
+      pageSize: pageSize.value
+    })
     
-    // 模拟数据
+    if (res.data.code === 0) {
+      orders.value = res.data.orders || []
+      total.value = res.data.total || 0
+    } else {
+      ElMessage.error(res.data.message || '获取订单列表失败')
+      orders.value = []
+      total.value = 0
+    }
+  } catch (error) {
+    ElMessage.error('获取订单列表失败: ' + error.message)
     orders.value = []
     total.value = 0
-  } catch (error) {
-    ElMessage.error('获取订单列表失败')
   } finally {
     loading.value = false
   }
 }
 
-const handlePay = (orderId) => {
+const handlePay = (orderNo) => {
   ElMessage.info('支付功能开发中...')
 }
 
-const handleConfirm = (orderId) => {
+const handleConfirm = (orderNo) => {
   ElMessage.info('确认收货功能开发中...')
 }
 
-const handleViewDetail = (orderId) => {
+const handleViewDetail = async (orderNo) => {
+  // TODO: 跳转到订单详情页或显示详情弹窗
   ElMessage.info('订单详情功能开发中...')
+}
+
+const handleCancel = async (orderNo) => {
+  try {
+    await ElMessageBox.confirm('确定要取消这个订单吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    const res = await cancelOrder(orderNo, '用户主动取消')
+    if (res.data.code === 0) {
+      ElMessage.success('订单已取消')
+      loadOrders()
+    } else {
+      ElMessage.error(res.data.message || '取消订单失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('取消订单失败: ' + error.message)
+    }
+  }
 }
 
 onMounted(() => {

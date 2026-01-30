@@ -37,3 +37,4 @@ echo "验证插件安装..."
 docker exec $CONTAINER_NAME elasticsearch-plugin list
 
 
+

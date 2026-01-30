@@ -47,6 +47,18 @@ const routes = [
         name: 'Addresses',
         component: () => import('@/views/Addresses.vue'),
         meta: { requiresAuth: true }
+      },
+      {
+        path: 'create-order-test',
+        name: 'CreateOrderTest',
+        component: () => import('@/views/CreateOrderTest.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'checkout',
+        name: 'Checkout',
+        component: () => import('@/views/Checkout.vue'),
+        meta: { requiresAuth: true }
       }
     ]
   },

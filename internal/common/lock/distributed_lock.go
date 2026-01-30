@@ -2,55 +2,41 @@ package lock
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 )
 
-// DistributedLock 分布式锁接口
-type DistributedLock interface {
-	// Lock 尝试获取锁，如果获取失败返回错误
-	Lock(ctx context.Context, key string, expiration time.Duration) (bool, error)
-	// Unlock 释放锁
-	Unlock(ctx context.Context, key string) error
-	// TryLock 尝试获取锁，立即返回结果（不阻塞）
-	TryLock(ctx context.Context, key string, expiration time.Duration) (bool, error)
+type DistributedLockService interface {
+	AcquireLock(ctx context.Context, key string, expireTime time.Duration) (bool, error)
+	ReleaseLock(ctx context.Context, key string) error
 }
 
-// RedisDistributedLock Redis 实现的分布式锁
-type RedisDistributedLock struct {
+// Redis实现
+type RedisLockService struct {
 	client *redis.Client
 }
 
-// NewDistributedLock 创建分布式锁实例
-func NewDistributedLock(client *redis.Client) DistributedLock {
-	return &RedisDistributedLock{
-		client: client,
-	}
+func NewRedisLockService(client *redis.Client) DistributedLockService {
+	return &RedisLockService{client: client}
 }
 
-// Lock 尝试获取锁（使用 SET NX EX）
-func (l *RedisDistributedLock) Lock(ctx context.Context, key string, expiration time.Duration) (bool, error) {
-	lockKey := fmt.Sprintf("lock:%s", key)
-	result, err := l.client.SetNX(ctx, lockKey, "1", expiration).Result()
-	if err != nil {
-		return false, fmt.Errorf("获取锁失败: %w", err)
-	}
-	return result, nil
+func (r *RedisLockService) AcquireLock(ctx context.Context, key string, expireTime time.Duration) (bool, error) {
+	return r.client.SetNX(ctx, key, "1", expireTime).Result()
 }
 
-// TryLock 尝试获取锁（立即返回，不阻塞）
-func (l *RedisDistributedLock) TryLock(ctx context.Context, key string, expiration time.Duration) (bool, error) {
-	return l.Lock(ctx, key, expiration)
+func (r *RedisLockService) ReleaseLock(ctx context.Context, key string) error {
+	// 使用Lua脚本保证原子性：只有锁的持有者才能释放
+	luaScript := `
+        local tokenKey = KEYS[1]
+        local value = redis.call('GET', tokenKey)
+        if value == '1' then
+            redis.call('DEL', tokenKey)
+            return 1
+        else
+            return 0
+        end
+    `
+	_, err := r.client.Eval(ctx, luaScript, []string{key}).Result()
+	return err
 }
-
-// Unlock 释放锁
-func (l *RedisDistributedLock) Unlock(ctx context.Context, key string) error {
-	lockKey := fmt.Sprintf("lock:%s", key)
-	if err := l.client.Del(ctx, lockKey).Err(); err != nil {
-		return fmt.Errorf("释放锁失败: %w", err)
-	}
-	return nil
-}
-

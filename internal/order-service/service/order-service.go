@@ -11,26 +11,33 @@ import (
 	inventoryv1 "zjMall/gen/go/api/proto/inventory"
 	orderv1 "zjMall/gen/go/api/proto/order"
 	"zjMall/internal/common/client"
+	"zjMall/internal/common/lock"
 	"zjMall/internal/common/middleware"
 	"zjMall/internal/order-service/model"
 	"zjMall/internal/order-service/repository"
 
+	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
 const (
 	// 正向流程
-	OrderStatusPendingPay = int32(orderv1.OrderStatus_ORDER_STATUS_PENDING_PAY) // 待支付（可取消）
-	OrderStatusPaid       = int32(orderv1.OrderStatus_ORDER_STATUS_PAID)        // 已支付（可退款）
-	OrderStatusShipped    = int32(orderv1.OrderStatus_ORDER_STATUS_SHIPPED)     // 已发货（可收货/退货）
-	OrderStatusCompleted  = int32(orderv1.OrderStatus_ORDER_STATUS_COMPLETED)   // 已完成（不可修改）
+	OrderStatusPendingPay = int8(orderv1.OrderStatus_ORDER_STATUS_PENDING_PAY) // 待支付（可取消）
+	OrderStatusPaid       = int8(orderv1.OrderStatus_ORDER_STATUS_PAID)        // 已支付（可退款）
+	OrderStatusShipped    = int8(orderv1.OrderStatus_ORDER_STATUS_SHIPPED)     // 已发货（可收货/退货）
+	OrderStatusCompleted  = int8(orderv1.OrderStatus_ORDER_STATUS_COMPLETED)   // 已完成（不可修改）
 
 	// 逆向流程
-	OrderStatusCancelled = int32(orderv1.OrderStatus_ORDER_STATUS_CANCELLED) // 已取消（用户主动）
-	OrderStatusRefunding = int32(orderv1.OrderStatus_ORDER_STATUS_REFUNDING) // 退款中
-	OrderStatusRefunded  = int32(orderv1.OrderStatus_ORDER_STATUS_REFUNDED)  // 已退款
-	OrderStatusClosed    = int32(orderv1.OrderStatus_ORDER_STATUS_CLOSED)    // 已关闭（超时自动）
+	OrderStatusCancelled = int8(orderv1.OrderStatus_ORDER_STATUS_CANCELLED) // 已取消（用户主动）
+	OrderStatusRefunding = int8(orderv1.OrderStatus_ORDER_STATUS_REFUNDING) // 退款中
+	OrderStatusRefunded  = int8(orderv1.OrderStatus_ORDER_STATUS_REFUNDED)  // 已退款
+	OrderStatusClosed    = int8(orderv1.OrderStatus_ORDER_STATUS_CLOSED)    // 已关闭（超时自动）
+
+	OrderTokenCacheKeyPrefix      = "order:token"
+	OrderTokenCacheExpireSeconds  = 300
+	OrderIdempotentCacheKeyPrefix = "order:idempotent"
 )
 
 // OrderService 订单服务（业务逻辑层）
@@ -39,17 +46,22 @@ type OrderService struct {
 	productClient   client.ProductClient
 	inventoryClient client.InventoryClient
 	userClient      client.UserClient
+	cartClient      client.CartClient
+	redisClient     *redis.Client
 }
 
-func NewOrderService(orderRepo repository.OrderRepository, productClient client.ProductClient, inventoryClient client.InventoryClient, userClient client.UserClient) *OrderService {
+func NewOrderService(orderRepo repository.OrderRepository, productClient client.ProductClient, inventoryClient client.InventoryClient, userClient client.UserClient, cartClient client.CartClient, redisClient *redis.Client) *OrderService {
 	return &OrderService{
 		orderRepo:       orderRepo,
 		productClient:   productClient,
 		inventoryClient: inventoryClient,
 		userClient:      userClient,
+		cartClient:      cartClient,
+		redisClient:     redisClient,
 	}
 }
 
+// 防止重复生成订单，前端提交token，后端消费并删除，然后获取分布式锁
 func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrderRequest) (*orderv1.CreateOrderResponse, error) {
 	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
@@ -63,6 +75,67 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		return &orderv1.CreateOrderResponse{
 			Code:    1,
 			Message: "订单商品不能为空",
+		}, nil
+	}
+	//检查token
+	if req.Token == "" {
+		return &orderv1.CreateOrderResponse{
+			Code:    1,
+			Message: "Token不能为空",
+		}, nil
+	}
+
+	//获取分布式锁
+	lockKey := fmt.Sprintf("%s:%s:%s", OrderIdempotentCacheKeyPrefix, userID, req.Token)
+	lockService := lock.NewRedisLockService(s.redisClient)
+	lockAcquired, err := lockService.AcquireLock(ctx, lockKey, 10*time.Second)
+	if err != nil || !lockAcquired {
+		log.Printf("❌ [OrderService] CreateOrder: 获取分布式锁失败: %v", err)
+		return &orderv1.CreateOrderResponse{
+			Code:    1,
+			Message: "系统繁忙，请稍后重试",
+		}, nil
+	}
+
+	defer func() {
+		if err := lockService.ReleaseLock(ctx, lockKey); err != nil {
+			log.Printf("⚠️ [OrderService] CreateOrder: 释放锁失败: %v", err)
+		}
+	}()
+
+	// 检查并消费Token
+	tokenValid, err := s.checkAndConsumeToken(ctx, userID, req.Token)
+	if err != nil {
+		log.Printf("❌ [OrderService] CreateOrder: 检查Token失败: %v", err)
+		return &orderv1.CreateOrderResponse{
+			Code:    1,
+			Message: "系统繁忙，请稍后重试",
+		}, nil
+	}
+	if !tokenValid {
+		return &orderv1.CreateOrderResponse{
+			Code:    1,
+			Message: "Token已失效或已使用",
+		}, nil
+	}
+	// 生成订单号（依赖数据库唯一索引保证唯一性）
+	// 注意：不再提前检查订单号是否存在，因为：
+	// 1. 检查和使用之间存在时间窗口，无法避免并发冲突
+	// 2. 数据库唯一索引会保证订单号唯一性
+	// 3. 如果订单号冲突，创建订单时会失败，然后回滚库存
+	var orderNo string
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		orderNo = orderNoGenerator(model.OrderTypeNormal)
+		// 直接使用订单号，如果冲突会在创建订单时被数据库唯一索引捕获
+		if orderNo != "" {
+			break
+		}
+	}
+	if orderNo == "" {
+		return &orderv1.CreateOrderResponse{
+			Code:    1,
+			Message: "订单号生成失败，请重试",
 		}, nil
 	}
 	var totalAmount float64
@@ -117,28 +190,10 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		payAmount = 0
 	}
 
-	// 生成订单号（依赖数据库唯一索引保证唯一性）
-	// 注意：不再提前检查订单号是否存在，因为：
-	// 1. 检查和使用之间存在时间窗口，无法避免并发冲突
-	// 2. 数据库唯一索引会保证订单号唯一性
-	// 3. 如果订单号冲突，创建订单时会失败，然后回滚库存
-	var orderNo string
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		orderNo = orderNoGenerator(model.OrderTypeNormal)
-		// 直接使用订单号，如果冲突会在创建订单时被数据库唯一索引捕获
-		if orderNo != "" {
-			break
-		}
-	}
-	if orderNo == "" {
-		return &orderv1.CreateOrderResponse{
-			Code:    1,
-			Message: "订单号生成失败，请重试",
-		}, nil
-	}
 	// 获取用户地址
+	log.Printf("req.AddressId: %s", req.AddressId)
 	userAddress, err := s.userClient.GetUserAddress(ctx, req.AddressId)
+	log.Printf("userAddress: %+v, err: %v", userAddress, err)
 	if err != nil || userAddress == nil {
 		return &orderv1.CreateOrderResponse{
 			Code:    1,
@@ -149,7 +204,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 	order := &model.Order{
 		OrderNo:         orderNo,
 		UserID:          userID,
-		Status:          OrderStatusPendingPay,
+		Status:          int8(OrderStatusPendingPay),
 		TotalAmount:     totalAmount,
 		DiscountAmount:  discountAmount,
 		ShippingAmount:  shippingAmount,
@@ -158,6 +213,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		ReceiverName:    userAddress.ReceiverName,
 		ReceiverPhone:   userAddress.ReceiverPhone,
 		ReceiverAddress: fmt.Sprintf("%s%s%s%s", userAddress.Province, userAddress.City, userAddress.District, userAddress.Detail),
+		Version:         1, // 初始化版本号为1
 	}
 
 	// 创建订单明细（填充商品快照信息）
@@ -235,6 +291,25 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		}, nil
 	}
 
+	// 订单创建成功，删除购物车中对应的商品
+	// 收集购物车项ID（如果有的话）
+	var cartItemIDs []string
+	for _, it := range req.Items {
+		if it.CartItemId != "" {
+			cartItemIDs = append(cartItemIDs, it.CartItemId)
+		}
+	}
+
+	// 如果有购物车项ID，调用购物车服务删除
+	if len(cartItemIDs) > 0 && s.cartClient != nil {
+		if err := s.cartClient.RemoveItems(ctx, cartItemIDs); err != nil {
+			// 购物车删除失败不影响订单创建成功，只记录日志
+			log.Printf("⚠️ [OrderService] CreateOrder: 删除购物车项失败（订单已创建成功）: %v", err)
+		} else {
+			log.Printf("✅ [OrderService] CreateOrder: 成功删除 %d 个购物车项", len(cartItemIDs))
+		}
+	}
+
 	return &orderv1.CreateOrderResponse{
 		Code:      0,
 		Message:   "创建成功",
@@ -292,7 +367,7 @@ func (s *OrderService) ListUserOrders(ctx context.Context, req *orderv1.ListUser
 	offset := int((req.Page - 1) * req.PageSize)
 	limit := int(req.PageSize)
 
-	orders, total, err := s.orderRepo.ListUserOrders(ctx, userID, int32(req.Status), offset, limit)
+	orders, total, err := s.orderRepo.ListUserOrders(ctx, userID, int8(req.Status), offset, limit)
 	if err != nil {
 		log.Printf("❌ [OrderService] ListUserOrders: 查询失败: %v", err)
 		return &orderv1.ListUserOrdersResponse{
@@ -324,28 +399,17 @@ func (s *OrderService) CancelOrder(ctx context.Context, req *orderv1.CancelOrder
 		}, nil
 	}
 
-	// 先查询订单，校验归属和状态
-	order, _, err := s.orderRepo.GetOrderByNo(ctx, userID, req.OrderNo)
-	if err != nil {
-		log.Printf("❌ [OrderService] CancelOrder: 查询订单失败: %v", err)
-		return &orderv1.CancelOrderResponse{
-			Code:    1,
-			Message: "订单不存在",
-		}, nil
-	}
-
-	// 校验订单状态：只有待支付订单可以取消
-	if order.Status != OrderStatusPendingPay {
-		return &orderv1.CancelOrderResponse{
-			Code:    1,
-			Message: fmt.Sprintf("订单状态为 %d，无法取消", order.Status),
-		}, nil
-	}
-
-	// 更新订单状态
+	// 更新订单状态（使用乐观锁）
 	if err := s.orderRepo.UpdateOrderStatus(ctx, req.OrderNo,
-		OrderStatusPendingPay,
-		OrderStatusCancelled); err != nil {
+		int8(OrderStatusPendingPay),
+		int8(OrderStatusCancelled)); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("⚠️ [OrderService] CancelOrder: 订单状态已被其他请求修改: %v", err)
+			return &orderv1.CancelOrderResponse{
+				Code:    1,
+				Message: "订单状态已变更，请刷新后重试",
+			}, nil
+		}
 		log.Printf("❌ [OrderService] CancelOrder: 取消订单失败: %v", err)
 		return &orderv1.CancelOrderResponse{
 			Code:    1,
@@ -379,27 +443,16 @@ func (s *OrderService) CancelOrder(ctx context.Context, req *orderv1.CancelOrder
 
 // MarkOrderPaid 标记订单已支付（简化版）
 func (s *OrderService) MarkOrderPaid(ctx context.Context, req *orderv1.MarkOrderPaidRequest) (*orderv1.MarkOrderPaidResponse, error) {
-	// 先查询订单，校验状态
-	order, _, err := s.orderRepo.GetOrderByNoNoUser(ctx, req.OrderNo)
-	if err != nil {
-		log.Printf("❌ [OrderService] MarkOrderPaid: 查询订单失败: %v", err)
-		return &orderv1.MarkOrderPaidResponse{
-			Code:    1,
-			Message: "订单不存在",
-		}, nil
-	}
 
-	// 校验订单状态：只有待支付订单可以标记为已支付
-	if order.Status != OrderStatusPendingPay {
-		return &orderv1.MarkOrderPaidResponse{
-			Code:    1,
-			Message: fmt.Sprintf("订单状态为 %d，无法标记为已支付", order.Status),
-		}, nil
-	}
-
-	// 更新订单状态和支付信息
 	now := time.Now()
 	if err := s.orderRepo.UpdateOrderPaid(ctx, req.OrderNo, OrderStatusPendingPay, OrderStatusPaid, req.PayChannel, req.PayTradeNo, now); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("⚠️ [OrderService] MarkOrderPaid: 订单状态已被其他请求修改（可能是重复回调）: %v", err)
+			return &orderv1.MarkOrderPaidResponse{
+				Code:    0, // 幂等返回成功
+				Message: "订单已处理",
+			}, nil
+		}
 		log.Printf("❌ [OrderService] MarkOrderPaid: 更新订单支付状态失败: %v", err)
 		return &orderv1.MarkOrderPaidResponse{
 			Code:    1,
@@ -416,7 +469,7 @@ func (s *OrderService) MarkOrderPaid(ctx context.Context, req *orderv1.MarkOrder
 // ======== 辅助转换函数 ========
 
 func convertOrderToProto(o *model.Order) *orderv1.Order {
-	return &orderv1.Order{
+	res := &orderv1.Order{
 		OrderNo:         o.OrderNo,
 		UserId:          o.UserID,
 		Status:          orderv1.OrderStatus(o.Status),
@@ -430,10 +483,21 @@ func convertOrderToProto(o *model.Order) *orderv1.Order {
 		ReceiverAddress: o.ReceiverAddress,
 		BuyerRemark:     o.BuyerRemark,
 		CreatedAt:       timestamppb.New(o.CreatedAt),
-		PaidAt:          timestamppb.New(o.PaidAt),
-		ShippedAt:       timestamppb.New(o.ShippedAt),
-		CompletedAt:     timestamppb.New(o.CompletedAt),
+		PaidAt:          nil,
+		ShippedAt:       nil,
+		CompletedAt:     nil,
 	}
+	// 只有当时间字段不为 nil 时才设置
+	if o.PaidAt != nil {
+		res.PaidAt = timestamppb.New(*o.PaidAt)
+	}
+	if o.ShippedAt != nil {
+		res.ShippedAt = timestamppb.New(*o.ShippedAt)
+	}
+	if o.CompletedAt != nil {
+		res.CompletedAt = timestamppb.New(*o.CompletedAt)
+	}
+	return res
 }
 
 func convertOrderItemsToProto(items []*model.OrderItem) []*orderv1.OrderItem {
@@ -464,4 +528,66 @@ func orderNoGenerator(orderType string) string {
 	}
 	orderNo += "00" //留作扩展用
 	return orderNo
+}
+
+// GenerateOrderToken 生成订单幂等性Token
+func (s *OrderService) GenerateOrderToken(ctx context.Context, req *orderv1.GenerateOrderTokenRequest) (*orderv1.GenerateOrderTokenResponse, error) {
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == "" {
+		return &orderv1.GenerateOrderTokenResponse{
+			Code:    1,
+			Message: "用户未登录",
+		}, nil
+	}
+	// 生成UUID作为Token
+	token := uuid.New().String()
+
+	// Token有效期5分钟（300秒）
+	cacheKey := fmt.Sprintf("%s:%s:%s", OrderTokenCacheKeyPrefix, userID, token)
+	set, err := s.redisClient.SetNX(ctx, cacheKey, "1", time.Duration(OrderTokenCacheExpireSeconds)*time.Second).Result()
+	if err != nil {
+		log.Printf("❌ [OrderService] GenerateOrderToken: 设置Token失败: %v", err)
+		return &orderv1.GenerateOrderTokenResponse{
+			Code:    1,
+			Message: "系统繁忙，请稍后重试",
+		}, nil
+	}
+	if !set {
+		// 极低概率的UUID碰撞，重新生成
+		log.Printf("⚠️ [OrderService] GenerateOrderToken: Token已存在，重新生成")
+		return s.GenerateOrderToken(ctx, req)
+	}
+
+	return &orderv1.GenerateOrderTokenResponse{
+		Code:          0,
+		Message:       "生成成功",
+		Token:         token,
+		ExpireSeconds: OrderTokenCacheExpireSeconds,
+	}, nil
+}
+func (s *OrderService) checkAndConsumeToken(ctx context.Context, userID, token string) (bool, error) {
+	if userID == "" || token == "" {
+		return false, errors.New("参数错误")
+	}
+
+	tokenKey := fmt.Sprintf("%s:%s:%s", OrderTokenCacheKeyPrefix, userID, token)
+
+	// 使用Lua脚本保证原子性：检查并删除
+	luaScript := `
+        local tokenKey = KEYS[1]
+        local value = redis.call('GET', tokenKey)
+        if value == '1' then
+            redis.call('DEL', tokenKey)
+            return 1
+        else
+            return 0
+        end
+    `
+
+	result, err := s.redisClient.Eval(ctx, luaScript, []string{tokenKey}).Int64()
+	if err != nil {
+		return false, fmt.Errorf("检查Token失败: %w", err)
+	}
+
+	return result == 1, nil
 }
