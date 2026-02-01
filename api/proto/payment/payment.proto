@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package payment.v1;
+
+option go_package = "zjMall/gen/go/api/proto/payment;paymentv1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+// 支付状态枚举
+enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0;  // 未指定
+  PAYMENT_STATUS_PENDING = 1;      // 待支付
+  PAYMENT_STATUS_PROCESSING = 2;   // 支付中
+  PAYMENT_STATUS_SUCCESS = 3;     // 支付成功
+  PAYMENT_STATUS_FAILED = 4;       // 支付失败
+  PAYMENT_STATUS_CLOSED = 5;       // 已关闭（超时）
+  PAYMENT_STATUS_REFUNDED = 6;     // 已退款
+}
+
+// 支付服务
+service PaymentService {
+  // 创建支付单
+  rpc CreatePayment(CreatePaymentRequest) returns (CreatePaymentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/payments"
+      body: "*"
+    };
+  }
+
+  // 查询支付单
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/payments/{payment_no}"
+    };
+  }
+
+  // 支付回调（第三方支付平台回调）
+  rpc PaymentCallback(PaymentCallbackRequest) returns (PaymentCallbackResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/payments/callback"
+      body: "*"
+    };
+  }
+
+  // 查询支付状态
+  rpc QueryPaymentStatus(QueryPaymentStatusRequest) returns (QueryPaymentStatusResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/payments/{payment_no}/status"
+    };
+  }
+
+  // 生成支付幂等性Token
+  rpc GeneratePaymentToken(GeneratePaymentTokenRequest) returns (GeneratePaymentTokenResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/payments/token"
+    };
+  }
+}
+
+// 支付单信息
+message Payment {
+  string id = 1;                    // 支付单ID
+  string payment_no = 2;            // 支付单号
+  string order_no = 3;              // 订单号
+  string user_id = 4;               // 用户ID
+  string amount = 5;                // 支付金额
+  string pay_channel = 6;       // 支付渠道
+  PaymentStatus status = 7;         // 支付状态
+  string trade_no = 8;              // 第三方交易号
+  string notify_url = 9;            // 回调地址
+  string return_url = 10;           // 返回地址
+  google.protobuf.Timestamp created_at = 11;  // 创建时间
+  google.protobuf.Timestamp paid_at = 12;     // 支付时间
+  google.protobuf.Timestamp expired_at = 13;   // 过期时间
+}
+
+// 创建支付单
+message CreatePaymentRequest {
+  string order_no = 1;              // 订单号
+  string pay_channel = 2;       // 支付渠道
+  string return_url = 3;           // 支付成功返回地址（可选）
+  string token = 4;                 // 幂等性Token（由GeneratePaymentToken接口获取）
+}
+
+message CreatePaymentResponse {
+  int32 code = 1;
+  string message = 2;
+  Payment payment = 3;
+  string pay_url = 4;              // 支付跳转URL（H5/PC）
+  string qr_code = 5;               // 支付二维码（移动端）
+  map<string, string> pay_params = 6; // 支付参数（前端调起支付用）
+}
+
+// 查询支付单
+message GetPaymentRequest {
+  string payment_no = 1;
+}
+
+message GetPaymentResponse {
+  int32 code = 1;
+  string message = 2;
+  Payment payment = 3;
+}
+
+// 支付回调
+message PaymentCallbackRequest {
+  string pay_channel = 1;      // 支付渠道
+  string payment_no = 2;            // 支付单号
+  string trade_no = 3;              // 第三方交易号
+  string amount = 4;                // 支付金额
+  string status = 5;                // 支付状态（第三方返回）
+  string sign = 6;                  // 签名
+  map<string, string> extra_params = 7; // 其他参数
+}
+
+message PaymentCallbackResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 查询支付状态
+message QueryPaymentStatusRequest {
+  string payment_no = 1;
+}
+
+message QueryPaymentStatusResponse {
+  int32 code = 1;
+  string message = 2;
+  PaymentStatus status = 3;
+  string trade_no = 4;              // 第三方交易号
+}
+
+// 生成支付幂等性Token
+message GeneratePaymentTokenRequest {
+  string order_no = 1;
+}
+
+message GeneratePaymentTokenResponse {
+  int32 code = 1;
+  string message = 2;
+  string token = 3;        // 幂等性Token
+  int64 expire_seconds = 4; // Token有效期（秒）
+}

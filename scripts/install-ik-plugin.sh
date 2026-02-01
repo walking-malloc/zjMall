@@ -38,3 +38,4 @@ docker exec $CONTAINER_NAME elasticsearch-plugin list
 
 
 
+

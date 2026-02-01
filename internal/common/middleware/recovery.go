@@ -13,7 +13,7 @@ type ErrorResponse struct {
 	TraceID string `json:"trace_id,omitempty"`
 }
 
-// Recovery 错误恢复中间件（企业级版本）
+// Recovery 错误恢复中间件
 // 捕获 panic，防止程序崩溃，返回 JSON 格式的错误响应
 func Recovery() Middleware {
 	return func(next http.Handler) http.Handler {
