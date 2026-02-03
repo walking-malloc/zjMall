@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -119,10 +120,6 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		}, nil
 	}
 	// 生成订单号（依赖数据库唯一索引保证唯一性）
-	// 注意：不再提前检查订单号是否存在，因为：
-	// 1. 检查和使用之间存在时间窗口，无法避免并发冲突
-	// 2. 数据库唯一索引会保证订单号唯一性
-	// 3. 如果订单号冲突，创建订单时会失败，然后回滚库存
 	var orderNo string
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {
@@ -146,6 +143,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		skuName      string
 		price        float64
 	}
+
 	itemSnapshots := make(map[string]*itemSnapshot) // key: skuId
 
 	for _, item := range req.Items {
@@ -191,14 +189,75 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 	}
 
 	// 获取用户地址
-	log.Printf("req.AddressId: %s", req.AddressId)
 	userAddress, err := s.userClient.GetUserAddress(ctx, req.AddressId)
-	log.Printf("userAddress: %+v, err: %v", userAddress, err)
 	if err != nil || userAddress == nil {
 		return &orderv1.CreateOrderResponse{
 			Code:    1,
 			Message: fmt.Sprintf("获取用户地址失败: %v", err),
 		}, nil
+	}
+	receiverAddress := fmt.Sprintf("%s%s%s%s", userAddress.Province, userAddress.City, userAddress.District, userAddress.Detail)
+
+	// 创建订单明细（填充商品快照信息）
+	var items []*model.OrderItem
+	var deductItems []*inventoryv1.SkuQuantity // 用于库存扣减
+	var itemsSnapshotList []ItemBasicSnapshot  // 用于生成订单表的精简快照
+
+	for _, it := range req.Items {
+		snapshot := itemSnapshots[it.SkuId]
+		if snapshot == nil {
+			return &orderv1.CreateOrderResponse{
+				Code:    1,
+				Message: fmt.Sprintf("SKU %s 快照信息缺失", it.SkuId),
+			}, nil
+		}
+
+		// 生成商品详细快照（JSON格式，保存到order_item表）
+		itemSnapshotJSON, err := s.generateItemDetailSnapshot(it, snapshot.productTitle, snapshot.productImage, snapshot.skuName, snapshot.price, receiverAddress)
+		if err != nil {
+			log.Printf("⚠️ [OrderService] CreateOrder: 生成商品快照失败: %v", err)
+			// 快照生成失败不影响主流程，继续创建订单
+			itemSnapshotJSON = ""
+		}
+
+		item := &model.OrderItem{
+			OrderNo:      orderNo,
+			UserID:       userID,
+			ProductID:    it.ProductId,
+			SKUID:        it.SkuId,
+			ProductTitle: snapshot.productTitle,
+			ProductImage: snapshot.productImage,
+			SKUName:      snapshot.skuName,
+			Price:        snapshot.price,
+			Quantity:     it.Quantity,
+			Subtotal:     float64(it.Quantity) * snapshot.price,
+			ItemSnapshot: itemSnapshotJSON, // 商品详细快照
+		}
+		items = append(items, item)
+
+		// 收集精简快照信息（用于订单表）
+		itemsSnapshotList = append(itemsSnapshotList, ItemBasicSnapshot{
+			ProductID:    it.ProductId,
+			SKUID:        it.SkuId,
+			ProductTitle: snapshot.productTitle,
+			SKUName:      snapshot.skuName,
+			Price:        fmt.Sprintf("%.2f", snapshot.price),
+			Quantity:     it.Quantity,
+			Subtotal:     fmt.Sprintf("%.2f", float64(it.Quantity)*snapshot.price),
+		})
+
+		deductItems = append(deductItems, &inventoryv1.SkuQuantity{
+			SkuId:    it.SkuId,
+			Quantity: int64(it.Quantity),
+		})
+	}
+
+	// 生成订单表的精简快照（商品列表摘要）
+	itemsSnapshotJSON, err := s.generateItemsSnapshot(itemsSnapshotList)
+	if err != nil {
+		log.Printf("⚠️ [OrderService] CreateOrder: 生成订单快照失败: %v", err)
+		// 快照生成失败不影响主流程
+		itemsSnapshotJSON = ""
 	}
 
 	order := &model.Order{
@@ -212,38 +271,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		BuyerRemark:     req.BuyerRemark,
 		ReceiverName:    userAddress.ReceiverName,
 		ReceiverPhone:   userAddress.ReceiverPhone,
-		ReceiverAddress: fmt.Sprintf("%s%s%s%s", userAddress.Province, userAddress.City, userAddress.District, userAddress.Detail),
-		Version:         1, // 初始化版本号为1
-	}
-
-	// 创建订单明细（填充商品快照信息）
-	var items []*model.OrderItem
-	var deductItems []*inventoryv1.SkuQuantity // 用于库存扣减
-	for _, it := range req.Items {
-		snapshot := itemSnapshots[it.SkuId]
-		if snapshot == nil {
-			return &orderv1.CreateOrderResponse{
-				Code:    1,
-				Message: fmt.Sprintf("SKU %s 快照信息缺失", it.SkuId),
-			}, nil
-		}
-		item := &model.OrderItem{
-			OrderNo:      orderNo,
-			UserID:       userID,
-			ProductID:    it.ProductId,
-			SKUID:        it.SkuId,
-			ProductTitle: snapshot.productTitle,
-			ProductImage: snapshot.productImage,
-			SKUName:      snapshot.skuName,
-			Price:        snapshot.price,
-			Quantity:     it.Quantity,
-			Subtotal:     float64(it.Quantity) * snapshot.price,
-		}
-		items = append(items, item)
-		deductItems = append(deductItems, &inventoryv1.SkuQuantity{
-			SkuId:    it.SkuId,
-			Quantity: int64(it.Quantity),
-		})
+		ReceiverAddress: receiverAddress,
+		ItemsSnapshot:   itemsSnapshotJSON, // 商品列表精简快照
+		Version:         1,                 // 初始化版本号为1
 	}
 
 	// 先扣减库存（在创建订单之前，防止超卖）
@@ -585,6 +615,80 @@ func (s *OrderService) GenerateOrderToken(ctx context.Context, req *orderv1.Gene
 		Token:         token,
 		ExpireSeconds: OrderTokenCacheExpireSeconds,
 	}, nil
+}
+
+// ItemBasicSnapshot 商品基本信息快照（用于订单表的精简快照）
+type ItemBasicSnapshot struct {
+	ProductID    string `json:"product_id"`
+	SKUID        string `json:"sku_id"`
+	ProductTitle string `json:"product_title"`
+	SKUName      string `json:"sku_name"`
+	Price        string `json:"price"`
+	Quantity     int32  `json:"quantity"`
+	Subtotal     string `json:"subtotal"`
+}
+
+// ItemDetailSnapshot 商品详细快照（用于订单明细表的详细快照）
+type ItemDetailSnapshot struct {
+	ProductID    string            `json:"product_id"`
+	SKUID        string            `json:"sku_id"`
+	ProductTitle string            `json:"product_title"`
+	ProductImage string            `json:"product_image"`
+	SKUName      string            `json:"sku_name"`
+	Price        string            `json:"price"`
+	Quantity     int32             `json:"quantity"`
+	Subtotal     string            `json:"subtotal"`
+	Address      string            `json:"address"`
+	ProductAttrs map[string]string `json:"product_attrs,omitempty"` // 商品属性（可选，扩展用）
+	SnapshotTime string            `json:"snapshot_time"`
+}
+
+// generateItemsSnapshot 生成订单表的精简快照（商品列表摘要）
+// 用于快速查看订单包含哪些商品，不需要查询order_items表
+func (s *OrderService) generateItemsSnapshot(items []ItemBasicSnapshot) (string, error) {
+	snapshot := map[string]interface{}{
+		"snapshot_version": "1.0",
+		"snapshot_time":    time.Now().Format("2006-01-02 15:04:05"),
+		"items_count":      len(items),
+		"items":            items,
+	}
+
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return "", fmt.Errorf("序列化订单快照失败: %w", err)
+	}
+
+	return string(data), nil
+}
+
+// generateItemDetailSnapshot 生成订单明细表的详细快照（单个商品的完整信息）
+// 用于审计、对账和问题排查，包含商品的完整信息
+func (s *OrderService) generateItemDetailSnapshot(
+	itemInput *orderv1.CreateOrderItemInput,
+	productTitle, productImage, skuName string,
+	price float64,
+	receiverAddress string,
+) (string, error) {
+	itemDetailSnapshot := ItemDetailSnapshot{
+		ProductID:    itemInput.ProductId,
+		SKUID:        itemInput.SkuId,
+		ProductTitle: productTitle,
+		ProductImage: productImage,
+		SKUName:      skuName,
+		Price:        fmt.Sprintf("%.2f", price),
+		Quantity:     itemInput.Quantity,
+		Subtotal:     fmt.Sprintf("%.2f", float64(itemInput.Quantity)*price),
+		Address:      receiverAddress,
+		SnapshotTime: time.Now().Format("2006-01-02 15:04:05"),
+		// ProductAttrs 可以后续扩展，保存商品的其他属性（如颜色、尺寸等）
+	}
+
+	data, err := json.Marshal(itemDetailSnapshot)
+	if err != nil {
+		return "", fmt.Errorf("序列化商品快照失败: %w", err)
+	}
+
+	return string(data), nil
 }
 func (s *OrderService) checkAndConsumeToken(ctx context.Context, userID, token string) (bool, error) {
 	if userID == "" || token == "" {

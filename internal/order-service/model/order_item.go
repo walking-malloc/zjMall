@@ -17,6 +17,8 @@ type OrderItem struct {
 	Price        float64 `gorm:"type:decimal(10,2);not null;comment:商品单价快照" json:"price"`
 	Quantity     int32   `gorm:"type:int;not null;default:1;comment:购买数量" json:"quantity"`
 	Subtotal     float64 `gorm:"type:decimal(10,2);not null;default:0;comment:小计金额" json:"subtotal"`
+
+	ItemSnapshot string `gorm:"type:json;comment:商品详细快照（JSON格式）" json:"item_snapshot"`
 }
 
 func (OrderItem) TableName() string {

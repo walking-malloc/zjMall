@@ -30,8 +30,9 @@ type Order struct {
 
 	BuyerRemark string `gorm:"type:varchar(255);comment:买家留言" json:"buyer_remark"`
 
-	PayChannel string `gorm:"type:varchar(20);comment:支付渠道" json:"pay_channel"`
-	PayTradeNo string `gorm:"type:varchar(64);comment:支付流水号" json:"pay_trade_no"`
+	PayChannel    string `gorm:"type:varchar(20);comment:支付渠道" json:"pay_channel"`
+	PayTradeNo    string `gorm:"type:varchar(64);comment:支付流水号" json:"pay_trade_no"`
+	ItemsSnapshot string `gorm:"column:items_snapshot;type:json;comment:商品列表精简快照（JSON格式）" json:"items_snapshot"`
 
 	CreatedAt   time.Time  `json:"created_at"`
 	PaidAt      *time.Time `gorm:"type:timestamp;null;default:null;comment:支付时间" json:"paid_at"`

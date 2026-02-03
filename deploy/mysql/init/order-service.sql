@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS orders (
     pay_channel VARCHAR(20) COMMENT '支付渠道：alipay、wechat 等',
     pay_trade_no VARCHAR(64) COMMENT '支付渠道流水号',
 
+    items_snapshot JSON COMMENT '商品列表精简快照（JSON格式，包含商品基本信息，用于快速查看订单商品）',
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     paid_at TIMESTAMP NULL DEFAULT NULL COMMENT '支付时间',
@@ -62,6 +64,8 @@ CREATE TABLE IF NOT EXISTS order_items (
     price DECIMAL(10, 2) NOT NULL DEFAULT 0 COMMENT '单价快照',
     quantity INT NOT NULL DEFAULT 1 COMMENT '购买数量',
     subtotal DECIMAL(10, 2) NOT NULL DEFAULT 0 COMMENT '小计金额（price * quantity - 分摊优惠）',
+
+    item_snapshot JSON COMMENT '商品详细快照（JSON格式，包含商品完整信息，用于审计和对账）',
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
