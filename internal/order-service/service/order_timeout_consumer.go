@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 	inventoryv1 "zjMall/gen/go/api/proto/inventory"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -13,7 +14,7 @@ import (
 // StartOrderTimeoutConsumer 启动订单超时消息消费者（处理延迟消息）
 func StartOrderTimeoutConsumer(ctx context.Context, orderService *OrderService, ch *amqp.Channel, queueName string) {
 	if ch == nil {
-		log.Println("⚠️ [OrderTimeoutConsumer] RabbitMQ Channel 为 nil，跳过消费者启动")
+		log.Println("⚠️ [OrderTimeoutConsumer] RabbitMQ Channel 为 nil，跳过消费者启动（将依赖补偿机制）")
 		return
 	}
 
@@ -121,5 +122,62 @@ func (s *OrderService) HandleOrderTimeout(ctx context.Context, orderNo string) e
 	}
 
 	log.Printf("✅ [OrderService] HandleOrderTimeout: 订单超时处理成功: orderNo=%s", orderNo)
+	return nil
+}
+
+// StartOrderTimeoutCompensation 启动订单超时补偿机制（定期扫描超时订单）
+// 作为延迟消息的兜底方案，确保即使延迟消息失败，超时订单也能被关闭
+func StartOrderTimeoutCompensation(ctx context.Context, orderService *OrderService, scanInterval time.Duration) {
+	log.Printf("✅ [OrderTimeoutCompensation] 启动订单超时补偿机制，扫描间隔=%v", scanInterval)
+
+	ticker := time.NewTicker(scanInterval)
+	defer ticker.Stop()
+
+	// 启动时立即执行一次扫描
+	if err := scanAndCloseTimeoutOrders(ctx, orderService); err != nil {
+		log.Printf("⚠️ [OrderTimeoutCompensation] 首次扫描失败: %v", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("ℹ️ [OrderTimeoutCompensation] 订单超时补偿机制退出")
+			return
+		case <-ticker.C:
+			if err := scanAndCloseTimeoutOrders(ctx, orderService); err != nil {
+				log.Printf("⚠️ [OrderTimeoutCompensation] 扫描超时订单失败: %v", err)
+			}
+		}
+	}
+}
+
+// scanAndCloseTimeoutOrders 扫描并关闭超时订单
+func scanAndCloseTimeoutOrders(ctx context.Context, orderService *OrderService) error {
+	// 查询超时的待支付订单（创建时间超过超时时间）
+	timeoutOrders, err := orderService.orderRepo.GetTimeoutOrders(ctx, OrderStatusPendingPay, orderService.orderTimeoutDelay, 100)
+	if err != nil {
+		return fmt.Errorf("查询超时订单失败: %w", err)
+	}
+
+	if len(timeoutOrders) == 0 {
+		return nil // 没有超时订单，正常返回
+	}
+
+	log.Printf("ℹ️ [OrderTimeoutCompensation] 发现 %d 个超时订单，开始处理", len(timeoutOrders))
+
+	successCount := 0
+	failCount := 0
+
+	for _, order := range timeoutOrders {
+		// 使用 HandleOrderTimeout 处理每个超时订单（该方法内部会检查订单状态，幂等）
+		if err := orderService.HandleOrderTimeout(ctx, order.OrderNo); err != nil {
+			log.Printf("⚠️ [OrderTimeoutCompensation] 处理超时订单失败: orderNo=%s, err=%v", order.OrderNo, err)
+			failCount++
+		} else {
+			successCount++
+		}
+	}
+
+	log.Printf("✅ [OrderTimeoutCompensation] 扫描完成: 成功=%d, 失败=%d, 总计=%d", successCount, failCount, len(timeoutOrders))
 	return nil
 }

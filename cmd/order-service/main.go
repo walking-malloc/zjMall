@@ -153,7 +153,17 @@ func main() {
 		timeoutConsumerCtx, timeoutConsumerCancel := context.WithCancel(context.Background())
 		defer timeoutConsumerCancel()
 		go service.StartOrderTimeoutConsumer(timeoutConsumerCtx, orderService, delayedCh, "order.timeout.queue")
+		log.Println("✅ 订单超时消息消费者已启动")
+	} else {
+		log.Println("⚠️ 订单超时消息消费者未启动（延迟消息未初始化），将依赖补偿机制定期扫描超时订单")
 	}
+
+	// 启动订单超时补偿机制（定期扫描超时订单，作为延迟消息的兜底方案）
+	// 注意：无论延迟消息是否启动，补偿机制都应该运行，确保即使延迟消息失败也能处理超时订单
+	compensationCtx, compensationCancel := context.WithCancel(context.Background())
+	defer compensationCancel()
+	go service.StartOrderTimeoutCompensation(compensationCtx, orderService, 5*time.Minute) // 每5分钟扫描一次
+	log.Println("✅ 订单超时补偿机制已启动（每5分钟扫描一次）")
 
 	// 3.2 初始化 RabbitMQ 并启动支付成功事件消费者（可选）
 	if rabbitCfg != nil && rabbitCfg.Host != "" {

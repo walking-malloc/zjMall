@@ -357,11 +357,13 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		}
 		delayMs := int64(s.orderTimeoutDelay.Milliseconds())
 		if err := s.delayedProducer.SendDelayedMessage(ctx, "order.timeout.delayed", "order.timeout.queue", timeoutPayload, delayMs); err != nil {
-			// 延迟消息发送失败不影响订单创建成功，只记录日志
-			log.Printf("⚠️ [OrderService] CreateOrder: 发送订单超时延迟消息失败: orderNo=%s, err=%v", orderNo, err)
+			// 延迟消息发送失败不影响订单创建成功，但记录警告日志（补偿机制会处理超时订单）
+			log.Printf("⚠️ [OrderService] CreateOrder: 发送订单超时延迟消息失败: orderNo=%s, err=%v (补偿机制将定期扫描超时订单)", orderNo, err)
 		} else {
 			log.Printf("✅ [OrderService] CreateOrder: 订单超时延迟消息已发送: orderNo=%s, delay=%dms", orderNo, delayMs)
 		}
+	} else {
+		log.Printf("⚠️ [OrderService] CreateOrder: 延迟消息生产者未初始化，订单超时将依赖补偿机制: orderNo=%s", orderNo)
 	}
 
 	return &orderv1.CreateOrderResponse{
