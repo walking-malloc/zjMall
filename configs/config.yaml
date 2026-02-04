@@ -41,6 +41,7 @@ service_databases:
   cart-service: cart_db
   inventory-service: inventory_db
   order-service: order_db
+  payment-service: payment_db
 
 mysql:
   host: 127.0.0.1

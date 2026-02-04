@@ -44,6 +44,10 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
+	// 初始化 JWT（与用户服务、网关保持同一套 secret）
+	jwtCfg := cfg.GetJWTConfig()
+	pkg.InitJWT(jwtCfg)
+
 	// 2. 初始化 Nacos 注册中心
 	svcCfg, _ := cfg.GetServiceConfig(serviceName)
 	nacosConfig := cfg.GetNacosConfig()
@@ -145,7 +149,7 @@ func main() {
 		dispatchCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		go func() {
-			ticker := time.NewTicker(5 * time.Second)
+			ticker := time.NewTicker(10 * time.Second)
 			defer ticker.Stop()
 			for {
 				select {

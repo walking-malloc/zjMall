@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS payment_logs (
     user_agent VARCHAR(255) COMMENT '用户代理',
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     
     INDEX idx_payment_no (payment_no),
     INDEX idx_order_no (order_no),

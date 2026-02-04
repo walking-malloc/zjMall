@@ -31,6 +31,11 @@ export default defineConfig({
         target: 'http://localhost:8086',
         changeOrigin: true,
         rewrite: (path) => path
+      },
+      '/api/v1/payments': {
+        target: 'http://localhost:8087',
+        changeOrigin: true,
+        rewrite: (path) => path
       }
     }
   }

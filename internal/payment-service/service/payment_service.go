@@ -84,9 +84,12 @@ type CreatePaymentRequest struct {
 // CreatePayment 创建支付单
 // 注意：参数校验应该在 handler 层完成，service 层只做业务逻辑校验
 func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentv1.CreatePaymentRequest) (*paymentv1.CreatePaymentResponse, error) {
+	log.Printf("⚠️ 创建支付单: %v\n", req)
+
 	//获取userId
 	userId := middleware.GetUserIDFromContext(ctx)
 	if userId == "" {
+		log.Printf("⚠️ 用户未登录")
 		return nil, fmt.Errorf("用户未登录")
 	}
 	// 幂等性key：基于用户ID和订单号（不依赖token，因为token可能为空）
@@ -98,6 +101,7 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentv1.Creat
 		// 幂等性key存在，说明已经创建过支付单，直接查询并返回
 		existingPayment, err := s.paymentRepo.GetPaymentByPaymentNo(ctx, existingPaymentNo)
 		if err == nil && existingPayment != nil {
+			log.Printf("⚠️ 幂等性key存在，说明已经创建过支付单，直接查询并返回")
 			return &paymentv1.CreatePaymentResponse{
 				Code:    0,
 				Message: "success",
@@ -110,11 +114,14 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentv1.Creat
 	lockKey := fmt.Sprintf("%s:%s", PaymentLockKeyPrefix, req.OrderNo)
 	acquired, err := s.lockService.AcquireLock(ctx, lockKey, time.Duration(PaymentLockExpireSeconds)*time.Second)
 	if err != nil {
+		log.Printf("⚠️ 获取分布式锁失败: %v\n", err)
 		return nil, fmt.Errorf("获取分布式锁失败: %w", err)
 	}
 	if !acquired {
+		log.Printf("⚠️ 获取分布式锁失败: %v\n", err)
 		return nil, fmt.Errorf("系统繁忙，请稍后重试")
 	}
+	log.Printf("⚠️ 获取分布式锁成功")
 	defer s.lockService.ReleaseLock(ctx, lockKey)
 
 	// 获取锁后再次检查幂等性key（双重检查，防止并发）
@@ -133,31 +140,38 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentv1.Creat
 	//首先查看订单
 	order, err := s.orderClient.GetOrderByNo(ctx, req.OrderNo)
 	if err != nil {
+		log.Printf("⚠️ 查询订单失败: %v\n", err)
 		return nil, fmt.Errorf("查询订单失败: %w", err)
 	}
 	if order == nil {
+		log.Printf("⚠️ 订单不存在: %s", req.OrderNo)
 		return nil, fmt.Errorf("订单不存在: %s", req.OrderNo)
 	}
 	//检查订单是否为待支付状态
 	if int8(order.Status) != model.PaymentStatusPending {
+		log.Printf("⚠️ 订单状态不正确: %s", req.OrderNo)
 		return nil, fmt.Errorf("订单状态不正确: %s", req.OrderNo)
 	}
 	//检查订单支付金额是否大于0
 	payAmount, err := strconv.ParseFloat(order.PayAmount, 64)
 	if err != nil {
+		log.Printf("⚠️ 订单支付金额格式错误: %v\n", err)
 		return nil, fmt.Errorf("订单支付金额格式错误: %w", err)
 	}
 	if payAmount <= 0 {
+		log.Printf("⚠️ 订单支付金额不能小于0")
 		return nil, fmt.Errorf("订单支付金额不能小于0")
 	}
 	// 检查是否已存在支付单（幂等性保障）
 	existingPayment, err := s.paymentRepo.GetPaymentByOrderNo(ctx, req.OrderNo)
 	if err != nil {
+		log.Printf("⚠️ 查询支付单失败: %v\n", err)
 		return nil, fmt.Errorf("查询支付单失败: %w", err)
 	}
 	if existingPayment != nil {
 		// 如果已存在且状态为待支付，直接返回（幂等处理）
 		if existingPayment.Status == model.PaymentStatusPending {
+			log.Printf("⚠️ 订单已存在支付单，状态为待支付，直接返回")
 			return &paymentv1.CreatePaymentResponse{
 				Code:    0,
 				Message: "success",
@@ -165,14 +179,17 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentv1.Creat
 			}, nil
 		}
 		// 如果已存在但状态不是待支付，返回错误
+		log.Printf("⚠️ 订单已存在支付单，状态为: %d", existingPayment.Status)
 		return nil, fmt.Errorf("订单已存在支付单，状态为: %d", existingPayment.Status)
 	}
 	// 检验支付渠道是否有效（req.PayChannel 是字符串，直接使用）
 	paymentChannel, err := s.paymentChannelRepo.GetPaymentChannelByChannelCode(ctx, req.PayChannel)
 	if err != nil {
+		log.Printf("⚠️ 查询支付渠道失败: %v\n", err)
 		return nil, fmt.Errorf("查询支付渠道失败: %w", err)
 	}
 	if paymentChannel == nil {
+		log.Printf("⚠️ 支付渠道不存在: %s", req.PayChannel)
 		return nil, fmt.Errorf("支付渠道不存在: %s", req.PayChannel)
 	}
 	//生成支付单号
@@ -205,11 +222,12 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentv1.Creat
 				}, nil
 			}
 		}
+		log.Printf("⚠️ 创建支付单失败: %v\n", err)
 		return nil, fmt.Errorf("创建支付单失败: %w", err)
 	}
-
+	log.Printf("⚠️ 创建支付单成功: %v\n", payment)
 	// 记录支付日志
-	log := &model.PaymentLog{
+	paymentLog := &model.PaymentLog{
 		PaymentNo: paymentNo,
 		OrderNo:   req.OrderNo,
 		UserID:    userId,
@@ -217,8 +235,8 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentv1.Creat
 		Channel:   paymentChannel.ChannelCode,
 		Amount:    payAmount,
 	}
-	if err := s.paymentLogRepo.CreatePaymentLog(ctx, log); err != nil {
-		fmt.Printf("⚠️ 记录支付日志失败: %v\n", err)
+	if err := s.paymentLogRepo.CreatePaymentLog(ctx, paymentLog); err != nil {
+		log.Printf("⚠️ 记录支付日志失败: %v\n", err)
 	}
 
 	// 生成支付参数（学习模式：模拟支付参数，便于开发和测试）
@@ -228,13 +246,31 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentv1.Creat
 	// 设置幂等性key（存储支付单号，有效期5分钟）
 	// 这样后续相同请求可以直接返回已创建的支付单
 	if err := s.cacheRepo.Set(ctx, idempotencyKey, paymentNo, time.Duration(PaymentIdempotencyExpireSeconds)*time.Second); err != nil {
-		fmt.Printf("⚠️ 设置幂等性key失败: %v\n", err)
+		log.Printf("⚠️ 设置幂等性key失败: %v\n", err)
 		// 不影响主流程，继续返回
 	}
-	go func() {
-		//TODO:异步调用支付网关
+	// go func() {
+	// 	//TODO:异步调用支付网关
 
-	}()
+	// }()
+	// 在学习/演示环境下，如果是余额支付，可以在创建支付单后直接模拟成功回调，
+	// 这样可以自动完成：更新支付单状态 -> 写支付日志 -> 写 Outbox -> 订单服务消费更新订单状态。
+	if paymentChannel.ChannelCode == model.PayChannelBalance {
+		callbackReq := &PaymentCallbackRequest{
+			PayChannel: paymentChannel.ChannelCode,
+			PaymentNo:  payment.PaymentNo,
+			// 学习模式下生成一个虚拟的第三方交易号
+			TradeNo: fmt.Sprintf("BALANCE_%s", payment.PaymentNo),
+			// 金额必须与支付单一致，否则 HandlePaymentCallback 会金额校验失败
+			Amount: fmt.Sprintf("%.2f", payment.Amount),
+			Status: "SUCCESS",
+			Sign:   "",
+		}
+
+		if err := s.HandlePaymentCallback(ctx, callbackReq); err != nil {
+			log.Printf("⚠️ 余额支付模拟回调失败: payment_no=%s, err=%v\n", payment.PaymentNo, err)
+		}
+	}
 
 	return &paymentv1.CreatePaymentResponse{
 		Code:      0,
@@ -273,6 +309,7 @@ type PaymentCallbackRequest struct {
 
 // HandlePaymentCallback 处理支付回调
 func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *PaymentCallbackRequest) error {
+	log.Printf("⚠️ 处理支付回调: %v\n", req)
 	// 1. 参数校验
 	if req.PaymentNo == "" {
 		return fmt.Errorf("支付单号不能为空")
@@ -290,8 +327,10 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 		if result == "SUCCESS" {
 			return nil // 已成功处理
 		} else if result == "PROCESSING" {
+			log.Printf("⚠️ 支付回调正在处理中，请勿重复提交: %s", idempotencyKey)
 			return fmt.Errorf("支付回调正在处理中，请勿重复提交")
 		} else {
+			log.Printf("⚠️ 上次处理失败: %s", result)
 			return fmt.Errorf("上次处理失败: %s", result)
 		}
 	}
@@ -303,9 +342,11 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 	lockKey := fmt.Sprintf("%s:%s", PaymentLockKeyPrefix, req.PaymentNo)
 	acquired, err := s.lockService.AcquireLock(ctx, lockKey, time.Duration(PaymentLockExpireSeconds)*time.Second)
 	if err != nil {
+		log.Printf("⚠️ 获取分布式锁失败: %v\n", err)
 		return fmt.Errorf("获取分布式锁失败: %w", err)
 	}
 	if !acquired {
+		log.Printf("⚠️ 获取分布式锁失败: %v\n", err)
 		return fmt.Errorf("系统繁忙，请稍后重试")
 	}
 	defer s.lockService.ReleaseLock(ctx, lockKey)
@@ -313,9 +354,11 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 	// 2. 查询支付单
 	payment, err := s.paymentRepo.GetPaymentByPaymentNo(ctx, req.PaymentNo)
 	if err != nil {
+		log.Printf("⚠️ 查询支付单失败: %v\n", err)
 		return fmt.Errorf("查询支付单失败: %w", err)
 	}
 	if payment == nil {
+		log.Printf("⚠️ 支付单不存在: %s", req.PaymentNo)
 		return fmt.Errorf("支付单不存在: %s", req.PaymentNo)
 	}
 
@@ -326,9 +369,11 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 	//检查交易号是否被其他订单使用（防止重复入账）
 	otherPayment, err := s.paymentRepo.GetPaymentByTradeNo(ctx, req.TradeNo)
 	if err != nil {
+		log.Printf("⚠️ 查询支付单失败: %v\n", err)
 		return fmt.Errorf("查询支付单失败: %w", err)
 	}
 	if otherPayment != nil && otherPayment.PaymentNo != payment.PaymentNo {
+		log.Printf("⚠️ 交易号已存在: %s, 支付单号: %s", req.TradeNo, otherPayment.PaymentNo)
 		return fmt.Errorf("交易号已存在: %s, 支付单号: %s", req.TradeNo, otherPayment.PaymentNo)
 	}
 	// 4. 签名校验（TODO: 后续实现），校验是否是平台发来的回调，防止伪造回调 采用支付宝公钥对签名进行校验
@@ -339,6 +384,7 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 	// 5. 金额校验
 	callbackAmount, err := strconv.ParseFloat(req.Amount, 64)
 	if err != nil {
+		log.Printf("⚠️ 支付金额格式错误: %v\n", err)
 		return fmt.Errorf("支付金额格式错误: %w", err)
 	}
 
@@ -370,6 +416,7 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 	if err := s.paymentRepo.WithTransaction(ctx, func(txCtx context.Context, txRepo repository.PaymentRepository) error {
 		// 7.1 更新支付单状态
 		if err := txRepo.UpdatePayment(txCtx, payment); err != nil {
+			log.Printf("⚠️ 更新支付单状态失败: %v\n", err)
 			return fmt.Errorf("更新支付单状态失败: %w", err)
 		}
 
@@ -386,7 +433,7 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 			TradeNo:    req.TradeNo,
 		}
 		if err := s.paymentLogRepo.CreatePaymentLog(txCtx, paymentLog); err != nil {
-			return fmt.Errorf("记录支付日志失败: %w", err)
+			log.Printf("⚠️ 记录支付日志失败: %v\n", err)
 		}
 
 		// 7.3 仅在支付成功时写入 Outbox 事件
@@ -401,6 +448,7 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 			}
 			payloadBytes, err := json.Marshal(payload)
 			if err != nil {
+				log.Printf("⚠️ 序列化支付成功事件失败: %v\n", err)
 				return fmt.Errorf("序列化支付成功事件失败: %w", err)
 			}
 
@@ -413,12 +461,14 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 			}
 
 			if err := s.outboxRepo.Create(txCtx, event); err != nil {
+				log.Printf("⚠️ 写入支付 Outbox 事件失败: %v\n", err)
 				return fmt.Errorf("写入支付 Outbox 事件失败: %w", err)
 			}
 		}
 
 		return nil
 	}); err != nil {
+		log.Printf("⚠️ 更新支付单状态失败: %v\n", err)
 		return err
 	}
 
