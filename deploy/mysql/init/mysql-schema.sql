@@ -1,4 +1,4 @@
--- Active: 1768481430314@@127.0.0.1@3306@nacos_config
+-- Active: 1769663211548@@127.0.0.1@3307@mysql
 /*
  * Copyright 1999-2018 Alibaba Group Holding Ltd.
  *
@@ -14,6 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+ CREATE DATABASE IF NOT EXISTS nacos_config CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ USE nacos_config;
 
 /******************************************/
 /*   表名称 = config_info                  */
@@ -178,3 +180,18 @@ CREATE TABLE `permissions` (
                                UNIQUE INDEX `uk_role_permission` (`role`,`resource`,`action`) USING BTREE
 );
 
+/******************************************/
+/*   表名称 = config_info_aggr             */
+/******************************************/
+CREATE TABLE IF NOT EXISTS `config_info_aggr` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'id',
+    `data_id` varchar(255) NOT NULL COMMENT 'data_id',
+    `group_id` varchar(128) NOT NULL COMMENT 'group_id',
+    `datum_id` varchar(255) NOT NULL COMMENT 'datum_id',
+    `content` longtext NOT NULL COMMENT '内容',
+    `gmt_modified` datetime NOT NULL COMMENT '修改时间',
+    `app_name` varchar(128) DEFAULT NULL COMMENT 'app_name',
+    `tenant_id` varchar(128) DEFAULT '' COMMENT '租户字段',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_configinfoaggr_datagrouptenantdatum` (`data_id`,`group_id`,`tenant_id`,`datum_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin COMMENT='增加租户字段';

@@ -53,7 +53,9 @@ services:
 
   # RabbitMQ（替代 RocketMQ 作为消息队列）
   rabbitmq:
-    image: rabbitmq:3.13-management
+    build:
+      context: .
+      dockerfile: Dockerfile.rabbitmq
     container_name: zjmall-rabbitmq
     ports:
       - "5673:5672"     # AMQP（宿主机 5673 -> 容器 5672，避免与本地 5672 冲突）
@@ -63,7 +65,10 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     restart: unless-stopped                               
     networks:
-      - zjmall-network                                    
+      - zjmall-network   
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    # 注意：插件已在 Dockerfile.rabbitmq 中安装，无需在 command 中再次安装
 
   # Nacos注册中心（可选，如果暂时不用可以注释掉）
   nacos:
@@ -93,6 +98,8 @@ volumes:
   redis_data:
     driver: local
   elasticsearch_data:
+    driver: local
+  rabbitmq_data:
     driver: local
 
 networks:

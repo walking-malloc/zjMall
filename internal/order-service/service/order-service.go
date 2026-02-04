@@ -14,6 +14,7 @@ import (
 	"zjMall/internal/common/client"
 	"zjMall/internal/common/lock"
 	"zjMall/internal/common/middleware"
+	"zjMall/internal/common/mq"
 	"zjMall/internal/order-service/model"
 	"zjMall/internal/order-service/repository"
 
@@ -43,22 +44,28 @@ const (
 
 // OrderService 订单服务（业务逻辑层）
 type OrderService struct {
-	orderRepo       repository.OrderRepository
-	productClient   client.ProductClient
-	inventoryClient client.InventoryClient
-	userClient      client.UserClient
-	cartClient      client.CartClient
-	redisClient     *redis.Client
+	orderRepo         repository.OrderRepository
+	outboxRepo        repository.OrderOutboxRepository
+	productClient     client.ProductClient
+	inventoryClient   client.InventoryClient
+	userClient        client.UserClient
+	cartClient        client.CartClient
+	redisClient       *redis.Client
+	delayedProducer   mq.MessageProducer // 延迟消息生产者
+	orderTimeoutDelay time.Duration      // 订单超时时间
 }
 
-func NewOrderService(orderRepo repository.OrderRepository, productClient client.ProductClient, inventoryClient client.InventoryClient, userClient client.UserClient, cartClient client.CartClient, redisClient *redis.Client) *OrderService {
+func NewOrderService(orderRepo repository.OrderRepository, outboxRepo repository.OrderOutboxRepository, productClient client.ProductClient, inventoryClient client.InventoryClient, userClient client.UserClient, cartClient client.CartClient, redisClient *redis.Client, delayedProducer mq.MessageProducer) *OrderService {
 	return &OrderService{
-		orderRepo:       orderRepo,
-		productClient:   productClient,
-		inventoryClient: inventoryClient,
-		userClient:      userClient,
-		cartClient:      cartClient,
-		redisClient:     redisClient,
+		orderRepo:         orderRepo,
+		outboxRepo:        outboxRepo,
+		productClient:     productClient,
+		inventoryClient:   inventoryClient,
+		userClient:        userClient,
+		cartClient:        cartClient,
+		redisClient:       redisClient,
+		delayedProducer:   delayedProducer,
+		orderTimeoutDelay: 30 * time.Minute, // 默认30分钟超时
 	}
 }
 
@@ -97,7 +104,6 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 			Message: "系统繁忙，请稍后重试",
 		}, nil
 	}
-
 	defer func() {
 		if err := lockService.ReleaseLock(ctx, lockKey); err != nil {
 			log.Printf("⚠️ [OrderService] CreateOrder: 释放锁失败: %v", err)
@@ -286,8 +292,16 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		}, nil
 	}
 
-	// 创建订单（在事务中）
-	if err := s.orderRepo.CreateOrder(ctx, order, items); err != nil {
+	// 收集购物车项ID（如果有的话），用于订单创建成功后直接删除
+	var cartItemIDs []string
+	for _, it := range req.Items {
+		if it.CartItemId != "" {
+			cartItemIDs = append(cartItemIDs, it.CartItemId)
+		}
+	}
+
+	// 创建订单
+	if err := s.orderRepo.CreateOrder(ctx, order, items, nil); err != nil {
 		log.Printf("❌ [OrderService] CreateOrder: 创建订单失败，回滚库存: %v", err)
 
 		// 检查是否是订单号冲突错误（唯一索引冲突）
@@ -321,22 +335,32 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		}, nil
 	}
 
-	// 订单创建成功，删除购物车中对应的商品
-	// 收集购物车项ID（如果有的话）
-	var cartItemIDs []string
-	for _, it := range req.Items {
-		if it.CartItemId != "" {
-			cartItemIDs = append(cartItemIDs, it.CartItemId)
+	log.Printf("✅ [OrderService] CreateOrder: 订单创建成功: orderNo=%s", orderNo)
+
+	// 订单创建成功后，直接删除购物车中的商品
+	if len(cartItemIDs) > 0 {
+		if err := s.cartClient.RemoveItems(ctx, cartItemIDs); err != nil {
+			// 购物车删除失败不影响订单创建成功，只记录日志
+			log.Printf("⚠️ [OrderService] CreateOrder: 删除购物车商品失败: orderNo=%s, cartItemIDs=%v, err=%v", orderNo, cartItemIDs, err)
+		} else {
+			log.Printf("✅ [OrderService] CreateOrder: 购物车商品删除成功: orderNo=%s, cartItemIDs=%v", orderNo, cartItemIDs)
 		}
 	}
 
-	// 如果有购物车项ID，调用购物车服务删除
-	if len(cartItemIDs) > 0 && s.cartClient != nil {
-		if err := s.cartClient.RemoveItems(ctx, cartItemIDs); err != nil {
-			// 购物车删除失败不影响订单创建成功，只记录日志
-			log.Printf("⚠️ [OrderService] CreateOrder: 删除购物车项失败（订单已创建成功）: %v", err)
+	// 发送延迟消息，用于订单超时检查（使用 RabbitMQ 延迟消息插件）
+	if s.delayedProducer != nil {
+		timeoutPayload := map[string]interface{}{
+			"order_no":   orderNo,
+			"user_id":    userID,
+			"pay_amount": payAmount,
+			"created_at": time.Now().Format(time.RFC3339),
+		}
+		delayMs := int64(s.orderTimeoutDelay.Milliseconds())
+		if err := s.delayedProducer.SendDelayedMessage(ctx, "order.timeout.delayed", "order.timeout.queue", timeoutPayload, delayMs); err != nil {
+			// 延迟消息发送失败不影响订单创建成功，只记录日志
+			log.Printf("⚠️ [OrderService] CreateOrder: 发送订单超时延迟消息失败: orderNo=%s, err=%v", orderNo, err)
 		} else {
-			log.Printf("✅ [OrderService] CreateOrder: 成功删除 %d 个购物车项", len(cartItemIDs))
+			log.Printf("✅ [OrderService] CreateOrder: 订单超时延迟消息已发送: orderNo=%s, delay=%dms", orderNo, delayMs)
 		}
 	}
 

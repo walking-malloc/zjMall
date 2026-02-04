@@ -68,4 +68,55 @@ func CloseRabbitMQ() error {
 	return nil
 }
 
+// InitDelayedExchange 初始化延迟消息 Exchange（需要 rabbitmq_delayed_message_exchange 插件）
+// exchangeName: 延迟消息 exchange 名称
+// queueName: 绑定的队列名称
+func InitDelayedExchange(ch *amqp.Channel, exchangeName, queueName string) error {
+	if ch == nil {
+		return fmt.Errorf("RabbitMQ Channel 不能为空")
+	}
 
+	// 声明延迟消息 exchange（类型为 x-delayed-message）
+	err := ch.ExchangeDeclare(
+		exchangeName,        // name
+		"x-delayed-message", // type（延迟消息插件类型）
+		true,                // durable
+		false,               // autoDelete
+		false,               // internal
+		false,               // noWait
+		amqp.Table{
+			"x-delayed-type": "direct", // 延迟消息的底层类型
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("声明延迟消息 Exchange 失败: %w", err)
+	}
+
+	// 声明队列
+	_, err = ch.QueueDeclare(
+		queueName, // name
+		true,      // durable
+		false,     // autoDelete
+		false,     // exclusive
+		false,     // noWait
+		nil,       // args
+	)
+	if err != nil {
+		return fmt.Errorf("声明队列失败: %w", err)
+	}
+
+	// 绑定队列到 exchange
+	err = ch.QueueBind(
+		queueName,    // queue name
+		queueName,    // routing key
+		exchangeName, // exchange
+		false,        // noWait
+		nil,          // args
+	)
+	if err != nil {
+		return fmt.Errorf("绑定队列到 Exchange 失败: %w", err)
+	}
+
+	log.Printf("✅ 延迟消息 Exchange 初始化成功: Exchange=%s, Queue=%s", exchangeName, queueName)
+	return nil
+}

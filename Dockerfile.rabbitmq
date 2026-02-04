@@ -1,0 +1,20 @@
+FROM rabbitmq:3.13-management
+
+# 优先使用 COPY 方式复制插件文件（推荐方式）
+# 如果文件不存在，构建会失败，提示用户先运行下载脚本
+COPY rabbitmq_delayed_message_exchange-3.13.0.ez /tmp/rabbitmq_delayed_message_exchange-3.13.0.ez
+
+# 复制插件到插件目录并启用
+RUN cd /opt/rabbitmq/plugins && \
+    if [ -f /tmp/rabbitmq_delayed_message_exchange-3.13.0.ez ]; then \
+        echo "使用本地插件文件..." && \
+        cp /tmp/rabbitmq_delayed_message_exchange-3.13.0.ez . && \
+        chown rabbitmq:rabbitmq rabbitmq_delayed_message_exchange-3.13.0.ez && \
+        rabbitmq-plugins enable --offline rabbitmq_delayed_message_exchange && \
+        echo "✅ 延迟消息插件已成功安装并启用"; \
+    else \
+        echo "❌ 错误：插件文件不存在"; \
+        echo "请先运行以下命令下载插件："; \
+        echo "  powershell -ExecutionPolicy Bypass -File scripts/download-rabbitmq-plugin.ps1"; \
+        exit 1; \
+    fi

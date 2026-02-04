@@ -10,12 +10,14 @@ import (
 
 // OrderRepository 订单仓储接口
 type OrderRepository interface {
-	CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem) error
+	CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem, outboxEvent *model.OrderOutbox) error
 	GetOrderByNo(ctx context.Context, userID, orderNo string) (*model.Order, []*model.OrderItem, error)
 	GetOrderByNoNoUser(ctx context.Context, orderNo string) (*model.Order, []*model.OrderItem, error) // 不校验用户ID，用于支付回调等场景
 	ListUserOrders(ctx context.Context, userID string, status int8, offset, limit int) ([]*model.Order, int64, error)
 	UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus int8) error
 	UpdateOrderPaid(ctx context.Context, orderNo string, fromStatus, toStatus int8, payChannel, payTradeNo string, paidAt time.Time) error
+	// GetTimeoutOrders 查询超时的订单（待支付状态，创建时间超过指定时间）
+	GetTimeoutOrders(ctx context.Context, status int8, timeoutDuration time.Duration, limit int) ([]*model.Order, error)
 }
 
 type orderRepository struct {
@@ -26,14 +28,20 @@ func NewOrderRepository(db *gorm.DB) OrderRepository {
 	return &orderRepository{db: db}
 }
 
-// CreateOrder 在事务中创建订单主表和明细
-func (r *orderRepository) CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem) error {
+// CreateOrder 在事务中创建订单主表和明细，同时写入outbox事件（采用outbox模式）
+func (r *orderRepository) CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem, outboxEvent *model.OrderOutbox) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(order).Error; err != nil {
 			return err
 		}
 		if len(items) > 0 {
 			if err := tx.Create(&items).Error; err != nil {
+				return err
+			}
+		}
+		// 在同一个事务中写入outbox事件（如果提供了outbox事件）
+		if outboxEvent != nil {
+			if err := tx.Create(outboxEvent).Error; err != nil {
 				return err
 			}
 		}
@@ -122,6 +130,21 @@ func (r *orderRepository) UpdateOrderStatus(ctx context.Context, orderNo string,
 	}
 
 	return nil
+}
+
+// GetTimeoutOrders 查询超时的订单（待支付状态，创建时间超过指定时间）
+func (r *orderRepository) GetTimeoutOrders(ctx context.Context, status int8, timeoutDuration time.Duration, limit int) ([]*model.Order, error) {
+	var orders []*model.Order
+	timeoutTime := time.Now().Add(-timeoutDuration)
+	err := r.db.WithContext(ctx).
+		Where("status = ? AND created_at < ?", status, timeoutTime).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	return orders, nil
 }
 
 // UpdateOrderPaid 更新订单支付信息和状态（使用乐观锁）

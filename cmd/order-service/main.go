@@ -11,6 +11,7 @@ import (
 	orderv1 "zjMall/gen/go/api/proto/order"
 	"zjMall/internal/common/client"
 	"zjMall/internal/common/middleware"
+	"zjMall/internal/common/mq"
 	registry "zjMall/internal/common/register"
 	"zjMall/internal/common/server"
 	"zjMall/internal/config"
@@ -20,6 +21,7 @@ import (
 	"zjMall/internal/order-service/service"
 	"zjMall/pkg"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 )
 
@@ -118,11 +120,42 @@ func main() {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 	// 3. 创建仓储与服务
 	orderRepo := repository.NewOrderRepository(db)
-	orderService := service.NewOrderService(orderRepo, productClient, inventoryClient, userClient, cartClient, redisClient)
+	outboxRepo := repository.NewOrderOutboxRepository(db)
+
+	// 3.1 初始化 RabbitMQ 延迟消息（用于订单超时）
+	var delayedProducer mq.MessageProducer
+	var delayedCh *amqp.Channel
+	rabbitCfg := cfg.GetRabbitMQConfig()
+	if rabbitCfg != nil && rabbitCfg.Host != "" {
+		// 初始化延迟消息 exchange 和队列
+		var err error
+		delayedCh, err = database.InitRabbitMQ(rabbitCfg)
+		if err != nil {
+			log.Printf("⚠️ order-service RabbitMQ 延迟消息初始化失败: %v", err)
+		} else {
+			// 初始化延迟消息 exchange
+			delayedExchange := "order.timeout.delayed"
+			delayedQueue := "order.timeout.queue"
+			if err := database.InitDelayedExchange(delayedCh, delayedExchange, delayedQueue); err != nil {
+				log.Printf("⚠️ order-service 延迟消息 Exchange 初始化失败: %v", err)
+			} else {
+				delayedProducer = mq.NewMessageProducer(delayedCh, delayedQueue)
+				log.Printf("✅ order-service 延迟消息 Exchange 初始化成功: Exchange=%s, Queue=%s", delayedExchange, delayedQueue)
+			}
+		}
+	}
+
+	orderService := service.NewOrderService(orderRepo, outboxRepo, productClient, inventoryClient, userClient, cartClient, redisClient, delayedProducer)
 	orderHandler := handler.NewOrderServiceHandler(orderService)
 
-	// 3.1 初始化 RabbitMQ 并启动支付成功事件消费者（可选）
-	rabbitCfg := cfg.GetRabbitMQConfig()
+	// 启动订单超时消息消费者（在 orderService 创建之后）
+	if delayedCh != nil && delayedProducer != nil {
+		timeoutConsumerCtx, timeoutConsumerCancel := context.WithCancel(context.Background())
+		defer timeoutConsumerCancel()
+		go service.StartOrderTimeoutConsumer(timeoutConsumerCtx, orderService, delayedCh, "order.timeout.queue")
+	}
+
+	// 3.2 初始化 RabbitMQ 并启动支付成功事件消费者（可选）
 	if rabbitCfg != nil && rabbitCfg.Host != "" {
 		// 复制一份配置，使用单独的队列用于支付成功事件
 		localCfg := *rabbitCfg
@@ -136,6 +169,36 @@ func main() {
 			consumerCtx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			go service.StartPaymentEventConsumer(consumerCtx, orderService, ch, localCfg.Queue)
+
+			// 初始化outbox消息生产者（用于发送outbox事件）
+			outboxCfg := *rabbitCfg
+			outboxCfg.Queue = "order.outbox" // outbox事件队列
+			outboxCh, err := database.InitRabbitMQ(&outboxCfg)
+			if err != nil {
+				log.Printf("⚠️ order-service RabbitMQ Outbox 初始化失败: %v", err)
+			} else {
+				outboxProducer := mq.NewMessageProducer(outboxCh, outboxCfg.Queue)
+				log.Printf("✅ order-service RabbitMQ Outbox 初始化成功，队列=%s", outboxCfg.Queue)
+
+				// 启动outbox dispatcher（定期发送outbox事件）
+				dispatchCtx, dispatchCancel := context.WithCancel(context.Background())
+				defer dispatchCancel()
+				go func() {
+					ticker := time.NewTicker(5 * time.Second) // 每5秒检查一次
+					defer ticker.Stop()
+					for {
+						select {
+						case <-dispatchCtx.Done():
+							log.Println("ℹ️ Outbox 派发协程退出")
+							return
+						case <-ticker.C:
+							if err := orderService.DispatchOutboxEvents(dispatchCtx, outboxProducer, 100); err != nil {
+								log.Printf("⚠️ Outbox 派发失败: %v", err)
+							}
+						}
+					}
+				}()
+			}
 		}
 	} else {
 		log.Println("ℹ️ RabbitMQ 未配置或主机为空，订单服务将不消费支付成功事件")
