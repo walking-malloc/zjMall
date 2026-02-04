@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -119,6 +120,26 @@ func main() {
 	orderRepo := repository.NewOrderRepository(db)
 	orderService := service.NewOrderService(orderRepo, productClient, inventoryClient, userClient, cartClient, redisClient)
 	orderHandler := handler.NewOrderServiceHandler(orderService)
+
+	// 3.1 初始化 RabbitMQ 并启动支付成功事件消费者（可选）
+	rabbitCfg := cfg.GetRabbitMQConfig()
+	if rabbitCfg != nil && rabbitCfg.Host != "" {
+		// 复制一份配置，使用单独的队列用于支付成功事件
+		localCfg := *rabbitCfg
+		localCfg.Queue = "payment.success.notify"
+
+		ch, err := database.InitRabbitMQ(&localCfg)
+		if err != nil {
+			log.Printf("⚠️ order-service RabbitMQ 初始化失败，将跳过支付事件消费: %v", err)
+		} else {
+			defer database.CloseRabbitMQ()
+			consumerCtx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			go service.StartPaymentEventConsumer(consumerCtx, orderService, ch, localCfg.Queue)
+		}
+	} else {
+		log.Println("ℹ️ RabbitMQ 未配置或主机为空，订单服务将不消费支付成功事件")
+	}
 
 	// 4. 获取服务配置
 	serviceCfg, err := cfg.GetServiceConfig(serviceName)

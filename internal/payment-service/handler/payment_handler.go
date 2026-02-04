@@ -92,7 +92,7 @@ func (h *PaymentHandler) PaymentCallback(ctx context.Context, req *paymentv1.Pay
 
 	// 4. 调用服务层处理回调
 	serviceReq := &service.PaymentCallbackRequest{
-		PayChannel:  payChannel,
+		PayChannel:  req.PayChannel,
 		PaymentNo:   req.PaymentNo,
 		TradeNo:     req.TradeNo,
 		Amount:      req.Amount,

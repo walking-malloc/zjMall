@@ -80,7 +80,11 @@ type ElasticsearchConfig struct {
 }
 
 type ServiceClientConfig struct {
-	ProductServiceAddr string `yaml:"product_service_addr"` // 商品服务 gRPC 地址，例如 "localhost:50053"
+	ProductServiceAddr   string `yaml:"product_service_addr"`   // 商品服务 gRPC 地址，例如 "localhost:50053"
+	OrderServiceAddr     string `yaml:"order_service_addr"`     // 订单服务 gRPC 地址，例如 "localhost:50054"
+	InventoryServiceAddr string `yaml:"inventory_service_addr"` // 库存服务 gRPC 地址，例如 "localhost:50055"
+	UserServiceAddr      string `yaml:"user_service_addr"`      // 用户服务 gRPC 地址，例如 "localhost:50052"
+	CartServiceAddr      string `yaml:"cart_service_addr"`      // 购物车服务 gRPC 地址，例如 "localhost:50054"
 }
 
 type NacosConfig struct {

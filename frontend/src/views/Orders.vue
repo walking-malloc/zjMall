@@ -167,8 +167,11 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getOrderList, cancelOrder, getOrderDetail } from '@/api/order'
+
+const router = useRouter()
 
 const activeTab = ref('all')
 const orders = ref([])
@@ -286,7 +289,8 @@ const loadOrders = async () => {
 }
 
 const handlePay = (orderNo) => {
-  ElMessage.info('支付功能开发中...')
+  // 跳转到支付调试页，并携带订单号
+  router.push({ name: 'Pay', query: { orderNo } })
 }
 
 const handleConfirm = (orderNo) => {

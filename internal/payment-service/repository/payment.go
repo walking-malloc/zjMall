@@ -20,6 +20,10 @@ type PaymentRepository interface {
 	UpdatePayment(ctx context.Context, payment *model.Payment) error
 	// GetExpiredPayments 查询超时的待支付支付单（用于定时任务）
 	GetExpiredPayments(ctx context.Context, limit int) ([]*model.Payment, error)
+	// GetPaymentByTradeNo 根据交易号查询支付单
+	GetPaymentByTradeNo(ctx context.Context, tradeNo string) (*model.Payment, error)
+	// WithTransaction 在事务中执行回调，提供事务内的 PaymentRepository
+	WithTransaction(ctx context.Context, fn func(txCtx context.Context, txRepo PaymentRepository) error) error
 }
 
 type paymentRepository struct {
@@ -98,4 +102,23 @@ func (r *paymentRepository) GetExpiredPayments(ctx context.Context, limit int) (
 		return nil, err
 	}
 	return payments, nil
+}
+
+func (r *paymentRepository) GetPaymentByTradeNo(ctx context.Context, tradeNo string) (*model.Payment, error) {
+	var payment model.Payment
+	if err := r.db.WithContext(ctx).Where("trade_no = ?", tradeNo).First(&payment).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &payment, nil
+}
+
+// WithTransaction 在事务中执行回调
+func (r *paymentRepository) WithTransaction(ctx context.Context, fn func(txCtx context.Context, txRepo PaymentRepository) error) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txRepo := &paymentRepository{db: tx}
+		return fn(ctx, txRepo)
+	})
 }

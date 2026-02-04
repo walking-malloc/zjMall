@@ -29,6 +29,11 @@ services:
       port: 50056
     http:
       port: 8086
+  payment-service:
+    grpc:
+      port: 50057
+    http:
+      port: 8087
 # 服务名到数据库名的映射（可选，如果不配置则使用命名约定）
 service_databases:
   user-service: user_db

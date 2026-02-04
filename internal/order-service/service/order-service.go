@@ -517,6 +517,56 @@ func (s *OrderService) MarkOrderPaid(ctx context.Context, req *orderv1.MarkOrder
 	}, nil
 }
 
+// PaymentSucceededEvent 支付成功事件（从支付服务的 MQ 消息反序列化而来）
+type PaymentSucceededEvent struct {
+	PaymentNo string  `json:"payment_no"`
+	OrderNo   string  `json:"order_no"`
+	UserID    string  `json:"user_id"`
+	Amount    float64 `json:"amount"`
+	TradeNo   string  `json:"trade_no"`
+	PaidAt    string  `json:"paid_at"` // RFC3339 字符串
+	Channel   string  `json:"pay_channel,omitempty"`
+}
+
+// HandlePaymentSucceededEvent 处理支付成功事件，幂等更新订单状态为已支付
+func (s *OrderService) HandlePaymentSucceededEvent(ctx context.Context, evt *PaymentSucceededEvent) error {
+	if evt == nil {
+		return fmt.Errorf("支付成功事件为空")
+	}
+	if evt.OrderNo == "" || evt.TradeNo == "" {
+		return fmt.Errorf("支付成功事件缺少关键字段: order_no=%s, trade_no=%s", evt.OrderNo, evt.TradeNo)
+	}
+
+	// 解析支付时间，解析失败则使用当前时间兜底
+	paidAt := time.Now()
+	if evt.PaidAt != "" {
+		if t, err := time.Parse(time.RFC3339, evt.PaidAt); err == nil {
+			paidAt = t
+		} else {
+			log.Printf("⚠️ [OrderService] HandlePaymentSucceededEvent: 解析 PaidAt 失败，使用当前时间: %v", err)
+		}
+	}
+
+	payChannel := evt.Channel
+	if payChannel == "" {
+		// 默认用支付宝，后续可以根据事件扩展真实渠道
+		payChannel = "alipay"
+	}
+
+	// 使用已存在的仓储方法，基于 fromStatus + 乐观锁保证幂等
+	if err := s.orderRepo.UpdateOrderPaid(ctx, evt.OrderNo, OrderStatusPendingPay, OrderStatusPaid, payChannel, evt.TradeNo, paidAt); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 可能已被其他流程更新为已支付 / 已取消，作为幂等成功处理
+			log.Printf("⚠️ [OrderService] HandlePaymentSucceededEvent: 订单状态已变更，忽略本次事件: orderNo=%s", evt.OrderNo)
+			return nil
+		}
+		return fmt.Errorf("更新订单支付状态失败: %w", err)
+	}
+
+	log.Printf("✅ [OrderService] HandlePaymentSucceededEvent: 订单标记为已支付成功: orderNo=%s, tradeNo=%s", evt.OrderNo, evt.TradeNo)
+	return nil
+}
+
 // ======== 辅助转换函数 ========
 
 func convertOrderToProto(o *model.Order) *orderv1.Order {

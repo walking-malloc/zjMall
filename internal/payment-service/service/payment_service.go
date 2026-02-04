@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"zjMall/internal/common/client"
 	"zjMall/internal/common/lock"
 	"zjMall/internal/common/middleware"
+	"zjMall/internal/common/mq"
 	"zjMall/internal/payment-service/model"
 	"zjMall/internal/payment-service/repository"
 
@@ -20,12 +23,15 @@ import (
 )
 
 const (
-	PaymentTokenCacheKeyPrefix      = "payment:token"
-	PaymentTokenCacheExpireSeconds  = 300                  // Token有效期5分钟
-	PaymentIdempotencyKeyPrefix     = "payment:idempotent" // 幂等性key前缀
-	PaymentIdempotencyExpireSeconds = 300                  // 幂等性key有效期5分钟
-	PaymentLockKeyPrefix            = "payment:lock"
-	PaymentLockExpireSeconds        = 300 // 锁有效期5分钟
+	PaymentTokenCacheKeyPrefix       = "payment:token"
+	PaymentTokenCacheExpireSeconds   = 300                  // Token有效期5分钟
+	PaymentIdempotencyKeyPrefix      = "payment:idempotent" // 幂等性key前缀
+	PaymentIdempotencyExpireSeconds  = 300                  // 幂等性key有效期5分钟
+	PaymentLockKeyPrefix             = "payment:lock"
+	PaymentLockExpireSeconds         = 300                           // 锁有效期5分钟
+	CallBackIdempotencyKeyPrefix     = "payment:callback:idempotent" // 回调幂等性key前缀
+	CallBackIdempotencyExpireSeconds = 300                           // 回调幂等性key有效期5分钟
+	PaySuccessNotifyTopic            = "payment:success:notify"
 )
 
 // PaymentService 支付服务
@@ -37,6 +43,8 @@ type PaymentService struct {
 	orderClient        client.OrderClient
 	cacheRepo          cache.CacheRepository
 	lockService        lock.DistributedLockService
+	paymentMQ          mq.MessageProducer
+	outboxRepo         repository.PaymentOutboxRepository
 }
 
 // NewPaymentService 创建支付服务
@@ -48,6 +56,8 @@ func NewPaymentService(
 	cacheRepo cache.CacheRepository,
 	paymentTimeout time.Duration,
 	lockService lock.DistributedLockService,
+	paymentMQ mq.MessageProducer,
+	outboxRepo repository.PaymentOutboxRepository,
 ) *PaymentService {
 	return &PaymentService{
 		paymentRepo:        paymentRepo,
@@ -57,6 +67,8 @@ func NewPaymentService(
 		orderClient:        orderClient,
 		cacheRepo:          cacheRepo,
 		lockService:        lockService,
+		paymentMQ:          paymentMQ,
+		outboxRepo:         outboxRepo,
 	}
 }
 
@@ -271,6 +283,32 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 	if req.Amount == "" {
 		return fmt.Errorf("支付金额不能为空")
 	}
+	//幂等性key：基于支付单号和交易号
+	idempotencyKey := fmt.Sprintf("%s:%s:%s", CallBackIdempotencyKeyPrefix, req.PaymentNo, req.TradeNo)
+	result, err := s.cacheRepo.Get(ctx, idempotencyKey)
+	if err == nil && result != "" {
+		if result == "SUCCESS" {
+			return nil // 已成功处理
+		} else if result == "PROCESSING" {
+			return fmt.Errorf("支付回调正在处理中，请勿重复提交")
+		} else {
+			return fmt.Errorf("上次处理失败: %s", result)
+		}
+	}
+	if ok, err := s.cacheRepo.SetNX(ctx, idempotencyKey, "PROCESSING", time.Duration(CallBackIdempotencyExpireSeconds)*time.Second); err != nil || !ok {
+		log.Printf("⚠️ 设置幂等性key失败: %v\n", err)
+		return fmt.Errorf("系统繁忙，请稍后重试")
+	}
+	//获取分布式锁，避免重复回调
+	lockKey := fmt.Sprintf("%s:%s", PaymentLockKeyPrefix, req.PaymentNo)
+	acquired, err := s.lockService.AcquireLock(ctx, lockKey, time.Duration(PaymentLockExpireSeconds)*time.Second)
+	if err != nil {
+		return fmt.Errorf("获取分布式锁失败: %w", err)
+	}
+	if !acquired {
+		return fmt.Errorf("系统繁忙，请稍后重试")
+	}
+	defer s.lockService.ReleaseLock(ctx, lockKey)
 
 	// 2. 查询支付单
 	payment, err := s.paymentRepo.GetPaymentByPaymentNo(ctx, req.PaymentNo)
@@ -285,8 +323,15 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 	if payment.Status == model.PaymentStatusSuccess {
 		return nil // 幂等处理
 	}
-
-	// 4. 签名校验（TODO: 后续实现）
+	//检查交易号是否被其他订单使用（防止重复入账）
+	otherPayment, err := s.paymentRepo.GetPaymentByTradeNo(ctx, req.TradeNo)
+	if err != nil {
+		return fmt.Errorf("查询支付单失败: %w", err)
+	}
+	if otherPayment != nil && otherPayment.PaymentNo != payment.PaymentNo {
+		return fmt.Errorf("交易号已存在: %s, 支付单号: %s", req.TradeNo, otherPayment.PaymentNo)
+	}
+	// 4. 签名校验（TODO: 后续实现），校验是否是平台发来的回调，防止伪造回调 采用支付宝公钥对签名进行校验
 	// if !s.verifySign(req) {
 	//     return fmt.Errorf("签名校验失败")
 	// }
@@ -296,10 +341,10 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 	if err != nil {
 		return fmt.Errorf("支付金额格式错误: %w", err)
 	}
-	// 允许0.01元的差异
-	if abs(callbackAmount-payment.Amount) > 0.01 {
+
+	if callbackAmount != payment.Amount {
 		// 记录告警日志
-		fmt.Printf("⚠️ 支付金额不一致: payment_no=%s, 订单金额=%.2f, 回调金额=%.2f\n",
+		log.Printf("⚠️ 支付金额不一致: payment_no=%s, 订单金额=%.2f, 回调金额=%.2f\n",
 			req.PaymentNo, payment.Amount, callbackAmount)
 		return fmt.Errorf("支付金额不一致: 订单金额=%.2f, 回调金额=%.2f", payment.Amount, callbackAmount)
 	}
@@ -321,24 +366,65 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 		payment.PaidAt = &now
 	}
 
-	if err := s.paymentRepo.UpdatePayment(ctx, payment); err != nil {
-		return fmt.Errorf("更新支付单状态失败: %w", err)
+	// 使用 Outbox 模式：在一个本地事务中更新支付单、记录日志、写入 Outbox 事件
+	if err := s.paymentRepo.WithTransaction(ctx, func(txCtx context.Context, txRepo repository.PaymentRepository) error {
+		// 7.1 更新支付单状态
+		if err := txRepo.UpdatePayment(txCtx, payment); err != nil {
+			return fmt.Errorf("更新支付单状态失败: %w", err)
+		}
+
+		// 7.2 记录支付日志
+		paymentLog := &model.PaymentLog{
+			PaymentNo:  req.PaymentNo,
+			OrderNo:    payment.OrderNo,
+			UserID:     payment.UserID,
+			Action:     model.PaymentLogActionCallback,
+			FromStatus: &oldStatus,
+			ToStatus:   &newStatus,
+			Channel:    req.PayChannel,
+			Amount:     payment.Amount,
+			TradeNo:    req.TradeNo,
+		}
+		if err := s.paymentLogRepo.CreatePaymentLog(txCtx, paymentLog); err != nil {
+			return fmt.Errorf("记录支付日志失败: %w", err)
+		}
+
+		// 7.3 仅在支付成功时写入 Outbox 事件
+		if newStatus == model.PaymentStatusSuccess {
+			payload := map[string]interface{}{
+				"payment_no": payment.PaymentNo,
+				"order_no":   payment.OrderNo,
+				"user_id":    payment.UserID,
+				"amount":     payment.Amount,
+				"trade_no":   payment.TradeNo,
+				"paid_at":    payment.PaidAt,
+			}
+			payloadBytes, err := json.Marshal(payload)
+			if err != nil {
+				return fmt.Errorf("序列化支付成功事件失败: %w", err)
+			}
+
+			event := &model.PaymentOutbox{
+				EventType:   "payment.succeeded",
+				AggregateID: payment.PaymentNo,
+				Payload:     string(payloadBytes),
+				Status:      repository.OutboxStatusPending,
+				RetryCount:  0,
+			}
+
+			if err := s.outboxRepo.Create(txCtx, event); err != nil {
+				return fmt.Errorf("写入支付 Outbox 事件失败: %w", err)
+			}
+		}
+
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	// 8. 记录支付日志
-	log := &model.PaymentLog{
-		PaymentNo:  req.PaymentNo,
-		OrderNo:    payment.OrderNo,
-		UserID:     payment.UserID,
-		Action:     model.PaymentLogActionCallback,
-		FromStatus: &oldStatus,
-		ToStatus:   &newStatus,
-		Channel:    req.PayChannel,
-		Amount:     payment.Amount,
-		TradeNo:    req.TradeNo,
-	}
-	if err := s.paymentLogRepo.CreatePaymentLog(ctx, log); err != nil {
-		fmt.Printf("⚠️ 记录支付日志失败: %v\n", err)
+	// 设置幂等性key为成功（放在事务之外，失败不影响主流程）
+	if err := s.cacheRepo.Set(ctx, idempotencyKey, "SUCCESS", 24*time.Hour); err != nil {
+		log.Printf("⚠️ 设置回调幂等性key失败: %v\n", err)
 	}
 
 	return nil
@@ -595,12 +681,4 @@ func (s *PaymentService) generatePaymentParamsForLearning(payment *model.Payment
 	fmt.Printf("   - PayParams: %v\n", payParams)
 
 	return payURL, qrCode, payParams
-}
-
-// abs 计算绝对值
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
 }
