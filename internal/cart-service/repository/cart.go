@@ -182,6 +182,8 @@ func (r *cartRepository) RemoveItems(ctx context.Context, userID string, itemIDs
 		itemKey := fmt.Sprintf(CacheKeyCartItem, itemID)
 		pipe.HDel(ctx, cartKey, itemID)
 		pipe.Del(ctx, itemKey)
+		log.Printf("✅ [Repository] RemoveItems: 删除缓存,cartKey=%s, item_ids=%v", cartKey, deduplicatedIDs)
+		log.Printf("✅ [Repository] RemoveItems: 删除缓存,itemKey=%s, itemID=%s", itemKey, itemID)
 	}
 
 	// 批量执行所有删除操作（原子执行，减少网络往返）
@@ -190,7 +192,7 @@ func (r *cartRepository) RemoveItems(ctx context.Context, userID string, itemIDs
 		log.Printf("⚠️ 批量删除缓存失败: %v", err)
 		// 不返回错误，继续执行 MQ 发送（最终一致性）
 	}
-
+	log.Printf("✅ [Repository] RemoveItems: 批量删除缓存成功 - user_id=%s, item_ids=%v", userID, deduplicatedIDs)
 	// 2. 发送消息到 RocketMQ（异步同步到 MySQL）- 使用去重后的 IDs
 	if r.mqProducer != nil {
 		for _, itemID := range deduplicatedIDs {

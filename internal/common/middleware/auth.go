@@ -43,6 +43,7 @@ var publicPaths = []string{
 	"/api/v1/users/register",     // 注册
 	"/api/v1/users/login",        // 登录
 	"/api/v1/users/login-by-sms", // 短信登录
+	"/api/v1/users/sms-code",     // 获取短信验证码
 	"/healthz",                   // 健康检查
 	"/swagger/",                  // Swagger 文档
 }
@@ -93,16 +94,19 @@ func Auth() Middleware {
 				return
 			}
 
-			// 验证 Token
-			userID, err := pkg.VerifyJWT(token)
+			// 验证 Token 并获取 Claims（包含用户ID和角色）
+			claims, err := pkg.VerifyJWTWithClaims(token)
 			if err != nil {
 				log.Println("VerifyJWT error:", err)
 				http.Error(w, `{"code": 401, "message": "Token 无效或已过期"}`, http.StatusUnauthorized)
 				return
 			}
 
-			// 将用户ID放入 Context，后续 handler 可以从 context 中获取
-			ctx := context.WithValue(r.Context(), UserIDKey, userID)
+			// 将用户ID和角色放入 Context，后续 handler 可以从 context 中获取
+			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
+			if len(claims.Roles) > 0 {
+				ctx = context.WithValue(ctx, RolesKey, claims.Roles)
+			}
 			r = r.WithContext(ctx)
 
 			// 继续处理请求

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	productv1 "zjMall/gen/go/api/proto/product"
+	"zjMall/internal/common/middleware"
 	"zjMall/internal/product-service/service"
 )
 
@@ -223,6 +224,14 @@ func (h *ProductServiceHandler) BatchSetBrandCategories(ctx context.Context, req
 // ============================================
 
 func (h *ProductServiceHandler) CreateProduct(ctx context.Context, req *productv1.CreateProductRequest) (*productv1.CreateProductResponse, error) {
+	// 权限检查：只有商家运营和管理员可以创建商品
+	if !middleware.CheckRole(ctx, "merchant", "admin") {
+		return &productv1.CreateProductResponse{
+			Code:    403,
+			Message: "权限不足：需要商家运营或管理员权限",
+		}, nil
+	}
+
 	// 参数校验
 	validator := service.NewCreateProductRequestValidator(req)
 	if err := validator.Validate(); err != nil {
@@ -245,6 +254,14 @@ func (h *ProductServiceHandler) GetProduct(ctx context.Context, req *productv1.G
 }
 
 func (h *ProductServiceHandler) UpdateProduct(ctx context.Context, req *productv1.UpdateProductRequest) (*productv1.UpdateProductResponse, error) {
+	// 权限检查：只有商家运营和管理员可以更新商品
+	if !middleware.CheckRole(ctx, "merchant", "admin") {
+		return &productv1.UpdateProductResponse{
+			Code:    403,
+			Message: "权限不足：需要商家运营或管理员权限",
+		}, nil
+	}
+
 	// 参数校验
 	validator := service.NewUpdateProductRequestValidator(req)
 	if err := validator.Validate(); err != nil {
@@ -257,6 +274,14 @@ func (h *ProductServiceHandler) UpdateProduct(ctx context.Context, req *productv
 }
 
 func (h *ProductServiceHandler) DeleteProduct(ctx context.Context, req *productv1.DeleteProductRequest) (*productv1.DeleteProductResponse, error) {
+	// 权限检查：只有商家运营和管理员可以删除商品
+	if !middleware.CheckRole(ctx, "merchant", "admin") {
+		return &productv1.DeleteProductResponse{
+			Code:    403,
+			Message: "权限不足：需要商家运营或管理员权限",
+		}, nil
+	}
+
 	if req.ProductId == "" {
 		return &productv1.DeleteProductResponse{
 			Code:    1,
@@ -279,6 +304,14 @@ func (h *ProductServiceHandler) ListProducts(ctx context.Context, req *productv1
 }
 
 func (h *ProductServiceHandler) OnShelfProduct(ctx context.Context, req *productv1.OnShelfProductRequest) (*productv1.OnShelfProductResponse, error) {
+	// 权限检查：只有商家运营和管理员可以上架商品
+	if !middleware.CheckRole(ctx, "merchant", "admin") {
+		return &productv1.OnShelfProductResponse{
+			Code:    403,
+			Message: "权限不足：需要商家运营或管理员权限",
+		}, nil
+	}
+
 	if req.ProductId == "" {
 		return &productv1.OnShelfProductResponse{
 			Code:    1,
@@ -289,6 +322,14 @@ func (h *ProductServiceHandler) OnShelfProduct(ctx context.Context, req *product
 }
 
 func (h *ProductServiceHandler) OffShelfProduct(ctx context.Context, req *productv1.OffShelfProductRequest) (*productv1.OffShelfProductResponse, error) {
+	// 权限检查：只有商家运营和管理员可以下架商品
+	if !middleware.CheckRole(ctx, "merchant", "admin") {
+		return &productv1.OffShelfProductResponse{
+			Code:    403,
+			Message: "权限不足：需要商家运营或管理员权限",
+		}, nil
+	}
+
 	if req.ProductId == "" {
 		return &productv1.OffShelfProductResponse{
 			Code:    1,

@@ -22,15 +22,17 @@ import (
 // UserService 用户服务（业务逻辑层）
 type UserService struct {
 	userRepo  repository.UserRepository // 数据访问（内部封装查询缓存）
+	rbacRepo  repository.RBACRepository // RBAC数据访问
 	smsClient sms.SMSClient
 	smsConfig config.SMSConfig
 	ossClient upload.UploadClient // OSS上传客户端
 }
 
 // NewUserService 创建用户服务实例
-func NewUserService(userRepo repository.UserRepository, smsClient sms.SMSClient, smsConfig config.SMSConfig, ossClient upload.UploadClient) *UserService {
+func NewUserService(userRepo repository.UserRepository, rbacRepo repository.RBACRepository, smsClient sms.SMSClient, smsConfig config.SMSConfig, ossClient upload.UploadClient) *UserService {
 	return &UserService{
 		userRepo:  userRepo,
+		rbacRepo:  rbacRepo,
 		smsClient: smsClient,
 		smsConfig: smsConfig,
 		ossClient: ossClient,
@@ -98,9 +100,12 @@ func (s *UserService) Register(ctx context.Context, req *userv1.RegisterRequest)
 	}
 	log.Printf("用户创建成功: ID=%s, Phone=%s", user.ID, user.Phone)
 
-	//生成JWT Token（注册后自动登录，使用默认过期时间）
+	// 获取用户角色
+	roles, _ := s.rbacRepo.GetUserRoleCodes(ctx, user.ID)
+
+	//生成JWT Token（注册后自动登录，使用默认过期时间，包含角色信息）
 	expirationTime := 7 * 24 * time.Hour
-	token, _, err := pkg.GenerateJWT(user.ID, expirationTime)
+	token, _, err := pkg.GenerateJWTWithRoles(user.ID, roles, expirationTime)
 	if err != nil {
 		return &userv1.RegisterResponse{
 			Code:    1,
@@ -110,6 +115,7 @@ func (s *UserService) Register(ctx context.Context, req *userv1.RegisterRequest)
 
 	// 转换为 UserInfo
 	userInfo := s.convertToUserInfo(user)
+	userInfo.Roles = roles
 
 	return &userv1.RegisterResponse{
 		Code:    0,
@@ -149,18 +155,21 @@ func (s *UserService) Login(ctx context.Context, req *userv1.LoginRequest) (*use
 		}, nil
 	}
 
-	// 根据 RememberMe 生成 Token
+	// 获取用户角色
+	roles, _ := s.rbacRepo.GetUserRoleCodes(ctx, userAuthInfo.ID)
+
+	// 根据 RememberMe 生成 Token（包含角色信息）
 	var token string
 	var expiresAt int64
 	var expirationTime time.Duration
 
 	if req.RememberMe {
-		token, expiresAt, err = pkg.GenerateJWTWithRememberMe(userAuthInfo.ID, req.RememberMe)
+		token, expiresAt, err = pkg.GenerateJWTWithRolesAndRememberMe(userAuthInfo.ID, roles, req.RememberMe)
 		// 计算过期时长：从当前时间到过期时间戳的时长
 		expirationTime = time.Until(time.Unix(expiresAt, 0))
 	} else {
 		expirationTime = 7 * 24 * time.Hour
-		token, expiresAt, err = pkg.GenerateJWT(userAuthInfo.ID, expirationTime)
+		token, expiresAt, err = pkg.GenerateJWTWithRoles(userAuthInfo.ID, roles, expirationTime)
 	}
 
 	// 先检查错误，再存储 token
@@ -171,14 +180,18 @@ func (s *UserService) Login(ctx context.Context, req *userv1.LoginRequest) (*use
 		}, nil
 	}
 
+	// 获取完整用户信息
+	user, _ := s.userRepo.GetUserByID(ctx, userAuthInfo.ID)
+	userInfo := s.convertToUserInfo(user)
+	if userInfo != nil {
+		userInfo.Roles = roles
+	}
+
 	return &userv1.LoginResponse{
 		Code:    0,
 		Message: "登录成功",
 		Data: &userv1.LoginData{
-			User: &userv1.UserInfo{
-				Id:    userAuthInfo.ID,
-				Phone: s.maskPhone(userAuthInfo.Phone),
-			},
+			User:      userInfo,
 			Token:     token,
 			ExpiresAt: expiresAt,
 		},
@@ -209,9 +222,12 @@ func (s *UserService) LoginBySMS(ctx context.Context, req *userv1.LoginBySMSRequ
 		}, nil
 	}
 
-	//生成token（短信登录使用默认过期时间）
+	// 获取用户角色
+	roles, _ := s.rbacRepo.GetUserRoleCodes(ctx, user.ID)
+
+	//生成token（短信登录使用默认过期时间，包含角色信息）
 	expirationTime := 7 * 24 * time.Hour
-	token, expiresAt, err := pkg.GenerateJWT(user.ID, expirationTime)
+	token, expiresAt, err := pkg.GenerateJWTWithRoles(user.ID, roles, expirationTime)
 	if err != nil {
 		return &userv1.LoginResponse{
 			Code:    1,
@@ -221,6 +237,7 @@ func (s *UserService) LoginBySMS(ctx context.Context, req *userv1.LoginBySMSRequ
 
 	//转换为UserInfo
 	userInfo := s.convertToUserInfo(user)
+	userInfo.Roles = roles
 
 	return &userv1.LoginResponse{
 		Code:    0,

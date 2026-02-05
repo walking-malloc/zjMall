@@ -129,6 +129,51 @@ service UserService {
       body: "*"
     };
   }
+
+  // ========== 角色和权限管理 ==========
+
+  // 为用户分配角色
+  rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/{user_id}/roles"
+      body: "*"
+    };
+  }
+
+  // 移除用户角色
+  rpc RemoveRole(RemoveRoleRequest) returns (RemoveRoleResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/users/{user_id}/roles/{role_code}"
+    };
+  }
+
+  // 查询用户角色列表
+  rpc GetUserRoles(GetUserRolesRequest) returns (GetUserRolesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}/roles"
+    };
+  }
+
+  // 查询用户权限列表
+  rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}/permissions"
+    };
+  }
+
+  // 查询所有角色列表
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/roles"
+    };
+  }
+
+  // 查询所有权限列表
+  rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/permissions"
+    };
+  }
 }
 
 // ========== 通用响应结构 ==========
@@ -226,6 +271,7 @@ message UserInfo {
   int32 status = 8;        // 状态：1-正常，2-已锁定，3-已注销
   google.protobuf.Timestamp created_at = 9;  // 注册时间
   google.protobuf.Timestamp last_login_at = 10; // 最后登录时间
+  repeated string roles = 11; // 用户角色列表（可选）
 }
 
 // 查询用户信息请求
@@ -399,4 +445,103 @@ message BindPhoneRequest {
 message BindPhoneResponse {
   int32 code = 1;
   string message = 2;
+}
+
+// ========== 角色和权限管理请求和响应 ==========
+
+// 角色信息
+message RoleInfo {
+  string id = 1;                              // 角色ID
+  string code = 2;                            // 角色代码
+  string name = 3;                            // 角色名称
+  string description = 4;                     // 角色描述
+  int32 status = 5;                           // 状态：1-启用，2-停用
+  google.protobuf.Timestamp created_at = 6;    // 创建时间
+  google.protobuf.Timestamp updated_at = 7;    // 更新时间
+}
+
+// 权限信息
+message PermissionInfo {
+  string id = 1;                              // 权限ID
+  string code = 2;                            // 权限代码
+  string name = 3;                            // 权限名称
+  string resource = 4;                        // 资源类型
+  string action = 5;                          // 操作类型
+  string description = 6;                     // 权限描述
+  int32 status = 7;                           // 状态：1-启用，2-停用
+  google.protobuf.Timestamp created_at = 8;    // 创建时间
+  google.protobuf.Timestamp updated_at = 9;     // 更新时间
+}
+
+// 为用户分配角色请求
+message AssignRoleRequest {
+  string user_id = 1;        // 用户ID
+  string role_code = 2;     // 角色代码（如：merchant, admin）
+}
+
+// 为用户分配角色响应
+message AssignRoleResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 移除用户角色请求
+message RemoveRoleRequest {
+  string user_id = 1;       // 用户ID
+  string role_code = 2;    // 角色代码
+}
+
+// 移除用户角色响应
+message RemoveRoleResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// 查询用户角色列表请求
+message GetUserRolesRequest {
+  string user_id = 1;       // 用户ID
+}
+
+// 查询用户角色列表响应
+message GetUserRolesResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated RoleInfo data = 3; // 角色列表
+}
+
+// 查询用户权限列表请求
+message GetUserPermissionsRequest {
+  string user_id = 1;       // 用户ID
+}
+
+// 查询用户权限列表响应
+message GetUserPermissionsResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated PermissionInfo data = 3; // 权限列表
+}
+
+// 查询所有角色列表请求
+message ListRolesRequest {
+  int32 status = 1;         // 状态筛选（可选，1-启用，2-停用）
+}
+
+// 查询所有角色列表响应
+message ListRolesResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated RoleInfo data = 3; // 角色列表
+}
+
+// 查询所有权限列表请求
+message ListPermissionsRequest {
+  string resource = 1;      // 资源类型筛选（可选）
+  int32 status = 2;         // 状态筛选（可选，1-启用，2-停用）
+}
+
+// 查询所有权限列表响应
+message ListPermissionsResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated PermissionInfo data = 3; // 权限列表
 }

@@ -79,23 +79,29 @@ func main() {
 	// 7. 创建用户仓库
 	userRepo := repository.NewUserRepository(db, baseCacheRepo)
 
-	// 8. 获取短信配置并创建短信客户端（Mock）
+	// 8. 创建RBAC仓库
+	rbacRepo := repository.NewRBACRepository(db)
+
+	// 9. 获取短信配置并创建短信客户端（Mock）
 	smsConfig := config.GetSMSConfig()
 	smsClient := sms.NewMockSMSClient()
 	log.Println("✅ 使用 Mock 短信服务（学习模式）")
 
-	// 9. 创建OSS客户端
+	// 10. 创建OSS客户端
 	ossConfig := config.GetOSSConfig()
 	ossClient, err := upload.NewOSSClient(ossConfig)
 	if err != nil {
 		log.Fatalf("Error initializing OSS: %v", err)
 	}
 
-	// 10. 创建Service
-	userService := service.NewUserService(userRepo, smsClient, *smsConfig, ossClient)
+	// 11. 创建Service
+	userService := service.NewUserService(userRepo, rbacRepo, smsClient, *smsConfig, ossClient)
 
-	//7.创建Handler
-	userServiceHandler := handler.NewUserServiceHandler(userService)
+	// 12. 创建RBAC Service
+	rbacService := service.NewRBACService(rbacRepo)
+
+	// 13. 创建Handler
+	userServiceHandler := handler.NewUserServiceHandler(userService, rbacService)
 
 	serviceCfg, err := config.GetServiceConfig(serviceName)
 	if err != nil {

@@ -15,11 +15,13 @@ import (
 type UserServiceHandler struct {
 	userv1.UnimplementedUserServiceServer
 	userService *service.UserService // 依赖注入：业务逻辑层
+	rbacService *service.RBACService // RBAC服务
 }
 
-func NewUserServiceHandler(userService *service.UserService) *UserServiceHandler {
+func NewUserServiceHandler(userService *service.UserService, rbacService *service.RBACService) *UserServiceHandler {
 	return &UserServiceHandler{
 		userService: userService, // 初始化 service
+		rbacService: rbacService, // 初始化 RBAC service
 	}
 }
 
@@ -254,4 +256,160 @@ func (h *UserServiceHandler) GetUserAddress(ctx context.Context, req *userv1.Get
 		}, nil
 	}
 	return h.userService.GetUserAddress(ctx, userID, req.AddressId)
+}
+
+// ========== RBAC相关方法 ==========
+
+// AssignRole 为用户分配角色
+func (h *UserServiceHandler) AssignRole(ctx context.Context, req *userv1.AssignRoleRequest) (*userv1.AssignRoleResponse, error) {
+	if req.UserId == "" {
+		return &userv1.AssignRoleResponse{
+			Code:    1,
+			Message: "用户ID不能为空",
+		}, nil
+	}
+	if req.RoleCode == "" {
+		return &userv1.AssignRoleResponse{
+			Code:    1,
+			Message: "角色代码不能为空",
+		}, nil
+	}
+
+	err := h.rbacService.AssignRole(ctx, req.UserId, req.RoleCode)
+	if err != nil {
+		return &userv1.AssignRoleResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &userv1.AssignRoleResponse{
+		Code:    0,
+		Message: "分配角色成功",
+	}, nil
+}
+
+// RemoveRole 移除用户角色
+func (h *UserServiceHandler) RemoveRole(ctx context.Context, req *userv1.RemoveRoleRequest) (*userv1.RemoveRoleResponse, error) {
+	if req.UserId == "" {
+		return &userv1.RemoveRoleResponse{
+			Code:    1,
+			Message: "用户ID不能为空",
+		}, nil
+	}
+	if req.RoleCode == "" {
+		return &userv1.RemoveRoleResponse{
+			Code:    1,
+			Message: "角色代码不能为空",
+		}, nil
+	}
+
+	err := h.rbacService.RemoveRole(ctx, req.UserId, req.RoleCode)
+	if err != nil {
+		return &userv1.RemoveRoleResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &userv1.RemoveRoleResponse{
+		Code:    0,
+		Message: "移除角色成功",
+	}, nil
+}
+
+// GetUserRoles 查询用户角色列表
+func (h *UserServiceHandler) GetUserRoles(ctx context.Context, req *userv1.GetUserRolesRequest) (*userv1.GetUserRolesResponse, error) {
+	if req.UserId == "" {
+		return &userv1.GetUserRolesResponse{
+			Code:    1,
+			Message: "用户ID不能为空",
+		}, nil
+	}
+
+	roles, err := h.rbacService.GetUserRoles(ctx, req.UserId)
+	if err != nil {
+		return &userv1.GetUserRolesResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &userv1.GetUserRolesResponse{
+		Code:    0,
+		Message: "查询成功",
+		Data:    roles,
+	}, nil
+}
+
+// GetUserPermissions 查询用户权限列表
+func (h *UserServiceHandler) GetUserPermissions(ctx context.Context, req *userv1.GetUserPermissionsRequest) (*userv1.GetUserPermissionsResponse, error) {
+	if req.UserId == "" {
+		return &userv1.GetUserPermissionsResponse{
+			Code:    1,
+			Message: "用户ID不能为空",
+		}, nil
+	}
+
+	permissions, err := h.rbacService.GetUserPermissions(ctx, req.UserId)
+	if err != nil {
+		return &userv1.GetUserPermissionsResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &userv1.GetUserPermissionsResponse{
+		Code:    0,
+		Message: "查询成功",
+		Data:    permissions,
+	}, nil
+}
+
+// ListRoles 查询所有角色列表
+func (h *UserServiceHandler) ListRoles(ctx context.Context, req *userv1.ListRolesRequest) (*userv1.ListRolesResponse, error) {
+	var status *int32
+	if req.Status > 0 {
+		status = &req.Status
+	}
+
+	roles, err := h.rbacService.ListRoles(ctx, status)
+	if err != nil {
+		return &userv1.ListRolesResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &userv1.ListRolesResponse{
+		Code:    0,
+		Message: "查询成功",
+		Data:    roles,
+	}, nil
+}
+
+// ListPermissions 查询所有权限列表
+func (h *UserServiceHandler) ListPermissions(ctx context.Context, req *userv1.ListPermissionsRequest) (*userv1.ListPermissionsResponse, error) {
+	var resource *string
+	if req.Resource != "" {
+		resource = &req.Resource
+	}
+	var status *int32
+	if req.Status > 0 {
+		status = &req.Status
+	}
+
+	permissions, err := h.rbacService.ListPermissions(ctx, resource, status)
+	if err != nil {
+		return &userv1.ListPermissionsResponse{
+			Code:    1,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &userv1.ListPermissionsResponse{
+		Code:    0,
+		Message: "查询成功",
+		Data:    permissions,
+	}, nil
 }
