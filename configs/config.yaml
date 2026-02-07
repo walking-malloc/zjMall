@@ -73,7 +73,7 @@ sms:
   max_send_count: 20
 
 jwt:
-  secret: "your-secret-key-change-in-production"
+  secret: ""
   expires_in: 168h  # 7 天 (7 * 24 小时)
   remember_me_expires_in: 720h  # 30 天 (30 * 24 小时)
 
