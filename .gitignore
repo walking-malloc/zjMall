@@ -1,46 +1,55 @@
-# # IDE - GoLand/IntelliJ IDEA
-# .idea/
-# !.idea/modules.xml
-# !.idea/vcs.xml
-# !.idea/sqldialects.xml
-# !.idea/dataSources.xml
-# !.idea/*.iml
+# IDE - GoLand/IntelliJ IDEA
+.idea/
+!.idea/modules.xml
+!.idea/vcs.xml
+!.idea/sqldialects.xml
+!.idea/dataSources.xml
+!.idea/*.iml
 
-# # 个人配置（不应该提交）
-# .idea/dataSources.local.xml
-# .idea/workspace.xml
-# .idea/dataSources/
+# IDE - Cursor
+.cursor/
 
-# # 编译输出
-# # *.exe
-# *.exe~
-# *.dll
-# *.so
-# *.dylib
+# 部署相关
+.deploy/
 
-# # 测试二进制文件
-# *.test
+# 缓存目录
+.cache/  
 
-# # 输出目录
-# dist/
-# build/
-# bin/
+# 个人配置（不应该提交）
+.idea/dataSources.local.xml
+.idea/workspace.xml
+.idea/dataSources/
 
-# # 依赖
-# vendor/
+# 编译输出
+# *.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# # Go 工作区文件
-# go.work
-# go.work.sum
+# 测试二进制文件
+*.test
 
-# # 环境变量文件
-# .env
-# .env.local
+# 输出目录
+dist/
+build/
+bin/
 
-# # 日志文件
+# 依赖
+vendor/
+
+# Go 工作区文件
+go.work
+go.work.sum
+
+# 环境变量文件
+.env
+.env.local
+
+# 日志文件
 *.log
 
-# # 操作系统文件
-# .DS_Store
-# Thumbs.db
+# 操作系统文件
+.DS_Store
+Thumbs.db
 
