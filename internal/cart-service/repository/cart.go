@@ -243,84 +243,21 @@ func (r *cartRepository) GetCartItems(ctx context.Context, userID string) ([]*mo
 		}
 	}
 
-	// 2. 缓存未命中，使用分布式锁防止缓存击穿（支持多实例部署）
-	lockKey := fmt.Sprintf("lock:cart:user:%s", userID)
-	lockValue := fmt.Sprintf("%d", time.Now().UnixNano())
-	lockTTL := 5 * time.Second
-
-	acquired, err := r.redisClient.SetNX(ctx, lockKey, lockValue, lockTTL).Result()
-	if err != nil {
-		// 获取锁失败，降级直接查数据库
-		log.Printf("⚠️ [Repository] GetCartItems: 获取分布式锁失败，降级直接查询 - user_id=%s, error=%v", userID, err)
-		var items []*model.CartItem
-		if err := r.db.WithContext(ctx).
-			Where("user_id = ?", userID).
-			Order("created_at DESC").
-			Find(&items).Error; err != nil {
-			log.Printf("❌ [Repository] GetCartItems: 查询 MySQL 失败（降级） - user_id=%s, error=%v", userID, err)
-			return nil, fmt.Errorf("查询购物车列表失败: %w", err)
-		}
-		for _, item := range items {
-			r.setToCache(ctx, userID, item)
-		}
-		return items, nil
+	// 获取锁失败，降级直接查数据库
+	log.Printf("⚠️ [Repository] GetCartItems: 获取分布式锁失败，降级直接查询 - user_id=%s, error=%v", userID, err)
+	var items []*model.CartItem
+	if err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Find(&items).Error; err != nil {
+		log.Printf("❌ [Repository] GetCartItems: 查询 MySQL 失败（降级） - user_id=%s, error=%v", userID, err)
+		return nil, fmt.Errorf("查询购物车列表失败: %w", err)
 	}
-
-	if acquired {
-		// 获取锁成功，执行查询
-		defer func() {
-			luaScript := `
-				if redis.call("get", KEYS[1]) == ARGV[1] then
-					return redis.call("del", KEYS[1])
-				else
-					return 0
-				end
-			`
-			r.redisClient.Eval(ctx, luaScript, []string{lockKey}, lockValue).Result()
-		}()
-
-		var items []*model.CartItem
-		if err := r.db.WithContext(ctx).
-			Where("user_id = ?", userID).
-			Order("created_at DESC").
-			Find(&items).Error; err != nil {
-			log.Printf("❌ [Repository] GetCartItems: 查询 MySQL 失败（获取锁后） - user_id=%s, error=%v", userID, err)
-			return nil, fmt.Errorf("查询购物车列表失败: %w", err)
-		}
-
-		// 回写 Redis 缓存
-		for _, item := range items {
-			r.setToCache(ctx, userID, item)
-		}
-
-		return items, nil
-	} else {
-		// 未获取到锁，短暂等待后重试从缓存读取
-		time.Sleep(50 * time.Millisecond)
-		itemsMap, err := r.redisClient.HGetAll(ctx, cartKey).Result()
-		if err == nil && len(itemsMap) > 0 {
-			items := make([]*model.CartItem, 0, len(itemsMap))
-			for _, itemJSON := range itemsMap {
-				var item model.CartItem
-				if err := json.Unmarshal([]byte(itemJSON), &item); err == nil {
-					items = append(items, &item)
-				}
-			}
-			if len(items) > 0 {
-				return items, nil
-			}
-		}
-		// 如果仍然未命中，降级直接查数据库
-		var items []*model.CartItem
-		if err := r.db.WithContext(ctx).
-			Where("user_id = ?", userID).
-			Order("created_at DESC").
-			Find(&items).Error; err != nil {
-			log.Printf("❌ [Repository] GetCartItems: 查询 MySQL 失败（等待锁后） - user_id=%s, error=%v", userID, err)
-			return nil, fmt.Errorf("查询购物车列表失败: %w", err)
-		}
-		return items, nil
+	for _, item := range items {
+		r.setToCache(ctx, userID, item)
 	}
+	return items, nil
+
 }
 
 // GetCartItem 获取购物车项
@@ -339,82 +276,21 @@ func (r *cartRepository) GetCartItem(ctx context.Context, userID string, itemID 
 		}
 	}
 
-	// 2. 缓存未命中，使用分布式锁防止缓存击穿（支持多实例部署）
-	lockKey := fmt.Sprintf("lock:cart:item:%s", itemID)
-	lockValue := fmt.Sprintf("%d", time.Now().UnixNano())
-	lockTTL := 5 * time.Second
-
-	acquired, err := r.redisClient.SetNX(ctx, lockKey, lockValue, lockTTL).Result()
+	// 获取锁失败，降级直接查数据库
+	log.Printf("⚠️ [Repository] GetCartItem: 获取分布式锁失败，降级直接查询 - user_id=%s, item_id=%s, error=%v", userID, itemID, err)
+	var item model.CartItem
+	err = r.db.WithContext(ctx).
+		Where("id = ? AND user_id = ?", itemID, userID).
+		First(&item).Error
 	if err != nil {
-		// 获取锁失败，降级直接查数据库
-		log.Printf("⚠️ [Repository] GetCartItem: 获取分布式锁失败，降级直接查询 - user_id=%s, item_id=%s, error=%v", userID, itemID, err)
-		var item model.CartItem
-		if err := r.db.WithContext(ctx).
-			Where("id = ? AND user_id = ?", itemID, userID).
-			First(&item).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return nil, nil
-			}
-			log.Printf("❌ [Repository] GetCartItem: 查询 MySQL 失败（降级） - user_id=%s, item_id=%s, error=%v", userID, itemID, err)
-			return nil, fmt.Errorf("查询购物车项失败: %w", err)
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
 		}
-		r.setToCache(ctx, userID, &item)
-		return &item, nil
+		log.Printf("❌ [Repository] GetCartItem: 查询 MySQL 失败（降级） - user_id=%s, item_id=%s, error=%v", userID, itemID, err)
+		return nil, fmt.Errorf("查询购物车项失败: %w", err)
 	}
-
-	if acquired {
-		// 获取锁成功，执行查询
-		defer func() {
-			luaScript := `
-				if redis.call("get", KEYS[1]) == ARGV[1] then
-					return redis.call("del", KEYS[1])
-				else
-					return 0
-				end
-			`
-			r.redisClient.Eval(ctx, luaScript, []string{lockKey}, lockValue).Result()
-		}()
-
-		var item model.CartItem
-		if err := r.db.WithContext(ctx).
-			Where("id = ? AND user_id = ?", itemID, userID).
-			First(&item).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return nil, nil
-			}
-			log.Printf("❌ [Repository] GetCartItem: 查询 MySQL 失败（获取锁后） - user_id=%s, item_id=%s, error=%v", userID, itemID, err)
-			return nil, fmt.Errorf("查询购物车项失败: %w", err)
-		}
-
-		// 回写 Redis 缓存
-		r.setToCache(ctx, userID, &item)
-
-		return &item, nil
-	} else {
-		// 未获取到锁，短暂等待后重试从缓存读取
-		time.Sleep(50 * time.Millisecond)
-		itemJSON, err := r.redisClient.Get(ctx, itemKey).Result()
-		if err == nil {
-			var item model.CartItem
-			if err := json.Unmarshal([]byte(itemJSON), &item); err == nil {
-				if item.UserID == userID {
-					return &item, nil
-				}
-			}
-		}
-		// 如果仍然未命中，降级直接查数据库
-		var item model.CartItem
-		if err := r.db.WithContext(ctx).
-			Where("id = ? AND user_id = ?", itemID, userID).
-			First(&item).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return nil, nil
-			}
-			log.Printf("❌ [Repository] GetCartItem: 查询 MySQL 失败（等待锁后） - user_id=%s, item_id=%s, error=%v", userID, itemID, err)
-			return nil, fmt.Errorf("查询购物车项失败: %w", err)
-		}
-		return &item, nil
-	}
+	r.setToCache(ctx, userID, &item)
+	return &item, nil
 }
 
 // GetCartItemByUserAndSKU 根据用户ID和SKU ID查找购物车项
