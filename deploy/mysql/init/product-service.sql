@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS attribute_values (
 CREATE TABLE IF NOT EXISTS products (
     id VARCHAR(26) NOT NULL PRIMARY KEY,
     category_id VARCHAR(26) NOT NULL COMMENT '所属类目ID',
-    brand_id VARCHAR(26) COMMENT '品牌ID',
+    brand_id VARCHAR(26) NOT NULL COMMENT '品牌ID',
     title VARCHAR(200) NOT NULL COMMENT '商品标题',
     subtitle VARCHAR(200) COMMENT '商品副标题/卖点',
     main_image VARCHAR(255) NOT NULL COMMENT '主图URL',
@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS products (
     INDEX idx_status_created (status, created_at),
     -- 全文搜索索引
     FULLTEXT KEY ft_title (title, subtitle) COMMENT '全文索引，用于搜索'
+    UNIQUE KEY uk_category_brand_title_deleted (category_id, brand_id, title, deleted_at) COMMENT '唯一约束：同一类目+品牌+标题不能重复（考虑软删除）',
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品表（SPU）';
 
 -- ============================================

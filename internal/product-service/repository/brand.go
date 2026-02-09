@@ -75,17 +75,16 @@ func (r *brandRepository) GetBrandByID(ctx context.Context, id string) (*model.B
 	nullKey := fmt.Sprintf(BrandNullCacheKey, id)
 
 	//检查空值缓存
-	nullResult, _ := r.cacheRepo.Get(ctx, nullKey)
-	if nullResult == "1" {
-		log.Printf("[BrandRepository] GetBrandByID null-cache hit inside singleflight, id=%s", id)
-		return nil, nil
+	if nullExists, _ := r.cacheRepo.Exists(ctx, nullKey); nullExists {
+		log.Printf("[BrandRepository] GetBrandByID null-cache hit, id=%s", id)
+		return nil, errors.New("brand not found")
 	}
 
 	err := r.db.WithContext(ctx).Where("id = ?", id).First(&brand).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Printf("[BrandRepository] GetBrandByID record not found in DB, id=%s", id)
-			r.cacheRepo.Set(context.Background(), nullKey, "1", 5*time.Minute) //如果数据库中没有，则设置空值缓存
+			r.cacheRepo.Set(ctx, nullKey, "1", 5*time.Minute) //如果数据库中没有，则设置空值缓存
 			return nil, nil
 		}
 		return nil, err

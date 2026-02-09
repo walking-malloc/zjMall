@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"strings"
 	"time"
@@ -18,7 +19,6 @@ import (
 const (
 	ProductDetailCachedKey = "product:detail:%s"
 	ProductNullCachedKey   = "product:null:%s" //空值缓存，防止缓存击穿
-	ProductLockKey         = "product:lock:%s" //分布式锁
 
 	ProductStatusDraft     = 1
 	ProductStatusToAudit   = 2
@@ -78,7 +78,6 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *model.Pr
 		//先检查categoryId是否存在
 		var category model.Category
 		err := tx.Model(&model.Category{}).
-			Clauses(clause.Locking{Strength: "SHARE"}).
 			Where("id = ?", product.CategoryID).First(&category).Error
 		if err != nil {
 			return err
@@ -89,7 +88,6 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *model.Pr
 		//再检查brandId是否存在
 		var brand model.Brand
 		err = tx.Model(&model.Brand{}).
-			Clauses(clause.Locking{Strength: "SHARE"}).
 			Where("id = ?", product.BrandID).First(&brand).Error
 		if err != nil {
 			return err
@@ -108,10 +106,6 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *model.Pr
 
 	})
 
-	go func() {
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, product.ID)) //删除缓存商品信息
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, product.ID))   //删除空值缓存
-	}()
 	return err
 }
 
@@ -127,27 +121,32 @@ func (r *productRepository) GetProduct(ctx context.Context, id string) (*model.P
 		return &product, nil
 	}
 
-	//如果没有缓存，构建空值缓存
+	//如果没有缓存，查看空值缓存
 	nullKey := fmt.Sprintf(ProductNullCachedKey, id)
-	r.cacheRepo.Set(ctx, nullKey, "1", 5*time.Minute+time.Duration(rand.Intn(60))*time.Second) //设置5分钟+随机60秒防止缓存雪崩
+	if nullExists, _ := r.cacheRepo.Exists(ctx, nullKey); nullExists {
+		return nil, errors.New("product not found")
+	}
 	//然后从数据库中获取
 	var product model.Product
 	err = r.db.Where("id = ?", id).First(&product).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			//没有就构建空值缓存
+			r.cacheRepo.Set(ctx, nullKey, "1", 5*time.Minute+time.Duration(rand.Intn(60))*time.Second) //设置5分钟+随机60秒防止缓存雪崩
+			return nil, errors.New("product not found")
+		}
 		return nil, err
 	}
-	if product.ID == "" {
-		return nil, errors.New("product not found")
-	}
 
-	go func() {
-		data, err := json.Marshal(product)
-		if err != nil {
-			return
-		}
-		ctx2 := context.Background()
-		r.cacheRepo.Set(ctx2, fmt.Sprintf(ProductDetailCachedKey, id), string(data), 5*time.Minute+time.Duration(rand.Intn(60))*time.Second)
-	}()
+	data, err := json.Marshal(product)
+	if err != nil {
+		return nil, err
+	}
+	ctx2 := context.Background()
+	err = r.cacheRepo.Set(ctx2, fmt.Sprintf(ProductDetailCachedKey, id), string(data), 5*time.Minute+time.Duration(rand.Intn(60))*time.Second)
+	if err != nil {
+		log.Println("设置缓存失败:", err)
+	}
 	return &product, nil
 }
 
@@ -157,7 +156,6 @@ func (r *productRepository) UpdateProduct(ctx context.Context, product *model.Pr
 		//先检查categoryId是否存在
 		var category model.Category
 		err := tx.Model(&model.Category{}).
-			Clauses(clause.Locking{Strength: "SHARE"}).
 			Where("id = ?", product.CategoryID).First(&category).Error
 		if err != nil {
 			return err
@@ -166,7 +164,6 @@ func (r *productRepository) UpdateProduct(ctx context.Context, product *model.Pr
 		//再检查brandId是否存在
 		var brand model.Brand
 		err = tx.Model(&model.Brand{}).
-			Clauses(clause.Locking{Strength: "SHARE"}).
 			Where("id = ?", product.BrandID).First(&brand).Error
 		if err != nil {
 			return err
@@ -179,10 +176,12 @@ func (r *productRepository) UpdateProduct(ctx context.Context, product *model.Pr
 		}
 		return nil
 	})
-	go func() {
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, product.ID)) //删除缓存商品信息
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, product.ID))   //删除空值缓存
-	}()
+	if err != nil {
+		return err
+	}
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, product.ID)) //删除缓存商品信息
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, product.ID))   //删除空值缓存
+
 	return err
 }
 
@@ -204,11 +203,10 @@ func (r *productRepository) DeleteProduct(ctx context.Context, id string) error 
 	if err != nil {
 		return err
 	}
-	go func() {
-		ctx2 := context.Background()
-		r.cacheRepo.Delete(ctx2, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
-		r.cacheRepo.Delete(ctx2, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
-	}()
+
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
+
 	return nil
 }
 
@@ -315,10 +313,9 @@ func (r *productRepository) OnShelfProduct(ctx context.Context, id string) error
 		return errors.New("商品状态不正确")
 	}
 
-	go func() {
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
-	}()
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
+
 	return nil
 }
 
@@ -342,10 +339,10 @@ func (r *productRepository) OffShelfProduct(ctx context.Context, id string) erro
 		}
 		return errors.New("商品状态不正确")
 	}
-	go func() {
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
-	}()
+
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
+
 	return nil
 }
 
@@ -370,10 +367,9 @@ func (r *productRepository) SubmitProductAudit(ctx context.Context, id string) e
 		return errors.New("商品状态不正确")
 	}
 
-	go func() {
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
-	}()
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
+
 	return nil
 }
 
@@ -405,10 +401,10 @@ func (r *productRepository) AuditProduct(ctx context.Context, id string, result 
 		}
 		return errors.New("商品状态不正确")
 	}
-	go func() {
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
-		r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
-	}()
+
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductDetailCachedKey, id)) //删除缓存商品信息
+	r.cacheRepo.Delete(ctx, fmt.Sprintf(ProductNullCachedKey, id))   //删除空值缓存
+
 	return nil
 }
 
@@ -419,7 +415,7 @@ func (r *productRepository) AddProductTag(ctx context.Context, productID, tagID 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 检查商品是否存在，并锁定记录（FOR SHARE）
 		var product model.Product
-		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+		if err := tx.
 			Where("id = ?", productID).
 			First(&product).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -430,7 +426,7 @@ func (r *productRepository) AddProductTag(ctx context.Context, productID, tagID 
 
 		// 检查标签是否存在且启用，并锁定记录（FOR SHARE）
 		var tag model.Tag
-		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+		if err := tx.
 			Where("id = ? AND status = ?", tagID, 1).
 			First(&tag).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {

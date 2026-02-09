@@ -88,10 +88,9 @@ func (r *categoryRepository) GetCategoryByID(ctx context.Context, id string) (*m
 	nullKey := fmt.Sprintf(CategoryNullCacheKey, id)
 
 	//检查空值缓存
-	nullResult, _ := r.cacheRepo.Get(ctx, nullKey)
-	if nullResult == "1" {
-		log.Printf("[CategoryRepository] GetCategoryByID null-cache hit inside singleflight, id=%s", id)
-		return nil, nil
+	if nullExists, _ := r.cacheRepo.Exists(ctx, nullKey); nullExists {
+		log.Printf("[CategoryRepository] GetCategoryByID null-cache hit, id=%s", id)
+		return nil, errors.New("category not found")
 	}
 
 	log.Printf("[CategoryRepository] GetCategoryByID cache miss, enter singleflight, id=%s", id)
@@ -101,7 +100,7 @@ func (r *categoryRepository) GetCategoryByID(ctx context.Context, id string) (*m
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) { //如果记录不存在，设置缓存为null防止缓存穿透
 			log.Printf("[CategoryRepository] GetCategoryByID record not found in DB, id=%s", id)
-			r.cacheRepo.Set(context.Background(), nullKey, "1", 5*time.Minute)
+			r.cacheRepo.Set(ctx, nullKey, "1", 5*time.Minute)
 			return nil, nil
 		}
 		log.Printf("[CategoryRepository] GetCategoryByID DB error, id=%s, err=%v", id, err)
