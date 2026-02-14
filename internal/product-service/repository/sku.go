@@ -42,6 +42,8 @@ type SkuRepository interface {
 	RemoveSkuAttribute(ctx context.Context, skuID, attributeValueID string) error
 	GetSkuAttributes(ctx context.Context, skuID string) ([]*model.AttributeValue, error)
 	BatchSetSkuAttributes(ctx context.Context, skuID string, attributeValueIDs []string) error
+	// GetMinPriceByProductIDs 批量获取商品最低SKU价格，返回 product_id -> min_price
+	GetMinPriceByProductIDs(ctx context.Context, productIDs []string) (map[string]float64, error)
 }
 
 type skuRepository struct {
@@ -355,4 +357,30 @@ func (r *skuRepository) BatchSetSkuAttributes(ctx context.Context, skuID string,
 
 		return nil
 	})
+}
+
+// GetMinPriceByProductIDs 批量获取商品最低SKU价格（仅上架且未删除）
+func (r *skuRepository) GetMinPriceByProductIDs(ctx context.Context, productIDs []string) (map[string]float64, error) {
+	if len(productIDs) == 0 {
+		return map[string]float64{}, nil
+	}
+	type minPriceRow struct {
+		ProductID string  `gorm:"column:product_id"`
+		MinPrice  float64 `gorm:"column:min_price"`
+	}
+	var rows []minPriceRow
+	err := r.db.WithContext(ctx).Model(&model.Sku{}).
+		Select("product_id, MIN(price) as min_price").
+		Where("product_id IN ? AND status = ?", productIDs, SkuStatusOnShelf).
+		Where("deleted_at IS NULL").
+		Group("product_id").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]float64, len(rows))
+	for _, row := range rows {
+		result[row.ProductID] = row.MinPrice
+	}
+	return result, nil
 }

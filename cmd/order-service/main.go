@@ -162,8 +162,8 @@ func main() {
 	// 注意：无论延迟消息是否启动，补偿机制都应该运行，确保即使延迟消息失败也能处理超时订单
 	compensationCtx, compensationCancel := context.WithCancel(context.Background())
 	defer compensationCancel()
-	go service.StartOrderTimeoutCompensation(compensationCtx, orderService, 5*time.Minute) // 每5分钟扫描一次
-	log.Println("✅ 订单超时补偿机制已启动（每5分钟扫描一次）")
+	go service.StartOrderTimeoutCompensation(compensationCtx, orderService, 30*time.Minute) // 每5分钟扫描一次
+	log.Println("✅ 订单超时补偿机制已启动（每30分钟扫描一次）")
 
 	// 3.2 初始化 RabbitMQ 并启动支付成功事件消费者（可选）
 	if rabbitCfg != nil && rabbitCfg.Host != "" {
@@ -194,7 +194,7 @@ func main() {
 				dispatchCtx, dispatchCancel := context.WithCancel(context.Background())
 				defer dispatchCancel()
 				go func() {
-					ticker := time.NewTicker(5 * time.Second) // 每5秒检查一次
+					ticker := time.NewTicker(100 * time.Second) // 每5秒检查一次
 					defer ticker.Stop()
 					for {
 						select {

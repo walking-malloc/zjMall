@@ -606,7 +606,8 @@ func (s *ProductService) BatchSetBrandCategories(ctx context.Context, req *produ
 // ============================================
 
 // convertProductToProto 将 model.Product 转换为 productv1.ProductInfo
-func convertProductToProto(product *model.Product) *productv1.ProductInfo {
+// minPrice: 商品最低SKU价格，列表展示用，>0 时填入 productInfo.Price
+func convertProductToProto(product *model.Product, minPrice float64) *productv1.ProductInfo {
 	var images []string
 	if product.Images != "" {
 		_ = json.Unmarshal([]byte(product.Images), &images)
@@ -631,6 +632,9 @@ func convertProductToProto(product *model.Product) *productv1.ProductInfo {
 	}
 	if product.OffShelfTime != nil {
 		productInfo.OffShelfTime = timestamppb.New(*product.OffShelfTime)
+	}
+	if minPrice > 0 {
+		productInfo.Price = minPrice
 	}
 
 	return productInfo
@@ -714,7 +718,7 @@ func (s *ProductService) GetProduct(ctx context.Context, req *productv1.GetProdu
 		}, nil
 	}
 
-	productInfo := convertProductToProto(product)
+	productInfo := convertProductToProto(product, 0)
 
 	// 关联查询 category 和 brand 信息
 	if product.CategoryID != "" {
@@ -944,9 +948,17 @@ func (s *ProductService) ListProducts(ctx context.Context, req *productv1.ListPr
 		}, nil
 	}
 
+	// 批量获取商品最低SKU价格
+	productIDs := make([]string, 0, len(result.Products))
+	for _, p := range result.Products {
+		productIDs = append(productIDs, p.ID)
+	}
+	priceMap, _ := s.skuRepo.GetMinPriceByProductIDs(ctx, productIDs)
+
 	productList := make([]*productv1.ProductInfo, 0, len(result.Products))
 	for _, product := range result.Products {
-		productList = append(productList, convertProductToProto(product))
+		minPrice := priceMap[product.ID]
+		productList = append(productList, convertProductToProto(product, minPrice))
 	}
 	return &productv1.ListProductsResponse{
 		Code:    0,
@@ -2316,7 +2328,13 @@ func (s *ProductService) SearchProducts(ctx context.Context, req *productv1.Sear
 		}, nil
 	}
 
-	// 转换结果
+	// 转换结果，批量获取最低价
+	productIDs := make([]string, 0, len(result.Products))
+	for _, p := range result.Products {
+		productIDs = append(productIDs, p.ID)
+	}
+	priceMap, _ := s.skuRepo.GetMinPriceByProductIDs(ctx, productIDs)
+
 	productList := make([]*productv1.ProductInfo, 0, len(result.Products))
 	for _, productIndex := range result.Products {
 		// 从 ES 索引中获取商品ID，然后从数据库查询完整信息
@@ -2328,7 +2346,8 @@ func (s *ProductService) SearchProducts(ctx context.Context, req *productv1.Sear
 		if product == nil {
 			continue
 		}
-		productList = append(productList, convertProductToProto(product))
+		minPrice := priceMap[product.ID]
+		productList = append(productList, convertProductToProto(product, minPrice))
 	}
 
 	return &productv1.SearchProductsResponse{

@@ -63,6 +63,7 @@ gen/
 # 配置文件（包含数据库密码、密钥等敏感信息）
 configs/config.local.yaml
 configs/*.local.yaml
+configs/config.yaml
 
 # 环境变量文件
 .env
@@ -157,3 +158,6 @@ $RECYCLE.BIN/
 *.pfx
 *.jks
 
+*.ps1
+*.swagger.json
+buf.gen.yaml

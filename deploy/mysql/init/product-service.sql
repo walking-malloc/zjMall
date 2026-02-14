@@ -120,8 +120,8 @@ CREATE TABLE IF NOT EXISTS products (
     -- 后台管理：按状态和时间排序
     INDEX idx_status_created (status, created_at),
     -- 全文搜索索引
-    FULLTEXT KEY ft_title (title, subtitle) COMMENT '全文索引，用于搜索'
-    UNIQUE KEY uk_category_brand_title_deleted (category_id, brand_id, title, deleted_at) COMMENT '唯一约束：同一类目+品牌+标题不能重复（考虑软删除）',
+    FULLTEXT KEY ft_title (title, subtitle) COMMENT '全文索引，用于搜索',
+    UNIQUE KEY uk_category_brand_title_deleted (category_id, brand_id, title, deleted_at) COMMENT '唯一约束：同一类目+品牌+标题不能重复（考虑软删除）'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品表（SPU）';
 
 -- ============================================

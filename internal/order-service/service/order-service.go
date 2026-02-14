@@ -37,7 +37,7 @@ const (
 	OrderStatusRefunded  = int8(orderv1.OrderStatus_ORDER_STATUS_REFUNDED)  // 已退款
 	OrderStatusClosed    = int8(orderv1.OrderStatus_ORDER_STATUS_CLOSED)    // 已关闭（超时自动）
 
-	OrderTokenCacheKeyPrefix      = "order:token"
+	OrderLockCacheKeyPrefix       = "order:lock"
 	OrderTokenCacheExpireSeconds  = 300
 	OrderIdempotentCacheKeyPrefix = "order:idempotent"
 )
@@ -92,11 +92,31 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 			Message: "Token不能为空",
 		}, nil
 	}
+	if ok, err := s.redisClient.Get(ctx, fmt.Sprintf("%s:%s:%s", OrderIdempotentCacheKeyPrefix, userID, req.Token)).Result(); err != nil || ok != "1" {
+		if ok == "processed" {
+			return &orderv1.CreateOrderResponse{
+				Code:    1,
+				Message: "订单已经创建，请勿重复创建",
+			}, nil
+		}
+		if err != nil {
+			return &orderv1.CreateOrderResponse{
+				Code:    1,
+				Message: "系统繁忙，请稍后重试",
+			}, nil
+		}
+		if errors.Is(err, redis.Nil) {
+			return &orderv1.CreateOrderResponse{
+				Code:    1,
+				Message: "Token已失效或已使用",
+			}, nil
+		}
+	}
 
 	//获取分布式锁
-	lockKey := fmt.Sprintf("%s:%s:%s", OrderIdempotentCacheKeyPrefix, userID, req.Token)
+	lockKey := fmt.Sprintf("%s:%s:%s", OrderLockCacheKeyPrefix, userID, req.Token)
 	lockService := lock.NewRedisLockService(s.redisClient)
-	lockAcquired, err := lockService.AcquireLock(ctx, lockKey, 10*time.Second)
+	lockAcquired, err := lockService.AcquireLock(ctx, lockKey, 30*time.Second)
 	if err != nil || !lockAcquired {
 		log.Printf("❌ [OrderService] CreateOrder: 获取分布式锁失败: %v", err)
 		return &orderv1.CreateOrderResponse{
@@ -127,14 +147,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 	}
 	// 生成订单号（依赖数据库唯一索引保证唯一性）
 	var orderNo string
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		orderNo = orderNoGenerator(model.OrderTypeNormal)
-		// 直接使用订单号，如果冲突会在创建订单时被数据库唯一索引捕获
-		if orderNo != "" {
-			break
-		}
-	}
+	orderNo = orderNoGenerator(model.OrderTypeNormal)
+	// 直接使用订单号，如果冲突会在创建订单时被数据库唯一索引捕获
+
 	if orderNo == "" {
 		return &orderv1.CreateOrderResponse{
 			Code:    1,
@@ -670,7 +685,7 @@ func (s *OrderService) GenerateOrderToken(ctx context.Context, req *orderv1.Gene
 	token := uuid.New().String()
 
 	// Token有效期5分钟（300秒）
-	cacheKey := fmt.Sprintf("%s:%s:%s", OrderTokenCacheKeyPrefix, userID, token)
+	cacheKey := fmt.Sprintf("%s:%s:%s", OrderIdempotentCacheKeyPrefix, userID, token)
 	set, err := s.redisClient.SetNX(ctx, cacheKey, "1", time.Duration(OrderTokenCacheExpireSeconds)*time.Second).Result()
 	if err != nil {
 		log.Printf("❌ [OrderService] GenerateOrderToken: 设置Token失败: %v", err)
@@ -771,14 +786,15 @@ func (s *OrderService) checkAndConsumeToken(ctx context.Context, userID, token s
 		return false, errors.New("参数错误")
 	}
 
-	tokenKey := fmt.Sprintf("%s:%s:%s", OrderTokenCacheKeyPrefix, userID, token)
+	tokenKey := fmt.Sprintf("%s:%s:%s", OrderIdempotentCacheKeyPrefix, userID, token)
 
 	// 使用Lua脚本保证原子性：检查并删除
 	luaScript := `
         local tokenKey = KEYS[1]
         local value = redis.call('GET', tokenKey)
         if value == '1' then
-            redis.call('DEL', tokenKey)
+            redis.call('SET', tokenKey, 'processed')
+			redis.call('EXPIRE', tokenKey, 300)
             return 1
         else
             return 0

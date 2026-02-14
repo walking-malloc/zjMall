@@ -1176,6 +1176,7 @@ message ProductInfo {
   // 关联信息（可选，根据查询参数决定是否返回）
   CategoryInfo category = 14;                    // 类目信息（可选）
   BrandInfo brand = 15;                          // 品牌信息（可选）
+  double price = 16;                             // 展示价格（SKU最低价，列表用）
 }
 
 // SKU信息
