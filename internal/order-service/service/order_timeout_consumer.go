@@ -45,21 +45,20 @@ func StartOrderTimeoutConsumer(ctx context.Context, orderService *OrderService, 
 				return
 			}
 
-			// 处理订单超时消息
-			if err := handleOrderTimeoutMessage(ctx, orderService, msg); err != nil {
+			// 处理订单超时消息（内部处理重试与放弃，始终 Ack 避免死循环）
+			if err := handleOrderTimeoutMessage(ctx, orderService, ch, queueName, msg); err != nil {
 				log.Printf("❌ [OrderTimeoutConsumer] 处理订单超时消息失败: %v", err)
-				// 消息处理失败，拒绝消息并重新入队（可以设置重试次数限制）
-				_ = msg.Nack(false, true)
-			} else {
-				// 处理成功，确认消息
-				_ = msg.Ack(false)
 			}
+			_ = msg.Ack(false)
 		}
 	}
 }
 
+const orderTimeoutConsumerMaxRetries = 3
+
 // handleOrderTimeoutMessage 处理订单超时消息
-func handleOrderTimeoutMessage(ctx context.Context, orderService *OrderService, msg amqp.Delivery) error {
+// 失败时：未达重试上限则 Republish 后返回；达到上限则记录日志后返回。调用方始终 Ack，避免无限重试。
+func handleOrderTimeoutMessage(ctx context.Context, orderService *OrderService, ch *amqp.Channel, queueName string, msg amqp.Delivery) error {
 	var payload map[string]interface{}
 	if err := json.Unmarshal(msg.Body, &payload); err != nil {
 		return fmt.Errorf("解析消息失败: %w", err)
@@ -70,11 +69,30 @@ func handleOrderTimeoutMessage(ctx context.Context, orderService *OrderService, 
 		return fmt.Errorf("消息中缺少 order_no 字段")
 	}
 
-	log.Printf("ℹ️ [OrderTimeoutConsumer] 收到订单超时消息: orderNo=%s", orderNo)
+	retryCount := 0
+	if v, ok := payload["retry_count"].(float64); ok {
+		retryCount = int(v)
+	}
+
+	log.Printf("ℹ️ [OrderTimeoutConsumer] 收到订单超时消息: orderNo=%s, retryCount=%d", orderNo, retryCount)
 
 	// 处理订单超时
 	if err := orderService.HandleOrderTimeout(ctx, orderNo); err != nil {
-		return fmt.Errorf("处理订单超时失败: %w", err)
+		if retryCount >= orderTimeoutConsumerMaxRetries {
+			return fmt.Errorf("处理订单超时失败，已达最大重试次数 %d，放弃: orderNo=%s: %w", orderTimeoutConsumerMaxRetries, orderNo, err)
+		}
+		// Republish 并递增 retry_count
+		payload["retry_count"] = retryCount + 1
+		body, _ := json.Marshal(payload)
+		if pubErr := ch.PublishWithContext(ctx, "", queueName, false, false, amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         body,
+		}); pubErr != nil {
+			return fmt.Errorf("Republish 失败: %w (原错误: %v)", pubErr, err)
+		}
+		log.Printf("⚠️ [OrderTimeoutConsumer] 处理失败，已 Republish 重试: orderNo=%s, retryCount=%d->%d, err=%v", orderNo, retryCount, retryCount+1, err)
+		return fmt.Errorf("处理失败已重试: %w", err)
 	}
 
 	return nil

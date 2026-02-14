@@ -57,6 +57,21 @@ func InitRabbitMQ(cfg *config.RabbitMQConfig) (*amqp.Channel, error) {
 	return ch, nil
 }
 
+// EnablePublisherConfirm 开启 Publisher Confirm 模式，返回确认通道
+// 调用者需在 Publish 后从返回的 channel 读取确认，确认顺序与发布顺序一致
+func EnablePublisherConfirm(ch *amqp.Channel) (<-chan amqp.Confirmation, error) {
+	if ch == nil {
+		return nil, fmt.Errorf("RabbitMQ Channel 不能为空")
+	}
+	if err := ch.Confirm(false); err != nil {
+		return nil, fmt.Errorf("开启 Publisher Confirm 失败: %w", err)
+	}
+	// 使用缓冲避免阻塞 amqp 库
+	confirms := ch.NotifyPublish(make(chan amqp.Confirmation, 100))
+	log.Println("✅ Publisher Confirm 已开启")
+	return confirms, nil
+}
+
 // CloseRabbitMQ 关闭 RabbitMQ 连接
 func CloseRabbitMQ() error {
 	if RabbitMQChannel != nil {

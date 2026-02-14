@@ -139,7 +139,14 @@ func main() {
 			if err := database.InitDelayedExchange(delayedCh, delayedExchange, delayedQueue); err != nil {
 				log.Printf("⚠️ order-service 延迟消息 Exchange 初始化失败: %v", err)
 			} else {
-				delayedProducer = mq.NewMessageProducer(delayedCh, delayedQueue)
+				// 开启 Publisher Confirm，确保延迟消息被 broker 正确接收
+				confirmCh, err := database.EnablePublisherConfirm(delayedCh)
+				if err != nil {
+					log.Printf("⚠️ order-service Publisher Confirm 开启失败: %v，将使用普通生产者", err)
+					delayedProducer = mq.NewMessageProducer(delayedCh, delayedQueue)
+				} else {
+					delayedProducer = mq.NewMessageProducerWithConfirm(delayedCh, delayedQueue, confirmCh)
+				}
 				log.Printf("✅ order-service 延迟消息 Exchange 初始化成功: Exchange=%s, Queue=%s", delayedExchange, delayedQueue)
 			}
 		}
@@ -162,7 +169,7 @@ func main() {
 	// 注意：无论延迟消息是否启动，补偿机制都应该运行，确保即使延迟消息失败也能处理超时订单
 	compensationCtx, compensationCancel := context.WithCancel(context.Background())
 	defer compensationCancel()
-	go service.StartOrderTimeoutCompensation(compensationCtx, orderService, 30*time.Minute) // 每5分钟扫描一次
+	go service.StartOrderTimeoutCompensation(compensationCtx, orderService, 30*time.Minute) // 每30分钟扫描一次
 	log.Println("✅ 订单超时补偿机制已启动（每30分钟扫描一次）")
 
 	// 3.2 初始化 RabbitMQ 并启动支付成功事件消费者（可选）
