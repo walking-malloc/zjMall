@@ -365,10 +365,11 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 	// 发送延迟消息，用于订单超时检查（使用 RabbitMQ 延迟消息插件）
 	if s.delayedProducer != nil {
 		timeoutPayload := map[string]interface{}{
-			"order_no":   orderNo,
-			"user_id":    userID,
-			"pay_amount": payAmount,
-			"created_at": time.Now().Format(time.RFC3339),
+			"order_no":    orderNo,
+			"user_id":     userID,
+			"pay_amount":  payAmount,
+			"created_at":  time.Now().Format(time.RFC3339),
+			"retry_count": 0, // 消费者重试时递增，达到上限后放弃
 		}
 		delayMs := int64(s.orderTimeoutDelay.Milliseconds())
 		if err := s.delayedProducer.SendDelayedMessage(ctx, "order.timeout.delayed", "order.timeout.queue", timeoutPayload, delayMs); err != nil {
