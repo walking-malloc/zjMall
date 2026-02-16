@@ -129,11 +129,15 @@ configs/config.yaml
 ```bash
 #生成proto代码
  .\scripts\generate-all.bat
+
 # 启动用户服务
 go run cmd/user-service/main.go
 
 # 启动商品服务
 go run cmd/product-service/main.go
+
+# 启动库存服务
+go run cmd/inventory-service/main.go
 
 # 启动购物车服务
 go run cmd/cart-service/main.go
@@ -144,8 +148,6 @@ go run cmd/order-service/main.go
 # 启动支付服务
 go run cmd/payment-service/main.go
 
-# 启动库存服务
-go run cmd/inventory-service/main.go
 ```
 
 ### 6. 启动前端
