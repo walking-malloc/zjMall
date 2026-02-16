@@ -9,6 +9,7 @@ import (
 	"time"
 	commonv1 "zjMall/gen/go/api/proto/common"
 	orderv1 "zjMall/gen/go/api/proto/order"
+	"zjMall/internal/common/authz"
 	"zjMall/internal/common/client"
 	"zjMall/internal/common/middleware"
 	"zjMall/internal/common/mq"
@@ -41,6 +42,11 @@ func main() {
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
+	}
+
+	// 加载完配置 cfg 之后：
+	if err := authz.InitCasbin(); err != nil {
+		log.Fatalf("❌ Casbin 初始化失败: %v", err)
 	}
 	//2.初始化Nacos
 	svcCfg, _ := cfg.GetServiceConfig(serviceName)
@@ -233,6 +239,7 @@ func main() {
 		middleware.Logging(),
 		middleware.TraceID(),
 		middleware.Auth(),
+		middleware.CasbinRBAC(),
 	)
 
 	// 10. 启动服务器

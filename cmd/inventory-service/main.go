@@ -7,6 +7,7 @@ import (
 
 	commonv1 "zjMall/gen/go/api/proto/common"
 	inventoryv1 "zjMall/gen/go/api/proto/inventory"
+	"zjMall/internal/common/authz"
 	"zjMall/internal/common/middleware"
 	registry "zjMall/internal/common/register"
 	"zjMall/internal/common/server"
@@ -35,6 +36,10 @@ func main() {
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
+	}
+	// 加载完配置 cfg 之后：
+	if err := authz.InitCasbin(); err != nil {
+		log.Fatalf("❌ Casbin 初始化失败: %v", err)
 	}
 	//2.初始化Nacos
 	svcCfg, _ := cfg.GetServiceConfig(serviceName)
@@ -118,6 +123,7 @@ func main() {
 		middleware.Logging(),                            // 3. 记录日志
 		middleware.TraceID(),                            // 4. 生成 TraceID
 		middleware.Auth(),                               // 5. 认证（购物车需要登录）
+		middleware.CasbinRBAC(),                         // 6. RBAC 权限控制
 	)
 
 	// 17. 启动服务器（阻塞）

@@ -154,12 +154,6 @@ service UserService {
     };
   }
 
-  // 查询用户权限列表
-  rpc GetUserPermissions(GetUserPermissionsRequest) returns (GetUserPermissionsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/permissions"
-    };
-  }
 
   // 查询所有角色列表
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
@@ -168,12 +162,6 @@ service UserService {
     };
   }
 
-  // 查询所有权限列表
-  rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/permissions"
-    };
-  }
 }
 
 // ========== 通用响应结构 ==========

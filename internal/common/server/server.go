@@ -179,8 +179,11 @@ func (s *Server) RegisterSwagger(docs ...SwaggerDoc) {
 // UseMiddleware 使用中间件
 func (s *Server) UseMiddleware(middlewares ...func(http.Handler) http.Handler) {
 	var handler http.Handler = s.httpMux
-	for _, mw := range middlewares {
-		handler = mw(handler)
+	// 按声明顺序依次执行中间件：
+	// UseMiddleware(A, B, C) => 实际执行顺序为 A -> B -> C -> handler
+	// 因为 http.Handler 是“外层包裹内层”，这里需要从后往前包裹。
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = middlewares[i](handler)
 	}
 	s.httpServer = &http.Server{
 		Addr:         s.config.HTTPAddr,

@@ -82,30 +82,6 @@ func (s *RBACService) GetUserRoles(ctx context.Context, userID string) ([]*userv
 	return result, nil
 }
 
-// GetUserPermissions 获取用户权限列表
-func (s *RBACService) GetUserPermissions(ctx context.Context, userID string) ([]*userv1.PermissionInfo, error) {
-	permissions, err := s.rbacRepo.GetUserPermissions(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("获取用户权限失败: %v", err)
-	}
-
-	result := make([]*userv1.PermissionInfo, 0, len(permissions))
-	for _, perm := range permissions {
-		result = append(result, &userv1.PermissionInfo{
-			Id:          perm.ID,
-			Code:        perm.Code,
-			Name:        perm.Name,
-			Resource:    perm.Resource,
-			Action:      perm.Action,
-			Description: perm.Description,
-			Status:      int32(perm.Status),
-			CreatedAt:   timestamppb.New(perm.CreatedAt),
-			UpdatedAt:   timestamppb.New(perm.UpdatedAt),
-		})
-	}
-	return result, nil
-}
-
 // ListRoles 查询所有角色列表
 func (s *RBACService) ListRoles(ctx context.Context, status *int32) ([]*userv1.RoleInfo, error) {
 	var statusPtr *int8
@@ -134,42 +110,10 @@ func (s *RBACService) ListRoles(ctx context.Context, status *int32) ([]*userv1.R
 	return result, nil
 }
 
-// ListPermissions 查询所有权限列表
-func (s *RBACService) ListPermissions(ctx context.Context, resource *string, status *int32) ([]*userv1.PermissionInfo, error) {
-	var statusPtr *int8
-	if status != nil {
-		s := int8(*status)
-		statusPtr = &s
-	}
-
-	permissions, err := s.rbacRepo.ListPermissions(ctx, resource, statusPtr)
-	if err != nil {
-		return nil, fmt.Errorf("查询权限列表失败: %v", err)
-	}
-
-	result := make([]*userv1.PermissionInfo, 0, len(permissions))
-	for _, perm := range permissions {
-		result = append(result, &userv1.PermissionInfo{
-			Id:          perm.ID,
-			Code:        perm.Code,
-			Name:        perm.Name,
-			Resource:    perm.Resource,
-			Action:      perm.Action,
-			Description: perm.Description,
-			Status:      int32(perm.Status),
-			CreatedAt:   timestamppb.New(perm.CreatedAt),
-			UpdatedAt:   timestamppb.New(perm.UpdatedAt),
-		})
-	}
-	return result, nil
-}
-
 // GetUserRoleCodes 获取用户角色代码列表（用于JWT）
 func (s *RBACService) GetUserRoleCodes(ctx context.Context, userID string) ([]string, error) {
 	return s.rbacRepo.GetUserRoleCodes(ctx, userID)
 }
 
-// GetUserPermissionCodes 获取用户权限代码列表（用于权限检查）
-func (s *RBACService) GetUserPermissionCodes(ctx context.Context, userID string) ([]string, error) {
-	return s.rbacRepo.GetUserPermissionCodes(ctx, userID)
-}
+// 之前这里有基于数据库的权限查询逻辑（Permission、RolePermission），
+// 现在改用 Casbin 配置文件做权限控制，这些方法已不再需要。

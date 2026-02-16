@@ -1,0 +1,30 @@
+p, admin, /api/v1/orders, GET
+p, admin, /api/v1/orders/:order_no, GET
+p, admin, /api/v1/stocks, GET
+p, admin, /api/v1/stocks, POST
+p, admin, /api/v1/product/*, POST
+p, admin, /api/v1/product/*, GET
+p, admin, /api/v1/product/*, PUT
+p, admin, /api/v1/product/*, DELETE
+
+
+
+p, user, /api/v1/orders, POST
+p, user, /api/v1/orders, GET
+p, user, /api/v1/orders/:order_no, GET
+p, user, /api/v1/orders/token, GET
+p, user, /api/v1/orders/:order_no/cancel, POST
+p, user, /api/v1/cart/*, GET
+p, user, /api/v1/cart/*, POST
+p, user, /api/v1/cart/*, PUT
+p, user, /api/v1/cart/*, DELETE
+p, user, /api/v1/cart, GET
+p, user, /api/v1/cart, POST
+p, user, /api/v1/payments, POST
+p, user, /api/v1/payments/token, GET
+p, user, /api/v1/payments/:payment_no, GET
+p, user, /api/v1/payments/:payment_no/status, GET
+p, user, /api/v1/product/*, GET
+
+g, alice, admin
+g, bob, user

@@ -342,30 +342,6 @@ func (h *UserServiceHandler) GetUserRoles(ctx context.Context, req *userv1.GetUs
 	}, nil
 }
 
-// GetUserPermissions 查询用户权限列表
-func (h *UserServiceHandler) GetUserPermissions(ctx context.Context, req *userv1.GetUserPermissionsRequest) (*userv1.GetUserPermissionsResponse, error) {
-	if req.UserId == "" {
-		return &userv1.GetUserPermissionsResponse{
-			Code:    1,
-			Message: "用户ID不能为空",
-		}, nil
-	}
-
-	permissions, err := h.rbacService.GetUserPermissions(ctx, req.UserId)
-	if err != nil {
-		return &userv1.GetUserPermissionsResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
-
-	return &userv1.GetUserPermissionsResponse{
-		Code:    0,
-		Message: "查询成功",
-		Data:    permissions,
-	}, nil
-}
-
 // ListRoles 查询所有角色列表
 func (h *UserServiceHandler) ListRoles(ctx context.Context, req *userv1.ListRolesRequest) (*userv1.ListRolesResponse, error) {
 	var status *int32
@@ -385,31 +361,5 @@ func (h *UserServiceHandler) ListRoles(ctx context.Context, req *userv1.ListRole
 		Code:    0,
 		Message: "查询成功",
 		Data:    roles,
-	}, nil
-}
-
-// ListPermissions 查询所有权限列表
-func (h *UserServiceHandler) ListPermissions(ctx context.Context, req *userv1.ListPermissionsRequest) (*userv1.ListPermissionsResponse, error) {
-	var resource *string
-	if req.Resource != "" {
-		resource = &req.Resource
-	}
-	var status *int32
-	if req.Status > 0 {
-		status = &req.Status
-	}
-
-	permissions, err := h.rbacService.ListPermissions(ctx, resource, status)
-	if err != nil {
-		return &userv1.ListPermissionsResponse{
-			Code:    1,
-			Message: err.Error(),
-		}, nil
-	}
-
-	return &userv1.ListPermissionsResponse{
-		Code:    0,
-		Message: "查询成功",
-		Data:    permissions,
 	}, nil
 }

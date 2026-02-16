@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"zjMall/internal/common/authz"
 	"zjMall/pkg"
 
 	"google.golang.org/grpc/metadata"
@@ -176,4 +177,46 @@ func CheckPermission(ctx context.Context, permissionChecker func(userID string) 
 		}
 	}
 	return false, nil
+}
+
+// CasbinRBAC 使用 Casbin 做基于角色的接口权限控制
+// sub = role, obj = URL Path, act = HTTP Method
+func CasbinRBAC() Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// 公共路径直接放行（和 Auth 中间件保持一致）
+			if isPublicPath(r.URL.Path) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// 获取用户角色（由 Auth 中间件从 JWT 中注入）
+			roles := GetRolesFromContext(r.Context())
+			log.Printf("[CasbinRBAC] r.Context(): %v", r.Context())
+			log.Printf("[CasbinRBAC] roles: %v", roles)
+			if len(roles) == 0 {
+				http.Error(w, `{"code": 403, "message": "无访问权限：未绑定角色"}`, http.StatusForbidden)
+				return
+			}
+
+			obj := r.URL.Path
+			act := r.Method
+			log.Printf("obj:%v act:%v", obj, act)
+			// 只要有一个角色通过，就允许访问
+			for _, role := range roles {
+				ok, err := authz.Enforcer.Enforce(role, obj, act)
+				if err != nil {
+					log.Printf("Casbin 鉴权失败: role=%s, obj=%s, act=%s, err=%v", role, obj, act, err)
+					http.Error(w, `{"code": 500, "message": "权限校验失败"}`, http.StatusInternalServerError)
+					return
+				}
+				if ok {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			http.Error(w, `{"code": 403, "message": "无访问权限"}`, http.StatusForbidden)
+		})
+	}
 }

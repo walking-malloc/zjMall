@@ -101,7 +101,7 @@ func Auth() Middleware {
 				http.Error(w, `{"code": 401, "message": "Token 无效或已过期"}`, http.StatusUnauthorized)
 				return
 			}
-
+			log.Printf("[Auth] claims.Roles: %v", claims.Roles)
 			// 将用户ID和角色放入 Context，后续 handler 可以从 context 中获取
 			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 			if len(claims.Roles) > 0 {

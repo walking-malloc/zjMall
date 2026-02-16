@@ -22,7 +22,7 @@ import (
 // UserService 用户服务（业务逻辑层）
 type UserService struct {
 	userRepo  repository.UserRepository // 数据访问（内部封装查询缓存）
-	rbacRepo  repository.RBACRepository // RBAC数据访问
+	rbacRepo  repository.RBACRepository // RBAC数据访问（仅用于用户-角色）
 	smsClient sms.SMSClient
 	smsConfig config.SMSConfig
 	ossClient upload.UploadClient // OSS上传客户端
@@ -157,7 +157,7 @@ func (s *UserService) Login(ctx context.Context, req *userv1.LoginRequest) (*use
 
 	// 获取用户角色
 	roles, _ := s.rbacRepo.GetUserRoleCodes(ctx, userAuthInfo.ID)
-
+	log.Printf("用户角色: %v", roles)
 	// 根据 RememberMe 生成 Token（包含角色信息）
 	var token string
 	var expiresAt int64

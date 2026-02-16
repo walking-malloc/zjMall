@@ -17,21 +17,6 @@ func (Role) TableName() string {
 	return "roles"
 }
 
-// Permission 权限模型
-type Permission struct {
-	pkg.BaseModel
-	Code        string `gorm:"type:varchar(100);uniqueIndex;not null;comment:权限代码" json:"code"`
-	Name        string `gorm:"type:varchar(100);not null;comment:权限名称" json:"name"`
-	Resource    string `gorm:"type:varchar(50);not null;comment:资源类型" json:"resource"`
-	Action      string `gorm:"type:varchar(50);not null;comment:操作类型" json:"action"`
-	Description string `gorm:"type:varchar(255);comment:权限描述" json:"description"`
-	Status      int8   `gorm:"type:tinyint(1);default:1;comment:状态：1-启用，2-停用" json:"status"`
-}
-
-func (Permission) TableName() string {
-	return "permissions"
-}
-
 // UserRole 用户角色关联模型
 type UserRole struct {
 	pkg.BaseModel
@@ -43,13 +28,4 @@ func (UserRole) TableName() string {
 	return "user_roles"
 }
 
-// RolePermission 角色权限关联模型
-type RolePermission struct {
-	pkg.BaseModel
-	RoleID       string `gorm:"type:varchar(26);not null;index;comment:角色ID" json:"role_id"`
-	PermissionID string `gorm:"type:varchar(26);not null;index;comment:权限ID" json:"permission_id"`
-}
-
-func (RolePermission) TableName() string {
-	return "role_permissions"
-}
+// 之前这里有 Permission / RolePermission 结构体，目前已改用 Casbin 配置做权限控制，因此删除

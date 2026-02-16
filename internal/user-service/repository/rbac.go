@@ -13,20 +13,11 @@ type RBACRepository interface {
 	GetRoleByID(ctx context.Context, id string) (*model.Role, error)
 	ListRoles(ctx context.Context, status *int8) ([]*model.Role, error)
 
-	// 权限相关
-	GetPermissionByCode(ctx context.Context, code string) (*model.Permission, error)
-	ListPermissions(ctx context.Context, resource *string, status *int8) ([]*model.Permission, error)
-
 	// 用户角色相关
 	AssignRoleToUser(ctx context.Context, userID string, roleID string) error
 	RemoveRoleFromUser(ctx context.Context, userID string, roleID string) error
 	GetUserRoles(ctx context.Context, userID string) ([]*model.Role, error)
 	GetUserRoleCodes(ctx context.Context, userID string) ([]string, error)
-
-	// 角色权限相关
-	GetRolePermissions(ctx context.Context, roleID string) ([]*model.Permission, error)
-	GetUserPermissions(ctx context.Context, userID string) ([]*model.Permission, error)
-	GetUserPermissionCodes(ctx context.Context, userID string) ([]string, error)
 }
 
 type rbacRepository struct {
@@ -79,36 +70,6 @@ func (r *rbacRepository) ListRoles(ctx context.Context, status *int8) ([]*model.
 	return roles, nil
 }
 
-// GetPermissionByCode 根据权限代码获取权限
-func (r *rbacRepository) GetPermissionByCode(ctx context.Context, code string) (*model.Permission, error) {
-	var permission model.Permission
-	err := r.db.WithContext(ctx).Where("code = ?", code).First(&permission).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &permission, nil
-}
-
-// ListPermissions 查询权限列表
-func (r *rbacRepository) ListPermissions(ctx context.Context, resource *string, status *int8) ([]*model.Permission, error) {
-	var permissions []*model.Permission
-	query := r.db.WithContext(ctx)
-	if resource != nil {
-		query = query.Where("resource = ?", *resource)
-	}
-	if status != nil {
-		query = query.Where("status = ?", *status)
-	}
-	err := query.Find(&permissions).Error
-	if err != nil {
-		return nil, err
-	}
-	return permissions, nil
-}
-
 // AssignRoleToUser 为用户分配角色
 func (r *rbacRepository) AssignRoleToUser(ctx context.Context, userID string, roleID string) error {
 	userRole := &model.UserRole{
@@ -153,50 +114,3 @@ func (r *rbacRepository) GetUserRoleCodes(ctx context.Context, userID string) ([
 	return codes, nil
 }
 
-// GetRolePermissions 获取角色的所有权限
-func (r *rbacRepository) GetRolePermissions(ctx context.Context, roleID string) ([]*model.Permission, error) {
-	var permissions []*model.Permission
-	err := r.db.WithContext(ctx).
-		Model(&model.Permission{}).
-		Joins("JOIN role_permissions ON role_permissions.permission_id = permissions.id").
-		Where("role_permissions.role_id = ? AND permissions.status = ?", roleID, 1).
-		Find(&permissions).Error
-	if err != nil {
-		return nil, err
-	}
-	return permissions, nil
-}
-
-// GetUserPermissions 获取用户的所有权限（通过角色）
-func (r *rbacRepository) GetUserPermissions(ctx context.Context, userID string) ([]*model.Permission, error) {
-	var permissions []*model.Permission
-	err := r.db.WithContext(ctx).
-		Table("user_roles").
-		Select("DISTINCT permissions.*").
-		Joins("JOIN roles ON user_roles.role_id = roles.id").
-		Joins("JOIN role_permissions ON roles.id = role_permissions.role_id").
-		Joins("JOIN permissions ON role_permissions.permission_id = permissions.id").
-		Where("user_roles.user_id = ? AND roles.status = ? AND permissions.status = ?", userID, 1, 1).
-		Find(&permissions).Error
-	if err != nil {
-		return nil, err
-	}
-	return permissions, nil
-}
-
-// GetUserPermissionCodes 获取用户的所有权限代码
-func (r *rbacRepository) GetUserPermissionCodes(ctx context.Context, userID string) ([]string, error) {
-	var codes []string
-	err := r.db.WithContext(ctx).
-		Table("user_roles").
-		Select("DISTINCT permissions.code").
-		Joins("JOIN roles ON user_roles.role_id = roles.id").
-		Joins("JOIN role_permissions ON roles.id = role_permissions.role_id").
-		Joins("JOIN permissions ON role_permissions.permission_id = permissions.id").
-		Where("user_roles.user_id = ? AND roles.status = ? AND permissions.status = ?", userID, 1, 1).
-		Pluck("permissions.code", &codes).Error
-	if err != nil {
-		return nil, err
-	}
-	return codes, nil
-}

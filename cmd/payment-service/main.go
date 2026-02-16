@@ -9,6 +9,7 @@ import (
 
 	commonv1 "zjMall/gen/go/api/proto/common"
 	paymentv1 "zjMall/gen/go/api/proto/payment"
+	"zjMall/internal/common/authz"
 	"zjMall/internal/common/cache"
 	"zjMall/internal/common/client"
 	"zjMall/internal/common/lock"
@@ -43,7 +44,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
-
+	// 加载完配置 cfg 之后：
+	if err := authz.InitCasbin(); err != nil {
+		log.Fatalf("❌ Casbin 初始化失败: %v", err)
+	}
 	// 初始化 JWT（与用户服务、网关保持同一套 secret）
 	jwtCfg := cfg.GetJWTConfig()
 	pkg.InitJWT(jwtCfg)
@@ -210,6 +214,7 @@ func main() {
 		middleware.Logging(),
 		middleware.TraceID(),
 		middleware.Auth(),
+		middleware.CasbinRBAC(),
 	)
 
 	// 17. 启动服务器
