@@ -127,6 +127,8 @@ configs/config.yaml
 ### 5. 启动后端服务
 
 ```bash
+#生成proto代码
+ .\scripts\generate-all.bat
 # 启动用户服务
 go run cmd/user-service/main.go
 
