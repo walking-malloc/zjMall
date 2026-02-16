@@ -245,22 +245,10 @@ zjMall/
 
 ## 🔧 开发指南
 
-### 代码生成
-
-使用 Buf 生成 gRPC 代码：
-
-```bash
-# 安装 buf
-go install github.com/bufbuild/buf/cmd/buf@latest
-
-# 生成代码
-buf generate
-```
-
 ### 添加新服务
 
 1. 在 `api/proto/` 下定义 `.proto` 文件
-2. 运行 `buf generate` 生成代码
+2. 运行 `.\scripts\generate-all.bat` 生成代码
 3. 在 `cmd/` 下创建服务入口
 4. 在 `internal/` 下实现服务逻辑
 5. 更新 `docker-compose.yml` 和配置文件
