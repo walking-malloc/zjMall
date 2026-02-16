@@ -23,8 +23,6 @@ import (
 )
 
 const (
-	PaymentTokenCacheKeyPrefix       = "payment:token"
-	PaymentTokenCacheExpireSeconds   = 300                  // Token有效期5分钟
 	PaymentIdempotencyKeyPrefix      = "payment:idempotent" // 幂等性key前缀
 	PaymentIdempotencyExpireSeconds  = 300                  // 幂等性key有效期5分钟
 	PaymentLockKeyPrefix             = "payment:lock"
@@ -113,11 +111,7 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentv1.Creat
 	// 获取分布式锁（基于订单号，防止同一订单并发创建）
 	lockKey := fmt.Sprintf("%s:%s", PaymentLockKeyPrefix, req.OrderNo)
 	acquired, err := s.lockService.AcquireLock(ctx, lockKey, time.Duration(PaymentLockExpireSeconds)*time.Second)
-	if err != nil {
-		log.Printf("⚠️ 获取分布式锁失败: %v\n", err)
-		return nil, fmt.Errorf("获取分布式锁失败: %w", err)
-	}
-	if !acquired {
+	if err != nil || !acquired {
 		log.Printf("⚠️ 获取分布式锁失败: %v\n", err)
 		return nil, fmt.Errorf("系统繁忙，请稍后重试")
 	}
@@ -334,23 +328,20 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 			return fmt.Errorf("上次处理失败: %s", result)
 		}
 	}
-	if ok, err := s.cacheRepo.SetNX(ctx, idempotencyKey, "PROCESSING", time.Duration(CallBackIdempotencyExpireSeconds)*time.Second); err != nil || !ok {
-		log.Printf("⚠️ 设置幂等性key失败: %v\n", err)
-		return fmt.Errorf("系统繁忙，请稍后重试")
-	}
+
 	//获取分布式锁，避免重复回调
 	lockKey := fmt.Sprintf("%s:%s", PaymentLockKeyPrefix, req.PaymentNo)
 	acquired, err := s.lockService.AcquireLock(ctx, lockKey, time.Duration(PaymentLockExpireSeconds)*time.Second)
-	if err != nil {
-		log.Printf("⚠️ 获取分布式锁失败: %v\n", err)
-		return fmt.Errorf("获取分布式锁失败: %w", err)
-	}
-	if !acquired {
+	if err != nil || !acquired {
 		log.Printf("⚠️ 获取分布式锁失败: %v\n", err)
 		return fmt.Errorf("系统繁忙，请稍后重试")
 	}
 	defer s.lockService.ReleaseLock(ctx, lockKey)
 
+	if ok, err := s.cacheRepo.SetNX(ctx, idempotencyKey, "PROCESSING", time.Duration(CallBackIdempotencyExpireSeconds)*time.Second); err != nil || !ok {
+		log.Printf("⚠️ 设置幂等性key失败: %v\n", err)
+		return fmt.Errorf("系统繁忙，请稍后重试")
+	}
 	// 2. 查询支付单
 	payment, err := s.paymentRepo.GetPaymentByPaymentNo(ctx, req.PaymentNo)
 	if err != nil {
@@ -414,7 +405,7 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, req *Payment
 
 	// 使用 Outbox 模式：在一个本地事务中更新支付单、记录日志、写入 Outbox 事件
 	if err := s.paymentRepo.WithTransaction(ctx, func(txCtx context.Context, txRepo repository.PaymentRepository) error {
-		// 7.1 更新支付单状态
+		// 7.1 更新支付单状态，使用乐观锁
 		if err := txRepo.UpdatePayment(txCtx, payment); err != nil {
 			log.Printf("⚠️ 更新支付单状态失败: %v\n", err)
 			return fmt.Errorf("更新支付单状态失败: %w", err)
@@ -572,8 +563,8 @@ func (s *PaymentService) GeneratePaymentToken(ctx context.Context, req *paymentv
 	token := fmt.Sprintf("%s%s%s", userID, req.OrderNo, time.Now().Format("20060102150405"))
 
 	// Token有效期5分钟（300秒）
-	cacheKey := fmt.Sprintf("%s:%s:%s", PaymentTokenCacheKeyPrefix, userID, token)
-	set, err := s.cacheRepo.SetNX(ctx, cacheKey, "1", time.Duration(PaymentTokenCacheExpireSeconds)*time.Second)
+	cacheKey := fmt.Sprintf("%s:%s:%s", PaymentIdempotencyKeyPrefix, userID, token)
+	set, err := s.cacheRepo.SetNX(ctx, cacheKey, "1", time.Duration(PaymentIdempotencyExpireSeconds)*time.Second)
 	if err != nil {
 		fmt.Printf("❌ [PaymentService] GeneratePaymentToken: 设置Token失败: %v\n", err)
 		return &paymentv1.GeneratePaymentTokenResponse{
@@ -592,7 +583,7 @@ func (s *PaymentService) GeneratePaymentToken(ctx context.Context, req *paymentv
 		Code:          0,
 		Message:       "success",
 		Token:         token,
-		ExpireSeconds: PaymentTokenCacheExpireSeconds,
+		ExpireSeconds: PaymentIdempotencyExpireSeconds,
 	}, nil
 }
 

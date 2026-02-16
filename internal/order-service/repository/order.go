@@ -10,7 +10,7 @@ import (
 
 // OrderRepository 订单仓储接口
 type OrderRepository interface {
-	CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem, outboxEvent *model.OrderOutbox) error
+	CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem) error
 	GetOrderByNo(ctx context.Context, userID, orderNo string) (*model.Order, []*model.OrderItem, error)
 	GetOrderByNoNoUser(ctx context.Context, orderNo string) (*model.Order, []*model.OrderItem, error) // 不校验用户ID，用于支付回调等场景
 	ListUserOrders(ctx context.Context, userID string, status int8, offset, limit int) ([]*model.Order, int64, error)
@@ -28,20 +28,14 @@ func NewOrderRepository(db *gorm.DB) OrderRepository {
 	return &orderRepository{db: db}
 }
 
-// CreateOrder 在事务中创建订单主表和明细，同时写入outbox事件（采用outbox模式）
-func (r *orderRepository) CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem, outboxEvent *model.OrderOutbox) error {
+// CreateOrder 在事务中创建订单主表和明细
+func (r *orderRepository) CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(order).Error; err != nil {
 			return err
 		}
 		if len(items) > 0 {
 			if err := tx.Create(&items).Error; err != nil {
-				return err
-			}
-		}
-		// 在同一个事务中写入outbox事件（如果提供了outbox事件）
-		if outboxEvent != nil {
-			if err := tx.Create(outboxEvent).Error; err != nil {
 				return err
 			}
 		}

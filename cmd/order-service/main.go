@@ -120,7 +120,6 @@ func main() {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 	// 3. 创建仓储与服务
 	orderRepo := repository.NewOrderRepository(db)
-	outboxRepo := repository.NewOrderOutboxRepository(db)
 
 	// 3.1 初始化 RabbitMQ 延迟消息（用于订单超时）
 	var delayedProducer mq.MessageProducer
@@ -152,7 +151,7 @@ func main() {
 		}
 	}
 
-	orderService := service.NewOrderService(orderRepo, outboxRepo, productClient, inventoryClient, userClient, cartClient, redisClient, delayedProducer)
+	orderService := service.NewOrderService(orderRepo, productClient, inventoryClient, userClient, cartClient, redisClient, delayedProducer)
 	orderHandler := handler.NewOrderServiceHandler(orderService)
 
 	// 启动订单超时消息消费者（在 orderService 创建之后）
@@ -187,35 +186,7 @@ func main() {
 			defer cancel()
 			go service.StartPaymentEventConsumer(consumerCtx, orderService, ch, localCfg.Queue)
 
-			// 初始化outbox消息生产者（用于发送outbox事件）
-			outboxCfg := *rabbitCfg
-			outboxCfg.Queue = "order.outbox" // outbox事件队列
-			outboxCh, err := database.InitRabbitMQ(&outboxCfg)
-			if err != nil {
-				log.Printf("⚠️ order-service RabbitMQ Outbox 初始化失败: %v", err)
-			} else {
-				outboxProducer := mq.NewMessageProducer(outboxCh, outboxCfg.Queue)
-				log.Printf("✅ order-service RabbitMQ Outbox 初始化成功，队列=%s", outboxCfg.Queue)
-
-				// 启动outbox dispatcher（定期发送outbox事件）
-				dispatchCtx, dispatchCancel := context.WithCancel(context.Background())
-				defer dispatchCancel()
-				go func() {
-					ticker := time.NewTicker(100 * time.Second) // 每5秒检查一次
-					defer ticker.Stop()
-					for {
-						select {
-						case <-dispatchCtx.Done():
-							log.Println("ℹ️ Outbox 派发协程退出")
-							return
-						case <-ticker.C:
-							if err := orderService.DispatchOutboxEvents(dispatchCtx, outboxProducer, 100); err != nil {
-								log.Printf("⚠️ Outbox 派发失败: %v", err)
-							}
-						}
-					}
-				}()
-			}
+			// 这里原本初始化 Outbox 生产者并启动 Outbox 派发协程，现已移除
 		}
 	} else {
 		log.Println("ℹ️ RabbitMQ 未配置或主机为空，订单服务将不消费支付成功事件")

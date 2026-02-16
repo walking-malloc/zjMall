@@ -45,7 +45,6 @@ const (
 // OrderService 订单服务（业务逻辑层）
 type OrderService struct {
 	orderRepo         repository.OrderRepository
-	outboxRepo        repository.OrderOutboxRepository
 	productClient     client.ProductClient
 	inventoryClient   client.InventoryClient
 	userClient        client.UserClient
@@ -55,10 +54,9 @@ type OrderService struct {
 	orderTimeoutDelay time.Duration      // 订单超时时间
 }
 
-func NewOrderService(orderRepo repository.OrderRepository, outboxRepo repository.OrderOutboxRepository, productClient client.ProductClient, inventoryClient client.InventoryClient, userClient client.UserClient, cartClient client.CartClient, redisClient *redis.Client, delayedProducer mq.MessageProducer) *OrderService {
+func NewOrderService(orderRepo repository.OrderRepository, productClient client.ProductClient, inventoryClient client.InventoryClient, userClient client.UserClient, cartClient client.CartClient, redisClient *redis.Client, delayedProducer mq.MessageProducer) *OrderService {
 	return &OrderService{
 		orderRepo:         orderRepo,
-		outboxRepo:        outboxRepo,
 		productClient:     productClient,
 		inventoryClient:   inventoryClient,
 		userClient:        userClient,
@@ -316,7 +314,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 	}
 
 	// 创建订单
-	if err := s.orderRepo.CreateOrder(ctx, order, items, nil); err != nil {
+	if err := s.orderRepo.CreateOrder(ctx, order, items); err != nil {
 		log.Printf("❌ [OrderService] CreateOrder: 创建订单失败，回滚库存: %v", err)
 
 		// 检查是否是订单号冲突错误（唯一索引冲突）
