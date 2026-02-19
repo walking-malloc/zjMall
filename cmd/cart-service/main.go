@@ -37,9 +37,9 @@ func main() {
 
 	// 1. 加载配置
 	configPath := filepath.Join("./configs", "config.yaml")
-	cfg, err := config.LoadConfig(configPath)
+	cfg, err := config.LoadConfigFromNacos(configPath, "zjmall-dev.yaml", "DEFAULT_GROUP")
 	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+		log.Fatalf("❌ 从 Nacos 加载配置失败: %v", err)
 	}
 
 	// 加载完配置 cfg 之后：

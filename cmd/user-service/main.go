@@ -35,9 +35,9 @@ func main() {
 	log.Printf("==== %s starting ====", serviceName)
 	//1.加载配置
 	configPath := filepath.Join("./configs", "config.yaml")
-	config, err := config.LoadConfig(configPath)
+	config, err := config.LoadConfigFromNacos(configPath, "zjmall-dev.yaml", "DEFAULT_GROUP")
 	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+		log.Fatalf("❌ 从 Nacos 加载配置失败: %v", err)
 	}
 	//2.初始化Nacos
 	svcCfg, _ := config.GetServiceConfig(serviceName)
@@ -88,14 +88,14 @@ func main() {
 	log.Println("✅ 使用 Mock 短信服务（学习模式）")
 
 	// 10. 创建OSS客户端
-	ossConfig := config.GetOSSConfig()
-	ossClient, err := upload.NewOSSClient(ossConfig)
-	if err != nil {
-		log.Fatalf("Error initializing OSS: %v", err)
-	}
+	// ossConfig := config.GetOSSConfig()
+	// ossClient, err := upload.NewOSSClient(ossConfig)
+	// if err != nil {
+	// 	log.Fatalf("Error initializing OSS: %v", err)
+	// }
 
 	// 11. 创建Service
-	userService := service.NewUserService(userRepo, rbacRepo, smsClient, *smsConfig, ossClient)
+	userService := service.NewUserService(userRepo, rbacRepo, smsClient, *smsConfig, &upload.OSSClient{})
 
 	// 12. 创建RBAC Service
 	rbacService := service.NewRBACService(rbacRepo)

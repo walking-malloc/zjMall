@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync/atomic"
 	"time"
 
+	"github.com/nacos-group/nacos-sdk-go/v2/clients"
+	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
+	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -108,6 +112,9 @@ type Config struct {
 	RabbitMQ         RabbitMQConfig           `yaml:"rabbitmq"`
 }
 
+// globalConfig 持有当前生效的配置，用于 ListenConfig 动态更新。
+var globalConfig atomic.Value
+
 func LoadConfig(configPath string) (*Config, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -121,6 +128,99 @@ func LoadConfig(configPath string) (*Config, error) {
 		return nil, err
 	}
 	return &config, nil
+}
+
+// LoadConfigFromNacos 先使用本地 configPath 里的 nacos 段获取 Nacos 连接信息，
+// 然后从 Nacos 配置中心拉取完整业务配置。
+// dataID / group 需要与你在 Nacos 控制台中创建的配置保持一致。
+func LoadConfigFromNacos(configPath, dataID, group string) (*Config, error) {
+	// 1. 先读本地配置文件，只为拿到 Nacos 连接信息
+	localCfg, err := LoadConfig(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("load local config for nacos failed: %w", err)
+	}
+
+	nacosCfg := localCfg.GetNacosConfig()
+
+	// 2. 构造 Nacos ConfigClient
+	sc := []constant.ServerConfig{
+		*constant.NewServerConfig(nacosCfg.Host, nacosCfg.Port),
+	}
+	cc := *constant.NewClientConfig(
+		constant.WithNamespaceId(nacosCfg.Namespace),
+		constant.WithUsername(nacosCfg.Username),
+		constant.WithPassword(nacosCfg.Password),
+		constant.WithTimeoutMs(5000),
+		constant.WithNotLoadCacheAtStart(true),
+	)
+
+	configClient, err := clients.NewConfigClient(vo.NacosClientParam{
+		ClientConfig:  &cc,
+		ServerConfigs: sc,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create nacos config client failed: %w", err)
+	}
+
+	if group == "" {
+		group = "DEFAULT_GROUP"
+	}
+
+	// 3. 从 Nacos 拉取远程配置内容
+	content, err := configClient.GetConfig(vo.ConfigParam{
+		DataId: dataID,
+		Group:  group,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get config from nacos failed: %w", err)
+	}
+	if content == "" {
+		return nil, fmt.Errorf("empty config content from nacos, dataID=%s, group=%s", dataID, group)
+	}
+
+	// 4. 解析为 Config 结构体
+	var remoteCfg Config
+	if err := yaml.Unmarshal([]byte(content), &remoteCfg); err != nil {
+		return nil, fmt.Errorf("unmarshal nacos config failed: %w", err)
+	}
+
+	// 补回本地的 Nacos 段，方便后续代码继续使用 GetNacosConfig()
+	remoteCfg.Nacos = *nacosCfg
+
+	// 设置全局配置（供后续动态获取）
+	globalConfig.Store(&remoteCfg)
+
+	// 5. 启动 ListenConfig，监听配置变更并实时更新 globalConfig
+	err = configClient.ListenConfig(vo.ConfigParam{
+		DataId: dataID,
+		Group:  group,
+		OnChange: func(namespace, group, dataId, data string) {
+			log.Printf("[Nacos] config changed, dataId=%s, group=%s", dataId, group)
+			var updatedCfg Config
+			if err := yaml.Unmarshal([]byte(data), &updatedCfg); err != nil {
+				log.Printf("[Nacos] unmarshal updated config failed: %v", err)
+				return
+			}
+			updatedCfg.Nacos = *nacosCfg
+			globalConfig.Store(&updatedCfg)
+		},
+	})
+	if err != nil {
+		log.Printf("[Nacos] ListenConfig failed (will still use current config): %v", err)
+	}
+
+	return &remoteCfg, nil
+}
+
+// GetDynamicConfig 返回最近一次从 Nacos 拉取/监听到的配置。
+// 对于需要“实时”读取配置的业务逻辑，可以优先使用该方法。
+func GetDynamicConfig() *Config {
+	if v := globalConfig.Load(); v != nil {
+		if cfg, ok := v.(*Config); ok {
+			return cfg
+		}
+	}
+	return nil
 }
 
 func (c *Config) GetServiceConfig(serviceName string) (*ServiceConfig, error) {

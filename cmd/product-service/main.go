@@ -38,9 +38,10 @@ func main() {
 	//1.加载配置
 	log.Println("📝 加载配置文件...")
 	configPath := filepath.Join("./configs", "config.yaml")
-	config, err := config.LoadConfig(configPath)
+	// 从 Nacos 配置中心加载业务配置（DataID/Group 需要与你在 Nacos 中保持一致）
+	config, err := config.LoadConfigFromNacos(configPath, "zjmall-dev.yaml", "DEFAULT_GROUP")
 	if err != nil {
-		log.Fatalf("❌ 加载配置失败: %v", err)
+		log.Fatalf("❌ 从 Nacos 加载配置失败: %v", err)
 	}
 	log.Println("✅ 配置文件加载成功")
 	// 加载完配置 cfg 之后：
