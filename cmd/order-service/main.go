@@ -56,8 +56,17 @@ func main() {
 		log.Fatalf("❌ Nacos 初始化失败: %v", err)
 	}
 	registry.RegisterService(nacosClient, serviceName, serviceIP, uint64(svcCfg.GRPC.Port))
-	// 初始化商品服务客户端（基于 Nacos 的按请求负载均衡）
-	productClient := client.NewProductClientWithNacos(nacosClient, "product-service")
+	//初始化客户端
+	productServiceAddr, err := registry.SelectOneHealthyInstance(nacosClient, "product-service")
+	if err != nil || productServiceAddr == "" {
+		log.Fatalf("❌ 从 Nacos 发现商品服务失败: %v", err)
+	}
+	productClient, err := client.NewProductClient(productServiceAddr)
+	if err != nil {
+		log.Fatalf("❌ 商品服务客户端初始化失败: %v", err)
+	}
+	defer productClient.Close()
+	log.Printf("✅ 商品服务客户端连接成功: %s", productServiceAddr)
 
 	inventoryServiceAddr, err := registry.SelectOneHealthyInstance(nacosClient, "inventory-service")
 	if err != nil || inventoryServiceAddr == "" {
