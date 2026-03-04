@@ -92,6 +92,43 @@ services:
     networks:
       - zjmall-network
 
+  # Prometheus 监控
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: zjmall-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Windows/Mac 支持访问宿主机
+    restart: unless-stopped
+    networks:
+      - zjmall-network
+
+  # Grafana 可视化
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zjmall-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - zjmall-network
+    
 volumes:
   mysql_data:
     driver: local
@@ -100,6 +137,10 @@ volumes:
   elasticsearch_data:
     driver: local
   rabbitmq_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:

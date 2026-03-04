@@ -46,6 +46,7 @@ var publicPaths = []string{
 	"/api/v1/users/sms-code",     // 获取短信验证码
 	"/healthz",                   // 健康检查
 	"/swagger/",                  // Swagger 文档
+	"/metrics",                   // Prometheus metrics 端点
 }
 
 // isPublicPath 检查路径是否在白名单中

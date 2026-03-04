@@ -47,6 +47,12 @@ func InitMySQL(config *config.DatabaseConfig) (*gorm.DB, error) {
 
 	fmt.Println("MySQL 数据库连接成功")
 	DB = db
+
+	// 初始化数据库监控
+	if err := InitDatabaseMetrics(db); err != nil {
+		fmt.Printf("警告: 初始化数据库监控失败: %v\n", err)
+	}
+
 	return db, nil
 }
 

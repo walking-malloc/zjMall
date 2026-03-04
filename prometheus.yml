@@ -1,0 +1,144 @@
+# Prometheus 配置文件
+# 用于监控 zjMall 微服务系统
+
+global:
+  scrape_interval: 15s      # 每15秒抓取一次指标
+  evaluation_interval: 15s  # 每15秒评估一次告警规则
+  external_labels:
+    cluster: 'zjmall-dev'
+    environment: 'development'
+
+# 告警规则文件（可选，取消注释以启用）
+# rule_files:
+#   - "alerts.yml"
+
+# 抓取配置
+scrape_configs:
+  # Prometheus 自身指标
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # ============================================
+  # 微服务监控
+  # ============================================
+  
+  # 用户服务
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['host.docker.internal:8082']  # Windows/Mac 使用 host.docker.internal
+        # - targets: ['172.17.0.1:8082']        # Linux 使用宿主机IP
+        labels:
+          service: 'user-service'
+          environment: 'dev'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # 商品服务
+  - job_name: 'product-service'
+    static_configs:
+      - targets: ['host.docker.internal:8083']
+        labels:
+          service: 'product-service'
+          environment: 'dev'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # 购物车服务
+  - job_name: 'cart-service'
+    static_configs:
+      - targets: ['host.docker.internal:8084']
+        labels:
+          service: 'cart-service'
+          environment: 'dev'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # 库存服务
+  - job_name: 'inventory-service'
+    static_configs:
+      - targets: ['host.docker.internal:8085']
+        labels:
+          service: 'inventory-service'
+          environment: 'dev'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # 订单服务
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['host.docker.internal:8086']
+        labels:
+          service: 'order-service'
+          environment: 'dev'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # 支付服务
+  - job_name: 'payment-service'
+    static_configs:
+      - targets: ['host.docker.internal:8087']
+        labels:
+          service: 'payment-service'
+          environment: 'dev'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # ============================================
+  # 基础设施监控（可选，需要安装对应的 Exporter）
+  # ============================================
+
+  # MySQL Exporter（需要先安装 mysqld_exporter）
+  # 安装方法：docker run -d --name mysqld_exporter \
+  #   -e DATA_SOURCE_NAME="root:root123456@(host.docker.internal:3307)/" \
+  #   prom/mysqld-exporter
+  # - job_name: 'mysql'
+  #   static_configs:
+  #     - targets: ['mysqld_exporter:9104']
+  #       labels:
+  #         service: 'mysql'
+  #         instance: 'zjmall-mysql'
+
+  # Redis Exporter（需要先安装 redis_exporter）
+  # 安装方法：docker run -d --name redis_exporter \
+  #   -e REDIS_ADDR=host.docker.internal:6380 \
+  #   -e REDIS_PASSWORD=redis123 \
+  #   oliver006/redis_exporter
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis_exporter:9121']
+  #       labels:
+  #         service: 'redis'
+  #         instance: 'zjmall-redis'
+
+  # RabbitMQ Exporter（RabbitMQ 自带 Prometheus 插件）
+  # 需要先启用 RabbitMQ Prometheus 插件：
+  # docker exec zjmall-rabbitmq rabbitmq-plugins enable rabbitmq_prometheus
+  # - job_name: 'rabbitmq'
+  #   static_configs:
+  #     - targets: ['rabbitmq:15692']  # RabbitMQ Prometheus 端口
+  #       labels:
+  #         service: 'rabbitmq'
+  #         instance: 'zjmall-rabbitmq'
+
+  # Nacos 监控（Nacos 2.x 自带 Prometheus 端点）
+  # - job_name: 'nacos'
+  #   static_configs:
+  #     - targets: ['nacos:8848']
+  #       labels:
+  #         service: 'nacos'
+  #         instance: 'zjmall-nacos'
+  #   metrics_path: '/nacos/actuator/prometheus'
+
+  # Elasticsearch Exporter（需要先安装 elasticsearch_exporter）
+  # 安装方法：docker run -d --name elasticsearch_exporter \
+  #   -e ES_URI=http://elasticsearch:9200 \
+  #   justwatch/elasticsearch_exporter
+  # - job_name: 'elasticsearch'
+  #   static_configs:
+  #     - targets: ['elasticsearch_exporter:9114']
+  #       labels:
+  #         service: 'elasticsearch'
+  #         instance: 'zjmall-elasticsearch'

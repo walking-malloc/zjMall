@@ -122,8 +122,9 @@ func main() {
 		middleware.Recovery(),                           // 2. 捕获 panic
 		middleware.Logging(),                            // 3. 记录日志
 		middleware.TraceID(),                            // 4. 生成 TraceID
-		middleware.Auth(),                               // 5. 认证（购物车需要登录）
-		middleware.CasbinRBAC(),                         // 6. RBAC 权限控制
+		middleware.PrometheusMetrics(),                  // 5. Prometheus 指标收集
+		middleware.Auth(),                               // 6. 认证（购物车需要登录）
+		middleware.CasbinRBAC(),                         // 7. RBAC 权限控制
 	)
 
 	// 17. 启动服务器（阻塞）

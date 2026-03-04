@@ -238,6 +238,7 @@ func main() {
 		middleware.Recovery(),
 		middleware.Logging(),
 		middleware.TraceID(),
+		middleware.PrometheusMetrics(), // Prometheus 指标收集
 		middleware.Auth(),
 		middleware.CasbinRBAC(),
 	)

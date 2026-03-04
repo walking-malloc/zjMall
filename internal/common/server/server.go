@@ -14,6 +14,7 @@ import (
 	"zjMall/internal/common/middleware"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -67,6 +68,9 @@ func NewServer(cfg *Config) *Server {
 		ctx:        ctx,
 		cancel:     cancel,
 	}
+
+	// 注册 Prometheus metrics 端点
+	s.httpMux.Handle("/metrics", promhttp.Handler())
 
 	// 将 gRPC-Gateway mux 注册到主 HTTP mux
 	s.httpMux.Handle("/", s.gwMux)

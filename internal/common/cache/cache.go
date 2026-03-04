@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"zjMall/internal/common/metrics"
+
 	"github.com/go-redis/redis/v8"
 )
 
@@ -39,16 +41,55 @@ func NewCacheRepository(client *redis.Client) CacheRepository {
 
 // string类型
 func (r *RedisCacheRepository) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
-	return r.client.Set(ctx, key, value, expiration).Err()
+	start := time.Now()
+	err := r.client.Set(ctx, key, value, expiration).Err()
+	duration := time.Since(start).Seconds()
+
+	metrics.RedisOperationDuration.WithLabelValues("set").Observe(duration)
+	if err != nil {
+		metrics.RedisOperationsTotal.WithLabelValues("set", "error").Inc()
+	} else {
+		metrics.RedisOperationsTotal.WithLabelValues("set", "success").Inc()
+	}
+	return err
 }
 
 func (r *RedisCacheRepository) Get(ctx context.Context, key string) (string, error) {
-	return r.client.Get(ctx, key).Result()
+	start := time.Now()
+	result, err := r.client.Get(ctx, key).Result()
+	duration := time.Since(start).Seconds()
+
+	metrics.RedisOperationDuration.WithLabelValues("get").Observe(duration)
+	if err != nil {
+		if err == redis.Nil {
+			// 缓存未命中
+			metrics.RedisCacheMisses.Inc()
+			metrics.RedisOperationsTotal.WithLabelValues("get", "miss").Inc()
+		} else {
+			// 错误
+			metrics.RedisOperationsTotal.WithLabelValues("get", "error").Inc()
+		}
+	} else {
+		// 缓存命中
+		metrics.RedisCacheHits.Inc()
+		metrics.RedisOperationsTotal.WithLabelValues("get", "success").Inc()
+	}
+	return result, err
 }
 
 // Delete 删除缓存
 func (r *RedisCacheRepository) Delete(ctx context.Context, key string) error {
-	return r.client.Del(ctx, key).Err()
+	start := time.Now()
+	err := r.client.Del(ctx, key).Err()
+	duration := time.Since(start).Seconds()
+
+	metrics.RedisOperationDuration.WithLabelValues("del").Observe(duration)
+	if err != nil {
+		metrics.RedisOperationsTotal.WithLabelValues("del", "error").Inc()
+	} else {
+		metrics.RedisOperationsTotal.WithLabelValues("del", "success").Inc()
+	}
+	return err
 }
 
 // Exists 检查 key 是否存在
@@ -73,7 +114,23 @@ func (r *RedisCacheRepository) SetInt(ctx context.Context, key string, value int
 }
 
 func (r *RedisCacheRepository) GetInt(ctx context.Context, key string) (int64, error) {
-	return r.client.Get(ctx, key).Int64()
+	start := time.Now()
+	result, err := r.client.Get(ctx, key).Int64()
+	duration := time.Since(start).Seconds()
+
+	metrics.RedisOperationDuration.WithLabelValues("get").Observe(duration)
+	if err != nil {
+		if err == redis.Nil {
+			metrics.RedisCacheMisses.Inc()
+			metrics.RedisOperationsTotal.WithLabelValues("get", "miss").Inc()
+		} else {
+			metrics.RedisOperationsTotal.WithLabelValues("get", "error").Inc()
+		}
+	} else {
+		metrics.RedisCacheHits.Inc()
+		metrics.RedisOperationsTotal.WithLabelValues("get", "success").Inc()
+	}
+	return result, err
 }
 
 func (r *RedisCacheRepository) Incr(ctx context.Context, key string) error {
