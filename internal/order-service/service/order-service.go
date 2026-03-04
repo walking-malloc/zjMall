@@ -68,7 +68,7 @@ func NewOrderService(orderRepo repository.OrderRepository, productClient client.
 }
 
 // 防止重复生成订单，前端提交token，后端消费并删除，然后获取分布式锁
-func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrderRequest) (*orderv1.CreateOrderResponse, error) {
+func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrderRequest) (response *orderv1.CreateOrderResponse, err error) {
 	userID := middleware.GetUserIDFromContext(ctx)
 	if userID == "" {
 		return &orderv1.CreateOrderResponse{
@@ -90,11 +90,18 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 			Message: "Token不能为空",
 		}, nil
 	}
-	if ok, err := s.redisClient.Get(ctx, fmt.Sprintf("%s:%s:%s", OrderIdempotentCacheKeyPrefix, userID, req.Token)).Result(); err != nil || ok != "1" {
+	idempotentKey := fmt.Sprintf("%s:%s:%s", OrderIdempotentCacheKeyPrefix, userID, req.Token)
+	if ok, err := s.redisClient.Get(ctx, idempotentKey).Result(); err != nil || ok != "1" {
 		if ok == "processed" {
 			return &orderv1.CreateOrderResponse{
 				Code:    1,
 				Message: "订单已经创建，请勿重复创建",
+			}, nil
+		}
+		if ok == "processing" {
+			return &orderv1.CreateOrderResponse{
+				Code:    1,
+				Message: "订单正在处理，请稍后重试",
 			}, nil
 		}
 		if err != nil {
@@ -123,12 +130,39 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 		}, nil
 	}
 	defer func() {
-		if err := lockService.ReleaseLock(ctx, lockKey); err != nil {
-			log.Printf("⚠️ [OrderService] CreateOrder: 释放锁失败: %v", err)
+		// 处理Token状态：根据最终结果决定是恢复还是标记为已处理
+		// 注意：response 和 err 都是命名返回值，defer 中可以访问
+		if response != nil && response.Code != 0 {
+			log.Printf("❌ [OrderService] CreateOrder: 订单创建失败，删除Token: %s", idempotentKey)
+			s.redisClient.Del(ctx, idempotentKey)
+		} else if response != nil && response.Code == 0 {
+			// 成功 → 标记为已处理（防止重复提交）
+			// 使用Lua脚本原子性地将 processing 标记为 processed
+			luaScript := `
+				local tokenKey = KEYS[1]
+				local value = redis.call('GET', tokenKey)
+				if value == 'processing' then
+					redis.call('SET', tokenKey, 'processed')
+					redis.call('EXPIRE', tokenKey, 604800)
+					return 1
+				else
+					return 0
+				end
+			`
+			if result, markErr := s.redisClient.Eval(ctx, luaScript, []string{idempotentKey}).Int64(); markErr != nil {
+				log.Printf("❌ [OrderService] CreateOrder: 标记Token失败: %v", markErr)
+			} else if result == 1 {
+				log.Printf("✅ [OrderService] CreateOrder: Token已标记为已处理: %s", idempotentKey)
+			}
+
+		}
+		// 释放分布式锁
+		if releaseErr := lockService.ReleaseLock(ctx, lockKey); releaseErr != nil {
+			log.Printf("⚠️ [OrderService] CreateOrder: 释放锁失败: %v", releaseErr)
 		}
 	}()
 
-	// 检查并消费Token
+	// 检查并消费Token（标记为 processing）
 	tokenValid, err := s.checkAndConsumeToken(ctx, userID, req.Token)
 	if err != nil {
 		log.Printf("❌ [OrderService] CreateOrder: 检查Token失败: %v", err)
@@ -792,7 +826,7 @@ func (s *OrderService) checkAndConsumeToken(ctx context.Context, userID, token s
         local tokenKey = KEYS[1]
         local value = redis.call('GET', tokenKey)
         if value == '1' then
-            redis.call('SET', tokenKey, 'processed')
+            redis.call('SET', tokenKey, 'processing')
 			redis.call('EXPIRE', tokenKey, 300)
             return 1
         else
